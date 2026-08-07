@@ -38,6 +38,10 @@ fi
 CMDFILE="$(mktemp)"
 trap 'rm -f "$CMDFILE"' EXIT
 cat > "$CMDFILE" <<EOF
+device R7S721020
+if SWD
+speed 4000
+connect
 loadfile $ELF
 r
 g
@@ -45,13 +49,7 @@ exit
 EOF
 
 echo "==> Flashing: $ELF"
-# -device R7S721020: specify target device
-# -if SWD         : target interface
-# -speed 4000     : clock speed (kHz)
-# -autoconnect 1  : connect to probe and target automatically
-# -exitonerror 1  : abort on any error
-# < /dev/null     : essential on Linux to prevent stdin pollution from interrupting autoconnect
-JLinkExe -device R7S721020 -if SWD -speed 4000 -autoconnect 1 -exitonerror 1 -CommandFile "$CMDFILE" < /dev/null
+JLinkExe -autoconnect 1 -exitonerror 1 -CommandFile "$CMDFILE" < /dev/null
 
 echo "==> Done. Deluge should now be running the new firmware."
 

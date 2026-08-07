@@ -1,0 +1,8 @@
+connect
+device R7S721020
+if SWD
+speed 4000
+loadfile build/Release/deluge.elf
+r
+g
+exit
