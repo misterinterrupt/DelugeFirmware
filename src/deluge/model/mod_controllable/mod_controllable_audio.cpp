@@ -1587,6 +1587,10 @@ char const* ModControllableAudio::getLPFModeDisplayName() {
 
 	using enum deluge::l10n::String;
 	switch (lpfMode) {
+	case FilterMode::TRANSISTOR_12DB_LEGACY:
+		return l10n::get(STRING_FOR_12DB_LADDER_LEGACY);
+	case FilterMode::TRANSISTOR_24DB_LEGACY:
+		return l10n::get(STRING_FOR_24DB_LADDER_LEGACY);
 	case FilterMode::TRANSISTOR_12DB:
 		return l10n::get(STRING_FOR_12DB_LADDER);
 	case FilterMode::TRANSISTOR_24DB:
@@ -1623,6 +1627,8 @@ char const* ModControllableAudio::getHPFModeDisplayName() {
 	switch (hpfMode) {
 	case FilterMode::HPLADDER:
 		return l10n::get(STRING_FOR_HPLADDER);
+	case FilterMode::HPLADDER_LEGACY:
+		return l10n::get(STRING_FOR_HP_LADDER_LEGACY);
 	case FilterMode::SVF_BAND:
 		return l10n::get(STRING_FOR_SVF_BAND);
 	case FilterMode::SVF_NOTCH:
