@@ -43,7 +43,6 @@ if SWD
 speed 4000
 connect
 loadfile $ELF
-r
 g
 exit
 EOF
