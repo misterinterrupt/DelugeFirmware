@@ -15,3 +15,33 @@ The hardware is built around a Renesas RZ/A1L processor with an Arm® Cortex®-A
 * To learn about the toolchain, application, and to start working on the code continue with: [Getting Started with Deluge Development](docs/dev/getting_started.md)
 * Please also visit the [Synthstrom Forum](https://forums.synthstrom.com/) and the community [Discord](https://discord.gg/BnRcyFSgaT) to interact with other users and the developers
 * You can donate to the project using the [Synthstrom Patreon](https://www.patreon.com/Synthstrom)
+
+## J-Link RAM Flashing & Debugging (Linux)
+
+### 1. Direct Command Line Flashing (Non-persistent RAM load)
+To load and execute `deluge.elf` directly on the target (Renesas RZ/A1L) using `JLinkExe` over SWD:
+
+Create a command script (e.g. `scripts/.flash_cmd.jlink`):
+```text
+loadfile build/Release/deluge.elf
+r
+g
+exit
+```
+
+Then run `JLinkExe`:
+```bash
+JLinkExe -nogui 1 -device R7S721020 -if SWD -speed 4000 -autoconnect 1 \
+  -exitonerror 1 -CommandFile scripts/.flash_cmd.jlink < /dev/null
+```
+> **Important:** Redirecting standard input (`< /dev/null`) is essential on Linux. Piping stdin into `JLinkExe` disrupts the `-autoconnect 1` sequence and causes connection failures.
+
+### 2. GDB Debugging & Binary Naming Note (`dbt debug -j`)
+When using `dbt debug -j` on Linux with standard SEGGER installs, `dbt` expects `JLinkGDBServerCL` (or `JLinkGDBServerCLExe`). On some Linux systems (such as SEGGER's standard Linux package install), the command is installed as `JLinkGDBServerCLExe`. 
+
+Ensure `JLinkGDBServerCLExe` (or a symlink to it) is in your `PATH`, or pass the executable explicitly using the `-c` flag:
+```bash
+./dbt debug -j -c JLinkGDBServerCLExe
+```
+Then connect GDB via `./dbt gdb` or standard `arm-none-eabi-gdb`.
+

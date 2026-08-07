@@ -34,14 +34,10 @@ if ! command -v JLinkExe >/dev/null 2>&1; then
     exit 1
 fi
 
-# Headless J-Link command file: load all ELF segments, reset, run.
+# Headless J-Link command file: load ELF, reset, run.
 CMDFILE="$(mktemp)"
 trap 'rm -f "$CMDFILE"' EXIT
 cat > "$CMDFILE" <<EOF
-connect
-device R7S721020
-if SWD
-speed 4000
 loadfile $ELF
 r
 g
@@ -50,8 +46,13 @@ EOF
 
 echo "==> Flashing: $ELF"
 # -nogui 1        : no GUI popups / dialogs (unattended-safe)
-# -autoconnect 1  : connect to the probe immediately
-# -exitonerror 1  : abort on any error instead of hanging
-JLinkExe -nogui 1 -autoconnect 1 -exitonerror 1 -CommandFile "$CMDFILE"
+# -device R7S721020: specify target device
+# -if SWD         : target interface
+# -speed 4000     : clock speed (kHz)
+# -autoconnect 1  : connect to probe and target automatically
+# -exitonerror 1  : abort on any error
+# < /dev/null     : essential on Linux to prevent stdin pollution from interrupting autoconnect
+JLinkExe -nogui 1 -device R7S721020 -if SWD -speed 4000 -autoconnect 1 -exitonerror 1 -CommandFile "$CMDFILE" < /dev/null
 
 echo "==> Done. Deluge should now be running the new firmware."
+
