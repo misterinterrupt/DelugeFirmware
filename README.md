@@ -31,10 +31,10 @@ exit
 
 Then run `JLinkExe`:
 ```bash
-JLinkExe -nogui 1 -device R7S721020 -if SWD -speed 4000 -autoconnect 1 \
+JLinkExe -device R7S721020 -if SWD -speed 4000 -autoconnect 1 \
   -exitonerror 1 -CommandFile scripts/.flash_cmd.jlink < /dev/null
 ```
-> **Important:** Redirecting standard input (`< /dev/null`) is essential on Linux. Piping stdin into `JLinkExe` disrupts the `-autoconnect 1` sequence and causes connection failures.
+> **Important:** Redirecting standard input (`< /dev/null`) is essential on Linux host systems. Without redirecting stdin, interactive terminal prompts disrupt the `-autoconnect 1` sequence.
 
 ### 2. GDB Debugging & Binary Naming Note (`dbt debug -j`)
 When using `dbt debug -j` on Linux with standard SEGGER installs, `dbt` expects `JLinkGDBServerCL` (or `JLinkGDBServerCLExe`). On some Linux systems (such as SEGGER's standard Linux package install), the command is installed as `JLinkGDBServerCLExe`. 
