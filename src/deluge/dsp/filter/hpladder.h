@@ -48,6 +48,7 @@ private:
 		}
 	};
 	[[gnu::always_inline]] inline q31_t doHPF(q31_t input, HPLadderState& state);
+	[[gnu::always_inline]] inline q31_t doHPFLegacy(q31_t input, HPLadderState& state);
 
 	bool hpfDoingAntialiasingNow;
 	int32_t hpfDivideByTotalMoveabilityLastTime;
@@ -66,6 +67,7 @@ private:
 	q31_t alteredHpfMomentumMultiplier;
 	q31_t thisHpfResonance;
 	q31_t morph_;
+	bool legacyMode = false; // true = pre-community HPF behavior (no morph FM)
 	HPLadderState l;
 	HPLadderState r;
 };

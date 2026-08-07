@@ -30,6 +30,7 @@ enum class FilterMode {
 	TRANSISTOR_24DB_DRIVE, // filter logic relies on ladders being first and contiguous
 	SVF_BAND,              // first HPF mode
 	SVF_NOTCH,             // last LPF mode
+	HPLADDER_LEGACY,       // old pre-community HP ladder behavior (no morph FM)
 	HPLADDER,
 	OFF, // Keep last as a sentinel. Signifies that the filter is not on, used for filter reset logic
 };
@@ -63,8 +64,8 @@ enum LpLadderType { LP12_LEGACY, LP24_LEGACY, LP12, LP24, DRIVE };
 constexpr uint8_t kNumLadders = 5;
 enum SVFType { BAND, NOTCH };
 constexpr uint8_t kNumSVF = 2;
-enum HPFType { HP12 };
-constexpr uint8_t kNumHPLadders = 1;
+enum HPFType { HP12, HP12_LEGACY };
+constexpr uint8_t kNumHPLadders = 2;
 
 using specificFilterType = uint8_t;
 // must match order of filter family declaration for indexing to work
@@ -84,6 +85,10 @@ public:
 		case FilterMode::HPLADDER:
 			family = FilterFamily::HP_LADDER;
 			type = HPFType::HP12;
+			break;
+		case FilterMode::HPLADDER_LEGACY:
+			family = FilterFamily::HP_LADDER;
+			type = HPFType::HP12_LEGACY;
 			break;
 		case FilterMode::SVF_BAND:
 			family = FilterFamily::SVF;

@@ -187,6 +187,7 @@ PLACE_SDRAM_DATA Language english{
         {STRING_FOR_12DB_LADDER_LEGACY, "12dB Legacy"},
         {STRING_FOR_24DB_LADDER_LEGACY, "24dB Legacy"},
         {STRING_FOR_24DB_LADDER, "24dB Ladder"},
+        {STRING_FOR_HP_LADDER_LEGACY, "HP Legacy"},
         {STRING_FOR_FAST, "Fast"},
         {STRING_FOR_SLOW, "Slow"},
         {STRING_FOR_V_TRIGGER, "V-trig"},

@@ -27,6 +27,9 @@ q31_t tempRenderBuffer[SSI_TX_BUFFER_NUM_SAMPLES * 2]; // * 2 to accomodate ster
 		if (hpfMode_ == FilterMode::HPLADDER) {
 			hpfilter.ladder.filterMono(startSample, endSample, sampleIncrement);
 		}
+		else if (hpfMode_ == FilterMode::HPLADDER_LEGACY) {
+			hpfilter.ladder.filterMono(startSample, endSample, sampleIncrement);
+		}
 		else if ((hpfMode_ == FilterMode::SVF_BAND) || (hpfMode_ == FilterMode::SVF_NOTCH)) {
 			hpfilter.svf.filterMono(startSample, endSample, sampleIncrement);
 		}
@@ -35,6 +38,9 @@ q31_t tempRenderBuffer[SSI_TX_BUFFER_NUM_SAMPLES * 2]; // * 2 to accomodate ster
 [[gnu::hot]] void FilterSet::renderHPFLongStereo(q31_t* startSample, q31_t* endSample) {
 	if (HPFOn) {
 		if (hpfMode_ == FilterMode::HPLADDER) {
+			hpfilter.ladder.filterStereo(startSample, endSample);
+		}
+		else if (hpfMode_ == FilterMode::HPLADDER_LEGACY) {
 			hpfilter.ladder.filterStereo(startSample, endSample);
 		}
 		else if ((hpfMode_ == FilterMode::SVF_BAND) || (hpfMode_ == FilterMode::SVF_NOTCH)) {

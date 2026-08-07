@@ -1,15 +1,13 @@
 /*
  * Copyright © 2015-2023 Synthstrom Audible Limited
  *
- * This file is part of The Synthstrom Audible Deluge Firmware.
- *
  * The Synthstrom Audible Deluge Firmware is free software: you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software Foundation,
  * either version 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+ * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along with this program.
  * If not, see <https://www.gnu.org/licenses/>.
@@ -22,6 +20,7 @@ q31_t HpLadderFilter::setConfig(q31_t hpfFrequency, q31_t hpfResonance, FilterMo
                                 q31_t filterGain) {
 	int32_t extraFeedback = 1200000000;
 	morph_ = lpfMorph;
+	legacyMode = (lpfMode == FilterMode::HPLADDER_LEGACY);
 	curveFrequency(hpfFrequency);
 
 	int32_t resonanceUpperLimit = 536870911;
@@ -69,7 +68,7 @@ q31_t HpLadderFilter::setConfig(q31_t hpfFrequency, q31_t hpfResonance, FilterMo
 [[gnu::hot]] void HpLadderFilter::doFilter(q31_t* startSample, q31_t* endSample, int32_t sampleIncrement) {
 	q31_t* currentSample = startSample;
 	do {
-		*currentSample = doHPF(*currentSample, l);
+		*currentSample = legacyMode ? doHPFLegacy(*currentSample, l) : doHPF(*currentSample, l);
 		currentSample += sampleIncrement;
 	} while (currentSample < endSample);
 }
@@ -77,9 +76,9 @@ q31_t HpLadderFilter::setConfig(q31_t hpfFrequency, q31_t hpfResonance, FilterMo
 [[gnu::hot]] void HpLadderFilter::doFilterStereo(q31_t* startSample, q31_t* endSample) {
 	q31_t* currentSample = startSample;
 	do {
-		*currentSample = doHPF(*currentSample, l);
+		*currentSample = legacyMode ? doHPFLegacy(*currentSample, l) : doHPF(*currentSample, l);
 		currentSample += 1;
-		*currentSample = doHPF(*currentSample, r);
+		*currentSample = legacyMode ? doHPFLegacy(*currentSample, r) : doHPF(*currentSample, r);
 		currentSample += 1;
 	} while (currentSample < endSample);
 }
@@ -108,6 +107,35 @@ q31_t HpLadderFilter::setConfig(q31_t hpfFrequency, q31_t hpfResonance, FilterMo
 	}
 
 	state.hpfLPF1.doFilter(a - state.hpfHPF3.doFilter(a, temp_fc), temp_fc);
+
+	// Normalization
+	a = multiply_32x32_rshift32_rounded(a, hpfDivideByProcessedResonance) << (8 - 1);
+
+	return a;
+}
+
+// Legacy HPF - uses fc directly (no morph-based FM modulation) and the original
+// antialiased saturation level of 2. This is the pre-community-firmware behavior.
+[[gnu::always_inline]] inline q31_t HpLadderFilter::doHPFLegacy(q31_t input, HPLadderState& state) {
+	q31_t firstHPFOutput = input - state.hpfHPF1.doFilter(input, fc);
+
+	q31_t feedbacksValue =
+	    state.hpfHPF3.getFeedbackOutput(hpfHPF3Feedback) + state.hpfLPF1.getFeedbackOutput(hpfLPF1Feedback);
+
+	q31_t a = multiply_32x32_rshift32_rounded(divideByTotalMoveability, firstHPFOutput + feedbacksValue) << (4 + 1);
+
+	// Only saturate / anti-alias if lots of resonance
+	if (hpfProcessedResonance > 900000000) { // 890551738
+		a = getTanHAntialiased(a, &state.hpfLastWorkingValue, 2);
+	}
+	else {
+		state.hpfLastWorkingValue = (uint32_t)lshiftAndSaturate<2>(a) + 2147483648u;
+		if (hpfProcessedResonance > 750000000) { // 400551738
+			a = getTanHUnknown(a, 2);
+		}
+	}
+
+	state.hpfLPF1.doFilter(a - state.hpfHPF3.doFilter(a, fc), fc);
 
 	// Normalization
 	a = multiply_32x32_rshift32_rounded(a, hpfDivideByProcessedResonance) << (8 - 1);
