@@ -56,7 +56,12 @@ public:
 
 		Sound* sound = static_cast<Sound*>(modControllable);
 
-		return soundEditor.checkPermissionToBeginSessionForRangeSpecificParam(sound, whichThing, currentRange);
+		// Always default to the first range (C3) instead of forcing the user through the
+		// multi-sample zone picker before recording.
+		Source* source = &sound->sources[whichThing];
+		::MultiRange* firstRange = source->getOrCreateFirstRange();
+		*currentRange = firstRange;
+		return MenuPermission::YES;
 	}
 };
 } // namespace deluge::gui::menu_item::osc
