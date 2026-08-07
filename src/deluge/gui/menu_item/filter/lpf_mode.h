@@ -46,6 +46,7 @@ public:
 	deluge::vector<std::string_view> getOptions() override {
 		using enum l10n::String;
 		return {
+		    l10n::getView(STRING_FOR_12DB_LADDER_LEGACY), l10n::getView(STRING_FOR_24DB_LADDER_LEGACY),
 		    l10n::getView(STRING_FOR_12DB_LADDER), l10n::getView(STRING_FOR_24DB_LADDER),
 		    l10n::getView(STRING_FOR_DRIVE),       l10n::getView(STRING_FOR_SVF_BAND),
 		    l10n::getView(STRING_FOR_SVF_NOTCH),   l10n::getView(STRING_FOR_NONE),

@@ -68,8 +68,18 @@ private:
 
 		return temp;
 	}
+	// Legacy clean input scaling (pre-community-firmware behavior).
+	// No forced tanh saturation, always the full << 2 gain path.
+	[[gnu::always_inline]] inline q31_t scaleInputLegacy(q31_t input, q31_t feedbacksSum) {
+		return multiply_32x32_rshift32_rounded(
+		           (input - (multiply_32x32_rshift32_rounded(feedbacksSum, processedResonance) << 3)),
+		           divideByTotalMoveabilityAndProcessedResonance)
+		       << 2;
+	}
 	[[gnu::always_inline]] inline q31_t do24dBLPFOnSample(q31_t input, LpLadderState& state);
 	[[gnu::always_inline]] inline q31_t do12dBLPFOnSample(q31_t input, LpLadderState& state);
+	[[gnu::always_inline]] inline q31_t do24dBLPFLegacyOnSample(q31_t input, LpLadderState& state);
+	[[gnu::always_inline]] inline q31_t do12dBLPFLegacyOnSample(q31_t input, LpLadderState& state);
 	[[gnu::always_inline]] inline q31_t doDriveLPFOnSample(q31_t input, LpLadderState& state);
 	// all ladders are in this class to share the basic components
 	// this differentiates between them

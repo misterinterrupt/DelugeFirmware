@@ -1,15 +1,13 @@
 /*
  * Copyright © 2015-2023 Synthstrom Audible Limited
  *
- * This file is part of The Synthstrom Audible Deluge Firmware.
- *
  * The Synthstrom Audible Deluge Firmware is free software: you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software Foundation,
  * either version 3 of the License, or (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+ * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * for more details.
  *
  * You should have received a copy of the GNU General Public License along with this program.
  * If not, see <https://www.gnu.org/licenses/>.
@@ -92,8 +90,9 @@ q31_t LpLadderFilter::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMo
 		}
 	}
 
-	// Cold transistor ladder
-	if ((lpfMode == FilterMode::TRANSISTOR_24DB) || (lpfMode == FilterMode::TRANSISTOR_12DB)) {
+	// Cold transistor ladder (current + legacy modes share the same config math)
+	if (lpfMode == FilterMode::TRANSISTOR_24DB || lpfMode == FilterMode::TRANSISTOR_12DB
+	    || lpfMode == FilterMode::TRANSISTOR_24DB_LEGACY || lpfMode == FilterMode::TRANSISTOR_12DB_LEGACY) {
 		// Some long-winded stuff to make it so if frequency goes really low, resonance goes down. This is tuned a bit,
 		// but isn't perfect
 
@@ -115,7 +114,7 @@ q31_t LpLadderFilter::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMo
 	moveability = std::max(fc, (q31_t)4317840);
 	// min moveability is 4317840
 	//  Half ladder
-	if (lpfMode == FilterMode::TRANSISTOR_12DB) {
+	if (lpfMode == FilterMode::TRANSISTOR_12DB || lpfMode == FilterMode::TRANSISTOR_12DB_LEGACY) {
 		// Between -2 and 0. 1 represented as 1073741824
 		int32_t moveabilityNegative = moveability - 1073741824;
 		lpf2Feedback = multiply_32x32_rshift32_rounded(moveabilityNegative, divideBy1PlusTannedFrequency) << 1;
@@ -173,8 +172,26 @@ q31_t LpLadderFilter::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMo
 
 [[gnu::hot]] void LpLadderFilter::doFilter(q31_t* startSample, q31_t* endSample, int32_t sampleIncrement) {
 
+	// Half ladder (legacy)
+	if (lpfMode == FilterMode::TRANSISTOR_12DB_LEGACY) {
+		q31_t* currentSample = startSample;
+		do {
+			*currentSample = do12dBLPFLegacyOnSample(*currentSample, l);
+			currentSample += sampleIncrement;
+		} while (currentSample < endSample);
+	}
+
+	// Full ladder (legacy)
+	else if (lpfMode == FilterMode::TRANSISTOR_24DB_LEGACY) {
+		q31_t* currentSample = startSample;
+		do {
+			*currentSample = do24dBLPFLegacyOnSample(*currentSample, l);
+			currentSample += sampleIncrement;
+		} while (currentSample < endSample);
+	}
+
 	// Half ladder
-	if (lpfMode == FilterMode::TRANSISTOR_12DB) {
+	else if (lpfMode == FilterMode::TRANSISTOR_12DB) {
 
 		q31_t* currentSample = startSample;
 		do {
@@ -241,8 +258,30 @@ q31_t LpLadderFilter::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMo
 }
 [[gnu::hot]] void LpLadderFilter::doFilterStereo(q31_t* startSample, q31_t* endSample) {
 
+	// Half ladder (legacy)
+	if (lpfMode == FilterMode::TRANSISTOR_12DB_LEGACY) {
+		q31_t* currentSample = startSample;
+		do {
+			*currentSample = do12dBLPFLegacyOnSample(*currentSample, l);
+			currentSample += 1;
+			*currentSample = do12dBLPFLegacyOnSample(*currentSample, r);
+			currentSample += 1;
+		} while (currentSample < endSample);
+	}
+
+	// Full ladder (legacy)
+	else if (lpfMode == FilterMode::TRANSISTOR_24DB_LEGACY) {
+		q31_t* currentSample = startSample;
+		do {
+			*currentSample = do24dBLPFLegacyOnSample(*currentSample, l);
+			currentSample += 1;
+			*currentSample = do24dBLPFLegacyOnSample(*currentSample, r);
+			currentSample += 1;
+		} while (currentSample < endSample);
+	}
+
 	// Half ladder
-	if (lpfMode == FilterMode::TRANSISTOR_12DB) {
+	else if (lpfMode == FilterMode::TRANSISTOR_12DB) {
 
 		q31_t* currentSample = startSample;
 		do {
@@ -368,6 +407,41 @@ q31_t LpLadderFilter::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMo
 	// if (processedResonance > 900000000) {
 	// 	x = getTanHUnknown(x, 1);
 	// }
+
+	return state.lpfLPF4.doFilter(
+	           state.lpfLPF3.doFilter(state.lpfLPF2.doFilter(state.lpfLPF1.doFilter(x, noisy_m), noisy_m), noisy_m),
+	           noisy_m)
+	       << 1;
+}
+
+// Legacy 12dB filter - clean input scaling, no forced tanh saturation (pre-community-firmware behavior)
+[[gnu::always_inline]] inline q31_t LpLadderFilter::do12dBLPFLegacyOnSample(q31_t input, LpLadderState& state) {
+	q31_t noise = getNoise() >> 2;
+	q31_t distanceToGo = noise - state.noiseLastValue;
+	state.noiseLastValue += distanceToGo >> 7;
+	q31_t noisy_m = moveability + multiply_32x32_rshift32(moveability, state.noiseLastValue);
+
+	q31_t feedbacksSum = state.lpfLPF1.getFeedbackOutput(lpf1Feedback) + state.lpfLPF2.getFeedbackOutput(lpf2Feedback)
+	                     + state.lpfLPF3.getFeedbackOutput(divideBy1PlusTannedFrequency);
+	q31_t x = scaleInputLegacy(input, feedbacksSum);
+
+	return state.lpfLPF3.doAPF(state.lpfLPF2.doFilter(state.lpfLPF1.doFilter(x, noisy_m), noisy_m), noisy_m) << 1;
+}
+
+// Legacy 24dB filter - clean input scaling, no forced tanh saturation (pre-community-firmware behavior)
+[[gnu::always_inline]] inline q31_t LpLadderFilter::do24dBLPFLegacyOnSample(q31_t input, LpLadderState& state) {
+	q31_t noise = getNoise() >> 2;
+	q31_t distanceToGo = noise - state.noiseLastValue;
+	state.noiseLastValue += distanceToGo >> 7;
+	q31_t noisy_m = moveability + multiply_32x32_rshift32(moveability, state.noiseLastValue);
+
+	q31_t feedbacksSum = (state.lpfLPF1.getFeedbackOutputWithoutLshift(lpf1Feedback)
+	                      + state.lpfLPF2.getFeedbackOutputWithoutLshift(lpf2Feedback)
+	                      + state.lpfLPF3.getFeedbackOutputWithoutLshift(lpf3Feedback)
+	                      + state.lpfLPF4.getFeedbackOutputWithoutLshift(divideBy1PlusTannedFrequency))
+	                     << 2;
+
+	q31_t x = scaleInputLegacy(input, feedbacksSum);
 
 	return state.lpfLPF4.doFilter(
 	           state.lpfLPF3.doFilter(state.lpfLPF2.doFilter(state.lpfLPF1.doFilter(x, noisy_m), noisy_m), noisy_m),

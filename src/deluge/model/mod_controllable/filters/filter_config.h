@@ -23,6 +23,8 @@
 
 // non namespaced
 enum class FilterMode {
+	TRANSISTOR_12DB_LEGACY, // old pre-community LP12 behavior (clean gain, no forced saturation)
+	TRANSISTOR_24DB_LEGACY, // old pre-community LP24 behavior (clean gain, no forced saturation)
 	TRANSISTOR_12DB,
 	TRANSISTOR_24DB,
 	TRANSISTOR_24DB_DRIVE, // filter logic relies on ladders being first and contiguous
@@ -34,7 +36,7 @@ enum class FilterMode {
 constexpr int32_t kNumFilterModes = util::to_underlying(FilterMode::OFF);
 constexpr FilterMode kLastLadder = FilterMode::TRANSISTOR_24DB_DRIVE;
 // Off is not an LPF mode but is used to reset filters
-constexpr int32_t kNumLPFModes = util::to_underlying(FilterMode::SVF_NOTCH) + 1;
+constexpr int32_t kNumLPFModes = util::to_underlying(FilterMode::SVF_NOTCH) + 1; // now 7 (includes 2 legacy)
 constexpr FilterMode lastLpfMode = FilterMode::SVF_NOTCH;
 constexpr FilterMode firstHPFMode = FilterMode::SVF_BAND;
 constexpr int32_t kFirstHPFMode = util::to_underlying(FilterMode::SVF_BAND);
@@ -57,8 +59,8 @@ namespace deluge::dsp::filter {
 
 enum class FilterFamily { LP_LADDER, SVF, HP_LADDER, NONE };
 constexpr uint8_t kNumFamilies = 3;
-enum LpLadderType { LP12, LP24, DRIVE };
-constexpr uint8_t kNumLadders = 3;
+enum LpLadderType { LP12_LEGACY, LP24_LEGACY, LP12, LP24, DRIVE };
+constexpr uint8_t kNumLadders = 5;
 enum SVFType { BAND, NOTCH };
 constexpr uint8_t kNumSVF = 2;
 enum HPFType { HP12 };
@@ -94,6 +96,14 @@ public:
 		case FilterMode::TRANSISTOR_12DB:
 			family = FilterFamily::LP_LADDER;
 			type = LpLadderType::LP12;
+			break;
+		case FilterMode::TRANSISTOR_12DB_LEGACY:
+			family = FilterFamily::LP_LADDER;
+			type = LpLadderType::LP12_LEGACY;
+			break;
+		case FilterMode::TRANSISTOR_24DB_LEGACY:
+			family = FilterFamily::LP_LADDER;
+			type = LpLadderType::LP24_LEGACY;
 			break;
 		case FilterMode::TRANSISTOR_24DB:
 			family = FilterFamily::LP_LADDER;

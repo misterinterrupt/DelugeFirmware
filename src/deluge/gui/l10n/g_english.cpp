@@ -184,6 +184,8 @@ PLACE_SDRAM_DATA Language english{
         {STRING_FOR_SVF_NOTCH, "SVF Notch"},
         {STRING_FOR_HPLADDER, "HP Ladder"},
         {STRING_FOR_12DB_LADDER, "12dB Ladder"},
+        {STRING_FOR_12DB_LADDER_LEGACY, "12dB Legacy"},
+        {STRING_FOR_24DB_LADDER_LEGACY, "24dB Legacy"},
         {STRING_FOR_24DB_LADDER, "24dB Ladder"},
         {STRING_FOR_FAST, "Fast"},
         {STRING_FOR_SLOW, "Slow"},

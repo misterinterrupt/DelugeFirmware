@@ -3,10 +3,15 @@
 #include "util/container/enum_to_string_map.hpp"
 
 // converts lpf/hpf mode to string for saving
+// NOTE: "12dB"/"24dB" map to the LEGACY modes so that presets saved by older
+// firmware (including official 4.1.4) load with the original filter behavior.
+// The current community firmware modes use "12dBNew"/"24dBNew".
 namespace deluge::dsp::filter {
 
-EnumStringMap<FilterMode, kNumFilterModes> filterMap({{{FilterMode::TRANSISTOR_12DB, "12dB"},
-                                                       {FilterMode::TRANSISTOR_24DB, "24dB"},
+EnumStringMap<FilterMode, kNumFilterModes> filterMap({{{FilterMode::TRANSISTOR_12DB_LEGACY, "12dB"},
+                                                       {FilterMode::TRANSISTOR_24DB_LEGACY, "24dB"},
+                                                       {FilterMode::TRANSISTOR_12DB, "12dBNew"},
+                                                       {FilterMode::TRANSISTOR_24DB, "24dBNew"},
                                                        {FilterMode::TRANSISTOR_24DB_DRIVE, "24dBDrive"},
                                                        {FilterMode::SVF_BAND, "SVF_Band"},
                                                        {FilterMode::SVF_NOTCH, "SVF_Notch"},
