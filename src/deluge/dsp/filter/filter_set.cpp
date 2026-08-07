@@ -173,7 +173,7 @@ int32_t FilterSet::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMode 
 
 	// HPF
 	if (HPFOn) {
-		if (hpfMode_ == FilterMode::HPLADDER) {
+		if (hpfMode_ == FilterMode::HPLADDER || hpfMode_ == FilterMode::HPLADDER_LEGACY) {
 			filterGain = hpfilter.ladder.configure(hpfFrequency, hpfResonance, hpfmode, hpfMorph, filterGain);
 			if (lastHPFMode_ != hpfMode_) {
 				hpfilter.ladder.reset(lastHPFMode_ == FilterMode::OFF);
