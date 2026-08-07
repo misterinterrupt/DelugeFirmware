@@ -198,7 +198,7 @@ uint32_t VoiceUnisonPartSource::getSpeedParamForNoSyncing(Source* source, int32_
 
 	uint32_t timeStretchRatio = kMaxSampleValue;
 
-	// If pitch and time being treated independently, then achieve this by adjusting stretch to counteract pitch
+	// If pitch and time being treated independently, then achieve this by adjusting stretch to counteract pitch.
 	if (source->sampleControls.pitchAndSpeedAreIndependent) {
 		if (phaseIncrement != pitchAdjustNeutralValue) {
 			timeStretchRatio = ((uint64_t)pitchAdjustNeutralValue << 24) / (uint32_t)phaseIncrement;
@@ -206,7 +206,16 @@ uint32_t VoiceUnisonPartSource::getSpeedParamForNoSyncing(Source* source, int32_
 	}
 
 	// And whether or not that was the case, if there's a manual adjustment to time-stretch, apply that now
-	if (source->timeStretchAmount) {
+	// If BPM-based time stretching is active (Akai-MPC-style), it fully determines the playback speed ratio.
+	if (source->hasBPMTimeStretch()) {
+		float songBPM = currentSong->calculateBPM();
+		float origBPM = (float)source->originalBPM / 10.0f;       // stored as BPM*10
+		float percent = source->timeStretchPercent ? (float)source->timeStretchPercent / 10.0f : 100.0f;
+		// 100% = synced. 50% = 2x speed. 200% = 0.5x speed.
+		float bpmMultiplier = (songBPM / origBPM) * (100.0f / percent);
+		timeStretchRatio = ((uint64_t)timeStretchRatio * (uint32_t)(bpmMultiplier * (float)kMaxSampleValue)) >> 24;
+	}
+	else if (source->timeStretchAmount) {
 		timeStretchRatio = ((uint64_t)timeStretchRatio * timeStretchAdjustTable[source->timeStretchAmount + 48]) >> 24;
 	}
 

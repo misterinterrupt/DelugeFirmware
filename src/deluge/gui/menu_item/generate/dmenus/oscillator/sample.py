@@ -76,6 +76,26 @@ timestretch = Menu(
     available_when=_available_txt,
 )
 
+original_bpm = Menu(
+    "sample::OriginalBPM",
+    "originalBPMMenu",
+    ["{name}", "{title}"],
+    "oscillator/sample/original_bpm.md",
+    name="STRING_FOR_ORIGINAL_BPM",
+    title="STRING_FOR_ORIGINAL_BPM_MENU_TITLE",
+    available_when=_available_txt,
+)
+
+time_stretch_percent = Menu(
+    "sample::TimeStretchPercent",
+    "timeStretchPercentMenu",
+    ["{name}", "{title}"],
+    "oscillator/sample/time_stretch_percent.md",
+    name="STRING_FOR_TIME_STRETCH_PERCENT",
+    title="STRING_FOR_TIME_STRETCH_PERCENT_MENU_TITLE",
+    available_when=_available_txt,
+)
+
 interpolation = Menu(
     "sample::Interpolation",
     "interpolationMenu",

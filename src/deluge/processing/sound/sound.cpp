@@ -3299,6 +3299,14 @@ Error Sound::readSourceFromFile(Deserializer& reader, int32_t s, ParamManagerFor
 			source->timeStretchAmount = reader.readTagOrAttributeValueInt();
 			reader.exitTag("timeStretchAmount");
 		}
+		else if (!strcmp(tagName, "originalBPM")) {
+			source->originalBPM = reader.readTagOrAttributeValueInt();
+			reader.exitTag("originalBPM");
+		}
+		else if (!strcmp(tagName, "timeStretchPercent")) {
+			source->timeStretchPercent = reader.readTagOrAttributeValueInt();
+			reader.exitTag("timeStretchPercent");
+		}
 		else if (!strcmp(tagName, "linearInterpolation")) {
 			if (reader.readTagOrAttributeValueInt()) {
 				source->sampleControls.interpolationMode = InterpolationMode::LINEAR;
@@ -3506,6 +3514,12 @@ void Sound::writeSourceToFile(Serializer& writer, int32_t s, char const* tagName
 		writer.writeAttribute("reversed", source->sampleControls.reversed);
 		writer.writeAttribute("timeStretchEnable", source->sampleControls.pitchAndSpeedAreIndependent);
 		writer.writeAttribute("timeStretchAmount", source->timeStretchAmount);
+		if (source->originalBPM) {
+			writer.writeAttribute("originalBPM", source->originalBPM);
+		}
+		if (source->timeStretchPercent) {
+			writer.writeAttribute("timeStretchPercent", source->timeStretchPercent);
+		}
 		if (source->sampleControls.interpolationMode == InterpolationMode::LINEAR) {
 			writer.writeAttribute("linearInterpolation", 1);
 		}

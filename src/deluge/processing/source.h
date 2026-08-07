@@ -50,6 +50,14 @@ public:
 
 	int8_t timeStretchAmount;
 
+	// BPM-based time stretching (Akai-MPC-style).
+	// originalBPM: the source tempo of the sample, stored as BPM*10 (e.g. 1200 = 120.0 BPM).
+	//              0 means unset / disabled.
+	// timeStretchPercent: duration multiplier relative to the song tempo, stored as percent*10
+	//                     (e.g. 1000 = 100.0%). 50% = 2x speed, 200% = 0.5x speed.
+	uint16_t originalBPM = 0;       // BPM * 10, 0 = unset
+	uint16_t timeStretchPercent = 0; // percent * 10, 0 = unset (treated as 100%)
+
 	int16_t defaultRangeI; // -1 means none yet
 
 	bool renderInStereo(Sound* s, SampleHolder* sampleHolder = NULL);
@@ -66,6 +74,9 @@ public:
 	void doneReadingFromFile(Sound* sound);
 	bool hasAnyLoopEndPoint();
 	void setOscType(OscType newType);
+
+	// Returns true if BPM-based time stretching is active (originalBPM != 0).
+	bool hasBPMTimeStretch() const { return originalBPM != 0; }
 
 	DxPatch* ensureDxPatch();
 

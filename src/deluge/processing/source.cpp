@@ -42,6 +42,9 @@ Source::Source() {
 
 	timeStretchAmount = 0;
 
+	originalBPM = 0;
+	timeStretchPercent = 0;
+
 	defaultRangeI = -1;
 	dxPatch = NULL;
 }

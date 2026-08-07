@@ -77,11 +77,13 @@ sample::End sampleEndMenu{STRING_FOR_END_POINT};
 sample::Transpose sourceTransposeMenu{STRING_FOR_TRANSPOSE, STRING_FOR_OSC_TRANSPOSE_MENU_TITLE, params::LOCAL_OSC_A_PITCH_ADJUST};
 sample::PitchSpeed samplePitchSpeedMenu{STRING_FOR_PITCH_SPEED};
 sample::TimeStretch timeStretchMenu{STRING_FOR_SPEED, STRING_FOR_SAMP_SPEED_MENU_TITLE};
+sample::OriginalBPM originalBPMMenu{STRING_FOR_ORIGINAL_BPM, STRING_FOR_ORIGINAL_BPM_MENU_TITLE};
+sample::TimeStretchPercent timeStretchPercentMenu{STRING_FOR_TIME_STRETCH_PERCENT, STRING_FOR_TIME_STRETCH_PERCENT_MENU_TITLE};
 sample::Interpolation interpolationMenu{STRING_FOR_INTERPOLATION, STRING_FOR_SAMP_INTERP_MENU_TITLE};
 osc::PulseWidth pulseWidthMenu{STRING_FOR_PULSE_WIDTH, STRING_FOR_OSC_P_WIDTH_MENU_TITLE, params::LOCAL_OSC_A_PHASE_WIDTH};
 osc::Sync oscSyncMenu{STRING_FOR_OSCILLATOR_SYNC};
 osc::RetriggerPhase oscPhaseMenu{STRING_FOR_RETRIGGER_PHASE, STRING_FOR_OSC_R_PHASE_MENU_TITLE, false};
-std::array<MenuItem*, 17> child6 = {
+std::array<MenuItem*, 19> child6 = {
     &oscTypeMenu,
     &sourceVolumeMenu,
     &sourceWaveIndexMenu,
@@ -95,6 +97,8 @@ std::array<MenuItem*, 17> child6 = {
     &sourceTransposeMenu,
     &samplePitchSpeedMenu,
     &timeStretchMenu,
+    &originalBPMMenu,
+    &timeStretchPercentMenu,
     &interpolationMenu,
     &pulseWidthMenu,
     &oscSyncMenu,
