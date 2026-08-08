@@ -30,8 +30,8 @@ enum class FilterMode {
 	TRANSISTOR_24DB_DRIVE, // filter logic relies on ladders being first and contiguous
 	SVF_BAND,              // first HPF mode
 	SVF_NOTCH,             // last LPF mode
-	HPLADDER_LEGACY,       // old pre-community HP ladder behavior (no morph FM)
 	HPLADDER,
+	HPLADDER_LEGACY,       // old pre-community HP ladder behavior (no morph FM)
 	OFF, // Keep last as a sentinel. Signifies that the filter is not on, used for filter reset logic
 };
 constexpr int32_t kNumFilterModes = util::to_underlying(FilterMode::OFF);

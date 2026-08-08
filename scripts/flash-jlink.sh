@@ -34,7 +34,21 @@ if ! command -v JLinkExe >/dev/null 2>&1; then
     exit 1
 fi
 
-# Headless J-Link command file: load ELF, reset, run.
+# Extract ELF entry point address using readelf if available
+READELF="arm-none-eabi-readelf"
+if ! command -v "$READELF" >/dev/null 2>&1; then
+    READELF="$(dirname "$(which JLinkExe)")/../arm-none-eabi-gcc/bin/arm-none-eabi-readelf"
+fi
+
+ENTRY_HEX="0x2007b5c0"
+if command -v "$READELF" >/dev/null 2>&1; then
+    EXTRACTED="$("$READELF" -h "$ELF" 2>/dev/null | grep "Entry point address:" | awk '{print $4}')"
+    if [ -n "$EXTRACTED" ]; then
+        ENTRY_HEX="$EXTRACTED"
+    fi
+fi
+
+# Headless J-Link command file: load ELF, set PC to entry point, run.
 CMDFILE="$(mktemp)"
 trap 'rm -f "$CMDFILE"' EXIT
 cat > "$CMDFILE" <<EOF
@@ -43,6 +57,7 @@ if SWD
 speed 4000
 connect
 loadfile $ELF
+SetPC $ENTRY_HEX
 g
 exit
 EOF

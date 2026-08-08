@@ -38,8 +38,8 @@ public:
 		return {
 		    l10n::getView(STRING_FOR_SVF_BAND),
 		    l10n::getView(STRING_FOR_SVF_NOTCH),
-		    l10n::getView(STRING_FOR_HP_LADDER_LEGACY),
 		    l10n::getView(STRING_FOR_HPLADDER),
+		    l10n::getView(STRING_FOR_HP_LADDER_LEGACY),
 		    l10n::getView(STRING_FOR_NONE),
 		};
 	}
