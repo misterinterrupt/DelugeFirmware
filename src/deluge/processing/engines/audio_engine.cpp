@@ -875,13 +875,17 @@ void renderSongFX(size_t numSamples) { // LPF and stutter for song (must happen 
 		        134217728, cableToLinearParamShortcut(
 		                       currentSong->paramManager.getUnpatchedParamSet()->getValue(params::UNPATCHED_VOLUME)))
 		    >> 1;
-		// there used to be a static subtraction of 2 nepers (natural log based dB), this is the multiplicative
-		// equivalent
-		currentSong->globalEffectable.compressor.render(renderingBuffer.data(), numSamples,
-		                                                masterVolumeAdjustmentL >> 1, masterVolumeAdjustmentR >> 1,
-		                                                songVolume >> 3);
-		masterVolumeAdjustmentL = ONE_Q31;
-		masterVolumeAdjustmentR = ONE_Q31;
+		if (currentSong->globalEffectable.compressor.getThreshold() > 0) {
+			currentSong->globalEffectable.compressor.render(renderingBuffer.data(), numSamples,
+			                                                masterVolumeAdjustmentL >> 1, masterVolumeAdjustmentR >> 1,
+			                                                songVolume >> 3);
+			masterVolumeAdjustmentL = ONE_Q31;
+			masterVolumeAdjustmentR = ONE_Q31;
+		}
+		else {
+			masterVolumeAdjustmentL = multiply_32x32_rshift32(masterVolumeAdjustmentL, songVolume) << 2;
+			masterVolumeAdjustmentR = multiply_32x32_rshift32(masterVolumeAdjustmentR, songVolume) << 2;
+		}
 		logAction("mastercomp end");
 	}
 }
