@@ -883,8 +883,8 @@ void renderSongFX(size_t numSamples) { // LPF and stutter for song (must happen 
 			masterVolumeAdjustmentR = ONE_Q31;
 		}
 		else {
-			masterVolumeAdjustmentL = multiply_32x32_rshift32(masterVolumeAdjustmentL, songVolume) << 2;
-			masterVolumeAdjustmentR = multiply_32x32_rshift32(masterVolumeAdjustmentR, songVolume) << 2;
+			masterVolumeAdjustmentL = multiply_32x32_rshift32(masterVolumeAdjustmentL, songVolume) << 6;
+			masterVolumeAdjustmentR = multiply_32x32_rshift32(masterVolumeAdjustmentR, songVolume) << 6;
 		}
 		logAction("mastercomp end");
 	}
