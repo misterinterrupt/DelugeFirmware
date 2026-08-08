@@ -414,7 +414,7 @@ q31_t LpLadderFilter::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMo
 	       << 1;
 }
 
-// Legacy 12dB filter - clean input scaling, no forced tanh saturation (pre-community-firmware behavior)
+// Legacy 12dB filter - stock 4.1.4 pre-community firmware behavior.
 [[gnu::always_inline]] inline q31_t LpLadderFilter::do12dBLPFLegacyOnSample(q31_t input, LpLadderState& state) {
 	q31_t noise = getNoise() >> 2;
 	q31_t distanceToGo = noise - state.noiseLastValue;
@@ -423,12 +423,19 @@ q31_t LpLadderFilter::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMo
 
 	q31_t feedbacksSum = state.lpfLPF1.getFeedbackOutput(lpf1Feedback) + state.lpfLPF2.getFeedbackOutput(lpf2Feedback)
 	                     + state.lpfLPF3.getFeedbackOutput(divideBy1PlusTannedFrequency);
-	q31_t x = scaleInputLegacy(input, feedbacksSum);
+	q31_t x = multiply_32x32_rshift32_rounded(
+	              (input - (multiply_32x32_rshift32_rounded(feedbacksSum, processedResonance) << 3)),
+	              divideByTotalMoveabilityAndProcessedResonance)
+	          << 2;
+
+	if (processedResonance > 510000000) {
+		x = getTanHUnknown(x, 1);
+	}
 
 	return state.lpfLPF3.doAPF(state.lpfLPF2.doFilter(state.lpfLPF1.doFilter(x, noisy_m), noisy_m), noisy_m) << 1;
 }
 
-// Legacy 24dB filter - clean input scaling, no forced tanh saturation (pre-community-firmware behavior)
+// Legacy 24dB filter - stock 4.1.4 pre-community firmware behavior.
 [[gnu::always_inline]] inline q31_t LpLadderFilter::do24dBLPFLegacyOnSample(q31_t input, LpLadderState& state) {
 	q31_t noise = getNoise() >> 2;
 	q31_t distanceToGo = noise - state.noiseLastValue;
@@ -441,7 +448,14 @@ q31_t LpLadderFilter::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMo
 	                      + state.lpfLPF4.getFeedbackOutputWithoutLshift(divideBy1PlusTannedFrequency))
 	                     << 2;
 
-	q31_t x = scaleInputLegacy(input, feedbacksSum);
+	q31_t x = multiply_32x32_rshift32_rounded(
+	              (input - (multiply_32x32_rshift32_rounded(feedbacksSum, processedResonance) << 3)),
+	              divideByTotalMoveabilityAndProcessedResonance)
+	          << 2;
+
+	if (processedResonance > 900000000) {
+		x = getTanHUnknown(x, 1);
+	}
 
 	return state.lpfLPF4.doFilter(
 	           state.lpfLPF3.doFilter(state.lpfLPF2.doFilter(state.lpfLPF1.doFilter(x, noisy_m), noisy_m), noisy_m),
