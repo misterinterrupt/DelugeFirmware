@@ -68,20 +68,14 @@ private:
 
 		return temp;
 	}
-	// Legacy input scaling with resonance saturation protection.
-	// Uses clean scaling for lower resonance, and applies Tanh soft-clipping when processedResonance > 510000000
-	// to prevent fixed-point arithmetic overflow and non-linear blowout noise at high resonance.
+	// Legacy input scaling matching pre-community 4.1.4 firmware behavior.
+	// Uses << 2 scaling to distribute resonance response across the full knob sweep (self-oscillating at 80-90%)
+	// with lshiftAndSaturate to prevent fixed-point arithmetic overflow.
 	[[gnu::always_inline]] inline q31_t scaleInputLegacy(q31_t input, q31_t feedbacksSum) {
 		q31_t temp = multiply_32x32_rshift32_rounded(
 		                 (input - (multiply_32x32_rshift32_rounded(feedbacksSum, processedResonance) << 3)),
 		                 divideByTotalMoveabilityAndProcessedResonance);
-		if (processedResonance > 510000000) {
-			temp = getTanHUnknown(temp << 2, 2);
-		}
-		else {
-			temp = lshiftAndSaturate<2>(temp);
-		}
-		return temp;
+		return lshiftAndSaturate<2>(temp);
 	}
 	[[gnu::always_inline]] inline q31_t do24dBLPFOnSample(q31_t input, LpLadderState& state);
 	[[gnu::always_inline]] inline q31_t do12dBLPFOnSample(q31_t input, LpLadderState& state);
