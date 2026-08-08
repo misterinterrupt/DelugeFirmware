@@ -37,7 +37,7 @@ namespace params = deluge::modulation::params;
 
 GlobalEffectable::GlobalEffectable() {
 	unpatchedParamKind_ = params::Kind::UNPATCHED_GLOBAL;
-	lpfMode = FilterMode::TRANSISTOR_24DB;
+	lpfMode = FilterMode::TRANSISTOR_24DB_LEGACY;
 	filterSet.reset();
 
 	modFXType = ModFXType::NONE;
