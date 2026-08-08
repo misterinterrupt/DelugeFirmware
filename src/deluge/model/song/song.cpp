@@ -178,7 +178,7 @@ Song::Song() : backedUpParamManagers(sizeof(BackedUpParamManager)) {
 	reverbSidechainVolume = getParamFromUserValue(params::STATIC_SIDECHAIN_VOLUME, -1);
 	reverbSidechainShape = -601295438;
 	reverbSidechainSync = SYNC_LEVEL_8TH;
-	model = deluge::dsp::Reverb::Model::MUTABLE;
+	model = deluge::dsp::Reverb::Model::FREEVERB;
 
 	// setup base compressor gain to match 1.0
 	globalEffectable.compressor.setBaseGain(0.85);
