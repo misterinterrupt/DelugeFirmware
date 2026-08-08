@@ -72,8 +72,8 @@ ModControllableAudio::ModControllableAudio() {
 	bassOnlyR = 0;
 
 	// Filters
-	lpfMode = FilterMode::TRANSISTOR_24DB;
-	hpfMode = FilterMode::HPLADDER;
+	lpfMode = FilterMode::TRANSISTOR_24DB_LEGACY;
+	hpfMode = FilterMode::HPLADDER_LEGACY;
 	filterRoute = FilterRoute::HIGH_TO_LOW;
 
 	// Sample rate reduction
