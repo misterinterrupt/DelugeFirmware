@@ -122,8 +122,7 @@ q31_t SVFilter::setConfig(q31_t freq, q31_t res, FilterMode lpfMode, q31_t lpfMo
 	// saturate band feedback
 	band = getTanHUnknown(band, 3);
 	// compensate for division by two on each multiply
-	// then multiply by 1.5 to match ladders
-	result = 3 * result;
+	result = 2 * result;
 
 	state.low = low;
 	state.band = band;
