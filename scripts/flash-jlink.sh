@@ -56,6 +56,8 @@ device R7S721020
 if SWD
 speed 4000
 connect
+r
+h
 loadfile $ELF
 SetPC $ENTRY_HEX
 g
