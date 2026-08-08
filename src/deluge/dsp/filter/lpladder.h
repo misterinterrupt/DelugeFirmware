@@ -68,13 +68,20 @@ private:
 
 		return temp;
 	}
-	// Legacy clean input scaling (pre-community-firmware behavior).
-	// No forced tanh saturation, full << 3 headroom scaling to restore original loudness.
+	// Legacy input scaling with resonance saturation protection.
+	// Uses clean scaling for lower resonance, and applies Tanh soft-clipping when processedResonance > 510000000
+	// to prevent fixed-point arithmetic overflow and non-linear blowout noise at high resonance.
 	[[gnu::always_inline]] inline q31_t scaleInputLegacy(q31_t input, q31_t feedbacksSum) {
-		return multiply_32x32_rshift32_rounded(
-		           (input - (multiply_32x32_rshift32_rounded(feedbacksSum, processedResonance) << 3)),
-		           divideByTotalMoveabilityAndProcessedResonance)
-		       << 3;
+		q31_t temp = multiply_32x32_rshift32_rounded(
+		                 (input - (multiply_32x32_rshift32_rounded(feedbacksSum, processedResonance) << 3)),
+		                 divideByTotalMoveabilityAndProcessedResonance);
+		if (processedResonance > 510000000) {
+			temp = getTanHUnknown(temp << 2, 2);
+		}
+		else {
+			temp = lshiftAndSaturate<2>(temp);
+		}
+		return temp;
 	}
 	[[gnu::always_inline]] inline q31_t do24dBLPFOnSample(q31_t input, LpLadderState& state);
 	[[gnu::always_inline]] inline q31_t do12dBLPFOnSample(q31_t input, LpLadderState& state);

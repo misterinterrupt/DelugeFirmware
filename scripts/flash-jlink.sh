@@ -58,6 +58,7 @@ speed 4000
 connect
 r
 h
+ms 100
 loadfile $ELF
 SetPC $ENTRY_HEX
 g
