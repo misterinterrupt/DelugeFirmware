@@ -416,11 +416,6 @@ q31_t LpLadderFilter::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMo
 
 // Legacy 12dB filter - stock 4.1.4 pre-community firmware behavior.
 [[gnu::always_inline]] inline q31_t LpLadderFilter::do12dBLPFLegacyOnSample(q31_t input, LpLadderState& state) {
-	q31_t noise = getNoise() >> 2;
-	q31_t distanceToGo = noise - state.noiseLastValue;
-	state.noiseLastValue += distanceToGo >> 7;
-	q31_t noisy_m = moveability + multiply_32x32_rshift32(moveability, state.noiseLastValue);
-
 	q31_t feedbacksSum = state.lpfLPF1.getFeedbackOutput(lpf1Feedback) + state.lpfLPF2.getFeedbackOutput(lpf2Feedback)
 	                     + state.lpfLPF3.getFeedbackOutput(divideBy1PlusTannedFrequency);
 	q31_t x = multiply_32x32_rshift32_rounded(
@@ -432,16 +427,11 @@ q31_t LpLadderFilter::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMo
 		x = getTanHUnknown(x, 1);
 	}
 
-	return state.lpfLPF3.doAPF(state.lpfLPF2.doFilter(state.lpfLPF1.doFilter(x, noisy_m), noisy_m), noisy_m);
+	return state.lpfLPF3.doAPF(state.lpfLPF2.doFilter(state.lpfLPF1.doFilter(x, moveability), moveability), moveability);
 }
 
 // Legacy 24dB filter - stock 4.1.4 pre-community firmware behavior.
 [[gnu::always_inline]] inline q31_t LpLadderFilter::do24dBLPFLegacyOnSample(q31_t input, LpLadderState& state) {
-	q31_t noise = getNoise() >> 2;
-	q31_t distanceToGo = noise - state.noiseLastValue;
-	state.noiseLastValue += distanceToGo >> 7;
-	q31_t noisy_m = moveability + multiply_32x32_rshift32(moveability, state.noiseLastValue);
-
 	q31_t feedbacksSum = (state.lpfLPF1.getFeedbackOutputWithoutLshift(lpf1Feedback)
 	                      + state.lpfLPF2.getFeedbackOutputWithoutLshift(lpf2Feedback)
 	                      + state.lpfLPF3.getFeedbackOutputWithoutLshift(lpf3Feedback)
@@ -458,8 +448,9 @@ q31_t LpLadderFilter::setConfig(q31_t lpfFrequency, q31_t lpfResonance, FilterMo
 	}
 
 	return state.lpfLPF4.doFilter(
-	           state.lpfLPF3.doFilter(state.lpfLPF2.doFilter(state.lpfLPF1.doFilter(x, noisy_m), noisy_m), noisy_m),
-	           noisy_m)
+	           state.lpfLPF3.doFilter(state.lpfLPF2.doFilter(state.lpfLPF1.doFilter(x, moveability), moveability),
+	                                  moveability),
+	           moveability)
 	       << 1;
 }
 
