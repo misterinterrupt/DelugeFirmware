@@ -28,16 +28,11 @@ public:
 	using MenuItem::MenuItem;
 	void beginSession(MenuItem* navigatedBackwardFrom) override {
 		soundEditor.shouldGoUpOneLevelOnBegin = true;
-		bool success = openUI(&audioRecorder);
-		if (!success) {
-			if (getCurrentUI() == &soundEditor) {
-				soundEditor.goUpOneLevel();
-			}
-			uiTimerManager.unsetTimer(TimerName::SHORTCUT_BLINK);
+		display->displayPopup("EDIT");
+		if (getCurrentUI() == &soundEditor) {
+			soundEditor.goUpOneLevel();
 		}
-		else {
-			audioRecorder.process();
-		}
+		uiTimerManager.unsetTimer(TimerName::SHORTCUT_BLINK);
 	}
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
 		Sound* sound = static_cast<Sound*>(modControllable);
