@@ -683,6 +683,14 @@ ActionResult SampleMarkerEditor::buttonAction(deluge::hid::Button b, bool on, bo
 		}
 	}
 
+	// Record button: intercept to prevent recording and trigger offline sample edit actions
+	else if (b == RECORD) {
+		if (on) {
+			display->displayPopup("EDIT");
+		}
+		return ActionResult::DEALT_WITH;
+	}
+
 	else {
 		return ActionResult::NOT_DEALT_WITH;
 	}
