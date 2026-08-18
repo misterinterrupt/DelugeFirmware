@@ -43,6 +43,17 @@
 
 uint8_t currentlyAccessingCard = 0;
 
+/* TEMPORARY instrumentation for the normalize READ ERR hunt - remove after.
+ * lastSdDriverError: what sd_read_sect/sd_write_sect last returned. The SD_ERR_*
+ * codes from sdif.h: -1 general, -2 write protect, -3 read only, -4 response
+ * timeout, -5 card timeout, -6 end bit, -7 CRC, -8 card response, -9 host
+ * timeout, -10 erase, -13 host CRC, -14 card ECC, -15 card internal.
+ * sdReentryDetected: how many times card IO began while another card IO was
+ * already in flight (the E258/E259 condition - only freezes on alpha builds,
+ * silently proceeds otherwise). */
+volatile int lastSdDriverError = 0;
+volatile int sdReentryDetected = 0;
+
 #define _USE_WRITE 1 /* 1: Enable disk_write function */
 #define _USE_IOCTL 1 /* 1: Enable disk_ioctl fucntion */
 
@@ -195,6 +206,7 @@ DRESULT disk_read_without_streaming_first(BYTE pdrv, /* Physical drive nmuber to
 
     if (currentlyAccessingCard)
     {
+        sdReentryDetected++; /* TEMPORARY instrumentation */
         if (ALPHA_OR_BETA_VERSION)
         {
             // Operatricks got! But I think I fixed.
@@ -208,6 +220,7 @@ DRESULT disk_read_without_streaming_first(BYTE pdrv, /* Physical drive nmuber to
 
     err = sd_read_sect(SD_PORT, buff, sector, count);
 
+    lastSdDriverError = err; /* TEMPORARY instrumentation */
     currentlyAccessingCard = 0;
 
     /*
@@ -245,6 +258,7 @@ DRESULT disk_write(BYTE pdrv, /* Physical drive nmuber to identify the drive */
 
     if (currentlyAccessingCard)
     {
+        sdReentryDetected++; /* TEMPORARY instrumentation */
         if (ALPHA_OR_BETA_VERSION)
         {
             FREEZE_WITH_ERROR("E258");
@@ -255,6 +269,7 @@ DRESULT disk_write(BYTE pdrv, /* Physical drive nmuber to identify the drive */
 
     err = sd_write_sect(SD_PORT, buff, sector, count, 0x0001u);
 
+    lastSdDriverError = err; /* TEMPORARY instrumentation */
     currentlyAccessingCard = 0;
 
     if (err == 0)
