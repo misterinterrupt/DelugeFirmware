@@ -29,15 +29,16 @@ static void showPopup(char const* text) {
 	display->displayPopup(text);
 }
 
-static void showProgressPopup(uint32_t current, uint32_t total) {
+static void showProgressPopup(uint32_t current, uint32_t total, uint32_t passOffset = 0, uint32_t totalPasses = 1) {
 	if (total == 0) {
 		return;
 	}
-	uint32_t percent = (current * 100) / total;
+	uint32_t passPercent = (current * 100) / total;
+	uint32_t overallPercent = (passOffset * 100 + passPercent) / totalPasses;
 	DEF_STACK_STRING_BUF(buf, 16);
-	buf.appendInt(percent);
+	buf.appendInt(overallPercent);
 	buf.append("%");
-	display->displayPopup(buf.c_str());
+	display->displayPopup(buf.c_str(), 1);
 }
 
 NormalizeJob& normalizeJob() {
@@ -45,7 +46,7 @@ NormalizeJob& normalizeJob() {
 	return instance;
 }
 
-bool NormalizeJob::start(Sample* sample) {
+bool NormalizeJob::start(Sample* sample, bool overwrite) {
 	if (isActive()) {
 		showPopup("BUSY");
 		return false;
@@ -82,6 +83,7 @@ bool NormalizeJob::start(Sample* sample) {
 	sourcePath.clear();
 
 	sourcePath.set(&sample->filePath);
+	overwriteTarget_ = overwrite;
 
 	dataStart = (uint32_t)sample->audioDataStartPosBytes;
 	totalDataBytes = (uint32_t)total;
@@ -171,11 +173,7 @@ void NormalizeJob::tick() {
 				scanChunkForPeak(got);
 				dataBytesRemaining -= got;
 
-				chunksSinceProgressPopup++;
-				if (chunksSinceProgressPopup >= (65536 / dataChunkSize)) {
-					chunksSinceProgressPopup = 0;
-					showProgressPopup(totalDataBytes - dataBytesRemaining, totalDataBytes);
-				}
+				showProgressPopup(totalDataBytes - dataBytesRemaining, totalDataBytes, 0, 2);
 			}
 		}
 
@@ -253,11 +251,7 @@ void NormalizeJob::tick() {
 			}
 		}
 
-		chunksSinceProgressPopup++;
-		if (chunksSinceProgressPopup >= (65536 / dataChunkSize)) {
-			chunksSinceProgressPopup = 0;
-			showProgressPopup(totalDataBytes - dataBytesRemaining, totalDataBytes);
-		}
+		showProgressPopup(totalDataBytes - dataBytesRemaining, totalDataBytes, 1, 2);
 
 		if (dataBytesRemaining == 0) {
 			phase = Phase::FINALIZE;
@@ -343,6 +337,15 @@ void NormalizeJob::beginCopyPass() {
 	String finalPathScratch;
 	String tempPathScratch;
 
+	if (overwriteTarget_) {
+		finalPath.set(sourcePath.get());
+		DEF_STACK_STRING_BUF(tempBuf, 256);
+		tempBuf.append(stemBuf);
+		tempBuf.append(".TMP");
+		tempPath.set(tempBuf.c_str());
+	}
+	else {
+
 	for (char c = 'A'; c <= 'Z'; c++) {
 		DEF_STACK_STRING_BUF(candidateBuf, 256);
 		candidateBuf.append(stemBuf);
@@ -400,13 +403,14 @@ void NormalizeJob::beginCopyPass() {
 		}
 	}
 
-	if (!found || finalPathScratch.isEmpty() || tempPathScratch.isEmpty()) {
-		fail("SD ERR");
-		return;
-	}
+		if (!found || finalPathScratch.isEmpty() || tempPathScratch.isEmpty()) {
+			fail("SD ERR");
+			return;
+		}
 
-	finalPath.set(&finalPathScratch);
-	tempPath.set(&tempPathScratch);
+		finalPath.set(&finalPathScratch);
+		tempPath.set(&tempPathScratch);
+	}
 
 	auto rewindRes = sourceFile->lseek(0);
 	if (!rewindRes) {

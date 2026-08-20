@@ -62,6 +62,7 @@
 #include "processing/engines/cv_engine.h"
 #include "processing/offline/gain_job.h"
 #include "processing/offline/normalize_job.h"
+#include "processing/offline/reverse_job.h"
 #include "storage/audio/audio_file_manager.h"
 #include "storage/flash_storage.h"
 #include "storage/storage_manager.h"
@@ -292,6 +293,9 @@ bool readButtonsAndPads() {
 	PIC::Response value{0};
 	bool anything = uartGetChar(UART_ITEM_PIC, (char*)&value);
 	if (anything) {
+		if (normalizeJob().isActive() || gainJob().isActive() || reverseJob().isActive()) {
+			return false;
+		}
 
 		if (value < PIC::kPadAndButtonMessagesEnd) {
 
@@ -606,6 +610,7 @@ void registerTasks() {
 	    []() {
 		    normalizeJob().tick();
 		    gainJob().tick();
+		    reverseJob().tick();
 	    },
 	    p++, 0.005, 0.005, 0.01, "offline ops");
 

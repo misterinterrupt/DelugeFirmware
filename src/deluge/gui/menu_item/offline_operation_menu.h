@@ -5,12 +5,30 @@
 #include "gui/menu_item/submenu.h"
 #include <string_view>
 
+#include "gui/menu_item/toggle.h"
+
 namespace deluge::gui::menu_item {
+
+extern bool gOfflineJobOverwrite;
+
+class SaveModeMenuItem : public ToggleBool {
+public:
+	SaveModeMenuItem();
+	std::string_view getName() const override { return "OVERWRITE"; }
+};
 
 class NormalizeActionMenuItem : public MenuItem {
 public:
 	NormalizeActionMenuItem();
 	std::string_view getName() const override { return "NORMALIZE"; }
+	void readValueAgain() override;
+	MenuItem* selectButtonPress() override;
+};
+
+class ReverseActionMenuItem : public MenuItem {
+public:
+	ReverseActionMenuItem();
+	std::string_view getName() const override { return "REVERSE"; }
 	void readValueAgain() override;
 	MenuItem* selectButtonPress() override;
 };

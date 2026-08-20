@@ -5,13 +5,22 @@
 #include "model/sample/sample.h"
 #include "processing/offline/gain_job.h"
 #include "processing/offline/normalize_job.h"
+#include "processing/offline/reverse_job.h"
 #include "processing/sound/sound.h"
 #include "storage/multi_range/multisample_range.h"
 
 namespace deluge::gui::menu_item {
 
+bool gOfflineJobOverwrite = false;
+
+static SaveModeMenuItem saveModeMenuItem;
 static NormalizeActionMenuItem normalizeActionMenuItem;
+static ReverseActionMenuItem reverseActionMenuItem;
 static GainActionMenuItem gainActionMenuItem;
+
+SaveModeMenuItem::SaveModeMenuItem()
+    : ToggleBool(deluge::l10n::String::EMPTY_STRING, deluge::l10n::String::EMPTY_STRING, gOfflineJobOverwrite) {
+}
 
 NormalizeActionMenuItem::NormalizeActionMenuItem() : MenuItem(deluge::l10n::String::EMPTY_STRING) {
 }
@@ -42,7 +51,7 @@ MenuItem* NormalizeActionMenuItem::selectButtonPress() {
 		return nullptr;
 	}
 
-	normalizeJob().start(currentSample);
+	normalizeJob().start(currentSample, gOfflineJobOverwrite);
 	return nullptr;
 }
 
@@ -87,14 +96,34 @@ MenuItem* GainActionMenuItem::selectButtonPress() {
 	}
 
 	float gainDb = (float)getValue() / 100.0f;
-	gainJob().start(currentSample, gainDb);
+	gainJob().start(currentSample, gainDb, gOfflineJobOverwrite);
+	return nullptr;
+}
+
+ReverseActionMenuItem::ReverseActionMenuItem() : MenuItem(deluge::l10n::String::EMPTY_STRING) {
+}
+
+void ReverseActionMenuItem::readValueAgain() {
+	display->setText("REVERSE");
+}
+
+MenuItem* ReverseActionMenuItem::selectButtonPress() {
+	Sample* currentSample = getCurrentSample();
+
+	if (!currentSample) {
+		display->displayPopup("NO SAMPLE");
+		return nullptr;
+	}
+
+	reverseJob().start(currentSample, gOfflineJobOverwrite);
 	return nullptr;
 }
 
 OfflineOperationMenu offlineOperationMenu;
 
 OfflineOperationMenu::OfflineOperationMenu()
-    : Submenu(deluge::l10n::String::EMPTY_STRING, {&normalizeActionMenuItem, &gainActionMenuItem}) {
+    : Submenu(deluge::l10n::String::EMPTY_STRING,
+              {&normalizeActionMenuItem, &gainActionMenuItem, &reverseActionMenuItem, &saveModeMenuItem}) {
 }
 
 bool OfflineOperationMenu::isRelevant(ModControllableAudio* modControllable, int32_t /*whichThing*/) {

@@ -24,7 +24,7 @@ public:
 
 	/// Returns false (and shows a popup explaining why) if the job could not
 	/// be started. On success, the job proceeds via tick().
-	bool start(Sample* sample);
+	bool start(Sample* sample, bool overwrite = false);
 
 	/// Called regularly from the task scheduler. Does at most one chunk of
 	/// card I/O per call. Cheap no-op when idle.
@@ -85,6 +85,7 @@ private:
 
 	uint8_t byteDepth = 2;
 	float linearGain_ = 1.0f;
+	bool overwriteTarget_ = false;
 
 	/// Peak absolute raw-file value found during the SCAN pass.
 	uint32_t peakValue = 0;

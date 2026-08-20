@@ -28,6 +28,9 @@
 #include "hid/matrix/matrix_driver.h"
 #include "io/debug/log.h"
 #include "memory/general_memory_allocator.h"
+#include "processing/offline/gain_job.h"
+#include "processing/offline/normalize_job.h"
+#include "processing/offline/reverse_job.h"
 #include "model/action/action.h"
 #include "model/action/action_logger.h"
 #include "model/clip/instrument_clip.h"
@@ -1514,6 +1517,10 @@ PatchCableAcceptance Sound::maySourcePatchToParam(PatchSource s, uint8_t p, Para
 void Sound::noteOn(ModelStackWithThreeMainThings* modelStack, ArpeggiatorBase* arpeggiator, int32_t noteCodePreArp,
                    int16_t const* mpeValues, uint32_t sampleSyncLength, int32_t ticksLate, uint32_t samplesLate,
                    int32_t velocity, int32_t fromMIDIChannel) {
+
+	if (normalizeJob().isActive() || gainJob().isActive() || reverseJob().isActive()) {
+		return;
+	}
 
 	ParamManagerForTimeline* paramManager = (ParamManagerForTimeline*)modelStack->paramManager;
 

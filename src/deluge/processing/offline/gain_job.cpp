@@ -36,7 +36,7 @@ static void showProgressPopup(uint32_t current, uint32_t total) {
 	DEF_STACK_STRING_BUF(buf, 16);
 	buf.appendInt(percent);
 	buf.append("%");
-	display->displayPopup(buf.c_str());
+	display->displayPopup(buf.c_str(), 1);
 }
 
 GainJob& gainJob() {
@@ -44,7 +44,7 @@ GainJob& gainJob() {
 	return instance;
 }
 
-bool GainJob::start(Sample* sample, float gainDb) {
+bool GainJob::start(Sample* sample, float gainDb, bool overwrite) {
 	if (isActive()) {
 		showPopup("BUSY");
 		return false;
@@ -81,6 +81,7 @@ bool GainJob::start(Sample* sample, float gainDb) {
 	sourcePath.clear();
 
 	sourcePath.set(&sample->filePath);
+	overwriteTarget_ = overwrite;
 
 	dataStart = (uint32_t)sample->audioDataStartPosBytes;
 	totalDataBytes = (uint32_t)total;
@@ -217,11 +218,7 @@ void GainJob::tick() {
 			}
 		}
 
-		chunksSinceProgressPopup++;
-		if (chunksSinceProgressPopup >= (65536 / dataChunkSize)) {
-			chunksSinceProgressPopup = 0;
-			showProgressPopup(totalDataBytes - dataBytesRemaining, totalDataBytes);
-		}
+		showProgressPopup(totalDataBytes - dataBytesRemaining, totalDataBytes);
 
 		if (dataBytesRemaining == 0) {
 			phase = Phase::FINALIZE;
@@ -296,6 +293,15 @@ void GainJob::beginCopyPass() {
 	String finalPathScratch;
 	String tempPathScratch;
 
+	if (overwriteTarget_) {
+		finalPath.set(sourcePath.get());
+		DEF_STACK_STRING_BUF(tempBuf, 256);
+		tempBuf.append(stemBuf);
+		tempBuf.append(".TMP");
+		tempPath.set(tempBuf.c_str());
+	}
+	else {
+
 	for (char c = 'A'; c <= 'Z'; c++) {
 		DEF_STACK_STRING_BUF(candidateBuf, 256);
 		candidateBuf.append(stemBuf);
@@ -353,13 +359,14 @@ void GainJob::beginCopyPass() {
 		}
 	}
 
-	if (!found || finalPathScratch.isEmpty() || tempPathScratch.isEmpty()) {
-		fail("SD ERR");
-		return;
-	}
+		if (!found || finalPathScratch.isEmpty() || tempPathScratch.isEmpty()) {
+			fail("SD ERR");
+			return;
+		}
 
-	finalPath.set(&finalPathScratch);
-	tempPath.set(&tempPathScratch);
+		finalPath.set(&finalPathScratch);
+		tempPath.set(&tempPathScratch);
+	}
 
 	auto rewindRes = sourceFile->lseek(0);
 	if (!rewindRes) {

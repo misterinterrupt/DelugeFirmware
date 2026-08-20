@@ -24,7 +24,7 @@ public:
 
 	/// Returns false (and shows a popup explaining why) if the job could not
 	/// be started. On success, the job proceeds via tick().
-	bool start(Sample* sample, float gainDb);
+	bool start(Sample* sample, float gainDb, bool overwrite = false);
 
 	/// Called regularly from the task scheduler.
 	void tick();
@@ -76,8 +76,9 @@ private:
 	uint32_t audioBytesWritten = 0;
 
 	uint8_t byteDepth = 2;
-	float userGainDb_ = 0.0f;
 	float linearGain_ = 1.0f;
+	float userGainDb_ = 0.0f;
+	bool overwriteTarget_ = false;
 
 	std::optional<FatFS::File> sourceFile;
 	std::optional<FatFS::File> destFile;

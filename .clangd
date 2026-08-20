@@ -1,3 +1,17 @@
 CompileFlags:
-  Add: [-Wno-unknown-argument, -Wno-unknown-warning-option, -stdlib=libc++, -D__cpp_concepts=202002L]
-  Remove: [-mthumb-interwork, -fanalyzer]
+  CompilationDatabase: build
+  Add:
+    - "-isystem/home/interrupt/Documents/deluge/toolchain/v16/linux-x86_64/arm-none-eabi-gcc/arm-none-eabi/include/c++/13.2.1"
+    - "-isystem/home/interrupt/Documents/deluge/toolchain/v16/linux-x86_64/arm-none-eabi-gcc/arm-none-eabi/include/c++/13.2.1/arm-none-eabi"
+    - "-isystem/home/interrupt/Documents/deluge/toolchain/v16/linux-x86_64/arm-none-eabi-gcc/arm-none-eabi/include"
+    - "-Wno-unknown-argument"
+    - "-Wno-unknown-warning-option"
+  Remove:
+    - "-mthumb-interwork"
+    - "-fanalyzer"
+
+Diagnostics:
+  UnusedIncludes: None
+  MissingIncludes: None
+  Suppress:
+    - "*"
