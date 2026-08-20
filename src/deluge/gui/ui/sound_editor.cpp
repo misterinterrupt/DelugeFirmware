@@ -1548,6 +1548,15 @@ AudioFileHolder* SoundEditor::getCurrentAudioFileHolder() {
 	}
 
 	else {
+		if (currentMultiRange == nullptr && currentSound != nullptr) {
+			Source* source = &currentSound->sources[currentSourceIndex];
+			if (source != nullptr) {
+				currentMultiRange = source->getOrCreateFirstRange();
+			}
+		}
+		if (currentMultiRange == nullptr) {
+			return nullptr;
+		}
 		return currentMultiRange->getAudioFileHolder();
 	}
 }

@@ -1,21 +1,40 @@
 #pragma once
 
+#include "gui/menu_item/integer.h"
 #include "gui/menu_item/menu_item.h"
+#include "gui/menu_item/submenu.h"
+#include <string_view>
 
 namespace deluge::gui::menu_item {
 
-class OfflineOperationMenu : public MenuItem {
+class NormalizeActionMenuItem : public MenuItem {
 public:
-	OfflineOperationMenu();
+	NormalizeActionMenuItem();
+	std::string_view getName() const override { return "NORMALIZE"; }
+	void readValueAgain() override;
+	MenuItem* selectButtonPress() override;
+};
+
+class GainActionMenuItem : public Integer {
+public:
+	GainActionMenuItem();
+	std::string_view getName() const override { return "GAIN"; }
 	MenuItem* selectButtonPress() override;
 	void selectEncoderAction(int32_t offset) override;
-	void readValueAgain() override;
+
+protected:
+	int32_t getMaxValue() const override { return 600; }  // +6.00 dB
+	int32_t getMinValue() const override { return -600; } // -6.00 dB
+	void drawPixelsForOled() override;
+	void drawValue() override;
+};
+
+class OfflineOperationMenu : public Submenu {
+public:
+	OfflineOperationMenu();
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override;
 	MenuPermission checkPermissionToBeginSession(ModControllableAudio* modControllable, int32_t whichThing,
 	                                             ::MultiRange** currentRange) override;
-
-private:
-	void updateDisplay();
 };
 
 extern OfflineOperationMenu offlineOperationMenu;

@@ -59,8 +59,9 @@
 #include "playback/mode/arrangement.h"
 #include "playback/mode/session.h"
 #include "processing/engines/audio_engine.h"
-#include "processing/offline/normalize_job.h"
 #include "processing/engines/cv_engine.h"
+#include "processing/offline/gain_job.h"
+#include "processing/offline/normalize_job.h"
 #include "storage/audio/audio_file_manager.h"
 #include "storage/flash_storage.h"
 #include "storage/storage_manager.h"
@@ -599,9 +600,14 @@ void registerTasks() {
 	// if recordings are finished
 	addRepeatingTask([]() { audioFileManager.slowRoutine(); }, p++, 0.1, 0.1, 0.2, "audio file slow");
 
-	// Offline operations (e.g. sample normalize): one small chunk of card
+	// Offline operations (e.g. sample normalize, gain): one small chunk of card
 	// I/O per call, only while a job is active.
-	addRepeatingTask([]() { normalizeJob().tick(); }, p++, 0.005, 0.005, 0.01, "offline ops");
+	addRepeatingTask(
+	    []() {
+		    normalizeJob().tick();
+		    gainJob().tick();
+	    },
+	    p++, 0.005, 0.005, 0.01, "offline ops");
 
 	addRepeatingTask([]() { audioRecorder.slowRoutine(); }, p++, 0.01, 0.1, 0.1, "audio recorder slow");
 	// formerly part of cluster loading (why? no idea), actions undo/redo midi commands
