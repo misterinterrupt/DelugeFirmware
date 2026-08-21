@@ -135,9 +135,8 @@ bool LevelerJob::setupWaveformPreview(Sample* sample, bool overwrite) {
 
 				binFrames++;
 				if (binFrames >= framesPerBin) {
-					uint8_t h = (uint8_t)((binPeak * 24) / 32767);
-					if (h < 2) h = 2;
-					waveformOverview[binIdx] = h;
+				uint8_t h = (uint8_t)((binPeak * 32) / ((byteDepth == 2) ? 32767u : 8388607u));
+				waveformOverview[binIdx] = h;
 
 					binIdx++;
 					binPeak = 0;
@@ -147,8 +146,7 @@ bool LevelerJob::setupWaveformPreview(Sample* sample, bool overwrite) {
 			}
 		}
 		while (binIdx < 128) {
-			uint8_t h = (uint8_t)((binPeak * 24) / 32767);
-			if (h < 2) h = 2;
+			uint8_t h = (uint8_t)((binPeak * 32) / ((byteDepth == 2) ? 32767u : 8388607u));
 			waveformOverview[binIdx] = h;
 			binIdx++;
 		}

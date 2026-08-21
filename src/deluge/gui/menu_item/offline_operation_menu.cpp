@@ -106,8 +106,7 @@ static void populateOfflineWaveformOverview(Sample* sample) {
 
 			binFrames++;
 			if (binFrames >= framesPerBin) {
-				uint8_t h = (uint8_t)((binPeak * 24) / 32767);
-				if (h < 2) h = 2;
+				uint8_t h = (uint8_t)((binPeak * 32) / ((byteDepth == 2) ? 32767u : 8388607u));
 				gOfflineWaveformOverview[binIdx] = h;
 
 				binIdx++;
@@ -118,14 +117,13 @@ static void populateOfflineWaveformOverview(Sample* sample) {
 		}
 	}
 	while (binIdx < 128) {
-		uint8_t h = (uint8_t)((binPeak * 24) / 32767);
-		if (h < 2) h = 2;
+		uint8_t h = (uint8_t)((binPeak * 32) / ((byteDepth == 2) ? 32767u : 8388607u));
 		gOfflineWaveformOverview[binIdx] = h;
 		binIdx++;
 	}
 }
 
-static void renderWaveformOverviewOnCanvas(Sample* sample, int32_t yBase) {
+static void renderWaveformOverviewOnCanvas(Sample* sample, int32_t yBase = 38, int32_t maxHalfH = 14) {
 	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
 	if (!sample) {
 		return;
@@ -133,7 +131,7 @@ static void renderWaveformOverviewOnCanvas(Sample* sample, int32_t yBase) {
 	populateOfflineWaveformOverview(sample);
 	for (int32_t x = 0; x < 128; x++) {
 		uint8_t h = gOfflineWaveformOverview[x];
-		int32_t halfH = h / 2;
+		int32_t halfH = (h * maxHalfH) / 32;
 		if (halfH < 1) {
 			halfH = 1;
 		}
@@ -166,7 +164,8 @@ void NormalizeActionMenuItem::drawValue() {
 void NormalizeActionMenuItem::drawPixelsForOled() {
 	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
 	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
-	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
+	const int32_t yBase = 38;
+	const int32_t maxHalfH = 14;
 
 	canvas.drawString("NORM TARGET", 0, topY, kTextSpacingX, kTextSpacingY);
 
@@ -180,10 +179,10 @@ void NormalizeActionMenuItem::drawPixelsForOled() {
 	canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
 
 	Sample* currentSample = getCurrentSample();
-	renderWaveformOverviewOnCanvas(currentSample, yBase);
+	renderWaveformOverviewOnCanvas(currentSample, yBase, maxHalfH);
 
 	float ratio = powf(10.0f, db / 20.0f);
-	int32_t targetOffset = (int32_t)(ratio * 12.0f);
+	int32_t targetOffset = (int32_t)(ratio * (float)maxHalfH);
 	if (targetOffset < 1) {
 		targetOffset = 1;
 	}
@@ -233,7 +232,8 @@ void GainActionMenuItem::drawValue() {
 void GainActionMenuItem::drawPixelsForOled() {
 	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
 	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
-	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
+	const int32_t yBase = 38;
+	const int32_t maxHalfH = 14;
 
 	canvas.drawString("GAIN BOOST", 0, topY, kTextSpacingX, kTextSpacingY);
 
@@ -247,10 +247,10 @@ void GainActionMenuItem::drawPixelsForOled() {
 	canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
 
 	Sample* currentSample = getCurrentSample();
-	renderWaveformOverviewOnCanvas(currentSample, yBase);
+	renderWaveformOverviewOnCanvas(currentSample, yBase, maxHalfH);
 
 	float ratio = powf(10.0f, db / 20.0f);
-	int32_t gainOffset = (int32_t)(ratio * 12.0f);
+	int32_t gainOffset = (int32_t)(ratio * (float)maxHalfH);
 	if (gainOffset < 1) {
 		gainOffset = 1;
 	}
@@ -285,13 +285,14 @@ void ReverseActionMenuItem::readValueAgain() {
 void ReverseActionMenuItem::drawPixelsForOled() {
 	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
 	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
-	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
+	const int32_t yBase = 38;
+	const int32_t maxHalfH = 14;
 
 	canvas.drawString("REVERSE", 0, topY, kTextSpacingX, kTextSpacingY);
 	canvas.drawStringAlignRight("APPLY", topY, kTextSpacingX, kTextSpacingY);
 
 	Sample* currentSample = getCurrentSample();
-	renderWaveformOverviewOnCanvas(currentSample, yBase);
+	renderWaveformOverviewOnCanvas(currentSample, yBase, maxHalfH);
 
 	canvas.drawHorizontalLine(yBase, 0, 127);
 }
@@ -351,7 +352,8 @@ void LevelerActionMenuItem::selectEncoderAction(int32_t offset) {
 void LevelerActionMenuItem::drawPixelsForOled() {
 	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
 	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
-	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
+	const int32_t yBase = 38;
+	const int32_t maxHalfH = 14;
 
 	if (levelerJob().isWaitingForThreshold()) {
 		canvas.drawString("T THRESH", 0, topY, kTextSpacingX, kTextSpacingY);
@@ -363,10 +365,10 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 		canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
 
 		Sample* currentSample = getCurrentSample();
-		renderWaveformOverviewOnCanvas(currentSample, yBase);
+		renderWaveformOverviewOnCanvas(currentSample, yBase, maxHalfH);
 
 		float ratio = powf(10.0f, db / 20.0f);
-		int32_t threshOffset = (int32_t)(ratio * 12.0f);
+		int32_t threshOffset = (int32_t)(ratio * (float)maxHalfH);
 		if (threshOffset < 1) {
 			threshOffset = 1;
 		}
