@@ -17,18 +17,18 @@ public:
 	std::string_view getName() const override { return "OVERWRITE"; }
 };
 
-class NormalizeActionMenuItem : public Integer {
+class NormalizeActionMenuItem : public MenuItem {
 public:
 	NormalizeActionMenuItem();
 	std::string_view getName() const override { return "NORMALIZE"; }
+	void beginSession(MenuItem* navigatedBackwardFrom = nullptr) override;
 	MenuItem* selectButtonPress() override;
 	void selectEncoderAction(int32_t offset) override;
-
-protected:
-	int32_t getMaxValue() const override { return 300; }   // +3.00 dB
-	int32_t getMinValue() const override { return -2400; } // -24.00 dB
 	void drawPixelsForOled() override;
-	void drawValue() override;
+	void readValueAgain() override;
+
+private:
+	int32_t targetCeilingVal_ = 0; // 0.00 dB default
 };
 
 class ReverseActionMenuItem : public MenuItem {
@@ -36,7 +36,6 @@ public:
 	ReverseActionMenuItem();
 	std::string_view getName() const override { return "REVERSE"; }
 	void readValueAgain() override;
-	void drawPixelsForOled() override;
 	MenuItem* selectButtonPress() override;
 };
 
@@ -58,6 +57,7 @@ class LevelerActionMenuItem : public MenuItem {
 public:
 	LevelerActionMenuItem();
 	std::string_view getName() const override { return "LEVELER"; }
+	void beginSession(MenuItem* navigatedBackwardFrom = nullptr) override;
 	MenuItem* selectButtonPress() override;
 	void selectEncoderAction(int32_t offset) override;
 	void drawPixelsForOled() override;
@@ -70,7 +70,6 @@ private:
 class OfflineOperationMenu : public Submenu {
 public:
 	OfflineOperationMenu();
-	void beginSession(MenuItem* navigatedBackwardFrom = nullptr) override;
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override;
 	MenuPermission checkPermissionToBeginSession(ModControllableAudio* modControllable, int32_t whichThing,
 	                                             ::MultiRange** currentRange) override;

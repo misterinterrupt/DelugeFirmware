@@ -63,6 +63,7 @@
 #include "processing/offline/gain_job.h"
 #include "processing/offline/leveler_job.h"
 #include "processing/offline/normalize_job.h"
+#include "processing/offline/normalizer_job.h"
 #include "processing/offline/reverse_job.h"
 #include "storage/audio/audio_file_manager.h"
 #include "storage/flash_storage.h"
@@ -610,6 +611,7 @@ void registerTasks() {
 	addRepeatingTask(
 	    []() {
 		    normalizeJob().tick();
+		    normalizerJob().tick();
 		    gainJob().tick();
 		    levelerJob().tick();
 		    reverseJob().tick();
