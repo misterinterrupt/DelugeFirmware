@@ -53,6 +53,11 @@ GainJob& gainJob() {
 }
 
 bool GainJob::start(Sample* sample, bool overwrite) {
+	if (!sample) {
+		showPopup("NO SAMPLE");
+		return false;
+	}
+
 	if (isActive()) {
 		showPopup("BUSY");
 		return false;
@@ -132,7 +137,13 @@ void GainJob::tick() {
 		return;
 
 	case Phase::OPEN: {
-		auto opened = FatFS::File::open(sourcePath.get(), FA_READ);
+		char const* src = sourcePath.get();
+		if (!src || *src == '\0') {
+			fail("BAD PATH");
+			return;
+		}
+
+		auto opened = FatFS::File::open(src, FA_READ);
 		if (!opened) {
 			failIO(Site::OP, opened.error());
 			return;
@@ -296,6 +307,11 @@ void GainJob::beginCopyPass() {
 	linearGain_ = powf(10.0f, gainDb_ / 20.0f);
 
 	char const* src = sourcePath.get();
+	if (!src || *src == '\0') {
+		fail("BAD PATH");
+		return;
+	}
+
 	char const* lastDot = strrchr(src, '.');
 	char const* lastSlash = strrchr(src, '/');
 
@@ -384,6 +400,9 @@ void GainJob::beginCopyPass() {
 
 void GainJob::scanChunkForPeak(uint32_t bytesRead) {
 	uint32_t frameSize = byteDepth * numChannels;
+	if (frameSize == 0) {
+		return;
+	}
 	uint32_t numFrames = bytesRead / frameSize;
 
 	uint32_t bytesScannedSoFar = totalDataBytes - dataBytesRemaining;
@@ -429,6 +448,9 @@ void GainJob::scanChunkForPeak(uint32_t bytesRead) {
 
 void GainJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, uint8_t channels) {
 	uint32_t frameSize = depth * channels;
+	if (frameSize == 0) {
+		return;
+	}
 	uint32_t frames = bytes / frameSize;
 	uint8_t* ptr = buffer;
 
@@ -437,6 +459,9 @@ void GainJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, uint8
 			for (uint8_t c = 0; c < channels; c++) {
 				int16_t sampleVal = (int16_t)(ptr[0] | (ptr[1] << 8));
 				float scaled = (float)sampleVal * linearGain_;
+				if (std::isnan(scaled) || std::isinf(scaled)) {
+					scaled = 0.0f;
+				}
 				int32_t outVal = (int32_t)lroundf(scaled);
 
 				if (outVal > 32767) {
@@ -455,8 +480,14 @@ void GainJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, uint8
 	else if (depth == 3) {
 		for (uint32_t f = 0; f < frames; f++) {
 			for (uint8_t c = 0; c < channels; c++) {
-				int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
+				int32_t sampleVal = (int32_t)(ptr[0] | (ptr[1] << 8) | (ptr[2] << 16));
+				if (sampleVal & 0x800000) {
+					sampleVal |= 0xFF000000;
+				}
 				float scaled = (float)sampleVal * linearGain_;
+				if (std::isnan(scaled) || std::isinf(scaled)) {
+					scaled = 0.0f;
+				}
 				int32_t outVal = (int32_t)lroundf(scaled);
 
 				if (outVal > 8388607) {
@@ -548,11 +579,15 @@ void GainJob::succeed() {
 	if (holder) {
 		holder->setAudioFile(nullptr);
 	}
-	audioFileManager.tryToDeleteAudioFileFromMemoryIfItExists(finalPath.get());
+	if (!finalPath.isEmpty()) {
+		audioFileManager.tryToDeleteAudioFileFromMemoryIfItExists(finalPath.get());
+	}
 
 	Error error = Error::NONE;
-	Sample* newSample =
-	    (Sample*)audioFileManager.getAudioFileFromFilename(&finalPath, true, &error, nullptr, AudioFileType::SAMPLE);
+	Sample* newSample = nullptr;
+	if (!finalPath.isEmpty()) {
+		newSample = (Sample*)audioFileManager.getAudioFileFromFilename(&finalPath, true, &error, nullptr, AudioFileType::SAMPLE);
+	}
 	if (newSample) {
 		if (holder) {
 			holder->filePath.set(&finalPath);

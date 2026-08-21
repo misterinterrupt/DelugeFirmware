@@ -53,6 +53,11 @@ ReverseJob& reverseJob() {
 }
 
 bool ReverseJob::start(Sample* sample, bool overwrite) {
+	if (!sample) {
+		showPopup("NO SAMPLE");
+		return false;
+	}
+
 	if (isActive()) {
 		showPopup("BUSY");
 		return false;
@@ -132,7 +137,13 @@ void ReverseJob::tick() {
 		return;
 
 	case Phase::OPEN: {
-		auto opened = FatFS::File::open(sourcePath.get(), FA_READ);
+		char const* src = sourcePath.get();
+		if (!src || *src == '\0') {
+			fail("BAD PATH");
+			return;
+		}
+
+		auto opened = FatFS::File::open(src, FA_READ);
 		if (!opened) {
 			failIO(Site::OP, opened.error());
 			return;
@@ -205,6 +216,10 @@ void ReverseJob::tick() {
 
 	case Phase::REVERSE_DATA: {
 		uint32_t frameSize = byteDepth * numChannels;
+		if (frameSize == 0) {
+			fail("BAD FRAME");
+			return;
+		}
 		uint32_t chunkFrames = dataChunkSize / frameSize;
 		uint32_t bytesToRead = (dataBytesRemaining < (chunkFrames * frameSize))
 		                           ? dataBytesRemaining
@@ -309,6 +324,11 @@ void ReverseJob::tick() {
 
 void ReverseJob::beginCopyPass() {
 	char const* src = sourcePath.get();
+	if (!src || *src == '\0') {
+		fail("BAD PATH");
+		return;
+	}
+
 	char const* lastDot = strrchr(src, '.');
 	char const* lastSlash = strrchr(src, '/');
 
@@ -397,6 +417,9 @@ void ReverseJob::beginCopyPass() {
 
 void ReverseJob::scanChunkForPeak(uint32_t bytesRead) {
 	uint32_t frameSize = byteDepth * numChannels;
+	if (frameSize == 0) {
+		return;
+	}
 	uint32_t numFrames = bytesRead / frameSize;
 
 	uint32_t bytesScannedSoFar = totalDataBytes - dataBytesRemaining;
@@ -442,6 +465,9 @@ void ReverseJob::scanChunkForPeak(uint32_t bytesRead) {
 
 void ReverseJob::reverseChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, uint8_t channels) {
 	uint32_t frameSize = depth * channels;
+	if (frameSize == 0) {
+		return;
+	}
 	uint32_t frames = bytes / frameSize;
 
 	for (uint32_t i = 0; i < frames / 2; i++) {
@@ -526,11 +552,15 @@ void ReverseJob::succeed() {
 	if (holder) {
 		holder->setAudioFile(nullptr);
 	}
-	audioFileManager.tryToDeleteAudioFileFromMemoryIfItExists(finalPath.get());
+	if (!finalPath.isEmpty()) {
+		audioFileManager.tryToDeleteAudioFileFromMemoryIfItExists(finalPath.get());
+	}
 
 	Error error = Error::NONE;
-	Sample* newSample =
-	    (Sample*)audioFileManager.getAudioFileFromFilename(&finalPath, true, &error, nullptr, AudioFileType::SAMPLE);
+	Sample* newSample = nullptr;
+	if (!finalPath.isEmpty()) {
+		newSample = (Sample*)audioFileManager.getAudioFileFromFilename(&finalPath, true, &error, nullptr, AudioFileType::SAMPLE);
+	}
 	if (newSample) {
 		if (holder) {
 			holder->filePath.set(&finalPath);
