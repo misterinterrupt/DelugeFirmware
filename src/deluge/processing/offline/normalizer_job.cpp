@@ -29,8 +29,6 @@ extern "C" {
 extern uint8_t currentlyAccessingCard;
 }
 
-static uint32_t lastReportedPercent = 999;
-
 static void showPopup(char const* message) {
 	if (display->haveOLED()) {
 		display->displayPopup(message);
@@ -38,19 +36,15 @@ static void showPopup(char const* message) {
 }
 
 static void showProgressPopup(uint32_t current, uint32_t total, uint32_t passOffset, uint32_t totalPasses) {
-	if (!display->haveOLED() || total == 0) {
+	if (!display->haveOLED()) {
 		return;
 	}
 	uint32_t passPercent = (current * 100) / total;
 	uint32_t overallPercent = (passOffset * 100 + passPercent) / totalPasses;
-	uint32_t roundedPercent = (overallPercent / 5) * 5;
-	if (roundedPercent != lastReportedPercent) {
-		lastReportedPercent = roundedPercent;
-		DEF_STACK_STRING_BUF(buf, 16);
-		buf.appendInt(roundedPercent);
-		buf.append("%");
-		display->displayPopup(buf.c_str(), 1);
-	}
+	DEF_STACK_STRING_BUF(buf, 16);
+	buf.appendInt(overallPercent);
+	buf.append("%");
+	display->displayPopup(buf.c_str(), 1);
 }
 
 NormalizerJob& normalizerJob() {
@@ -59,11 +53,6 @@ NormalizerJob& normalizerJob() {
 }
 
 bool NormalizerJob::start(Sample* sample, bool overwrite) {
-	if (!sample) {
-		showPopup("NO SAMPLE");
-		return false;
-	}
-
 	if (isActive()) {
 		showPopup("BUSY");
 		return false;
@@ -110,7 +99,6 @@ bool NormalizerJob::start(Sample* sample, bool overwrite) {
 
 	peakValue = 0;
 	audioBytesWritten = 0;
-	lastReportedPercent = 999;
 	std::memset(waveformOverview, 0, sizeof(waveformOverview));
 
 	phase = Phase::OPEN;
@@ -120,7 +108,7 @@ bool NormalizerJob::start(Sample* sample, bool overwrite) {
 
 void NormalizerJob::confirmCeilingAndRun() {
 	if (phase == Phase::SELECT_CEILING) {
-		phase = Phase::PREPARE_COPY;
+		beginCopyPass();
 	}
 }
 
@@ -144,13 +132,7 @@ void NormalizerJob::tick() {
 		return;
 
 	case Phase::OPEN: {
-		char const* src = sourcePath.get();
-		if (!src || *src == '\0') {
-			fail("BAD PATH");
-			return;
-		}
-
-		auto opened = FatFS::File::open(src, FA_READ);
+		auto opened = FatFS::File::open(sourcePath.get(), FA_READ);
 		if (!opened) {
 			failIO(Site::OP, opened.error());
 			return;
@@ -197,11 +179,6 @@ void NormalizerJob::tick() {
 				renderUIsForOled();
 			}
 		}
-		return;
-	}
-
-	case Phase::PREPARE_COPY: {
-		beginCopyPass();
 		return;
 	}
 
@@ -332,11 +309,6 @@ void NormalizerJob::beginCopyPass() {
 	}
 
 	char const* src = sourcePath.get();
-	if (!src || *src == '\0') {
-		fail("BAD PATH");
-		return;
-	}
-
 	char const* lastDot = strrchr(src, '.');
 	char const* lastSlash = strrchr(src, '/');
 
@@ -425,9 +397,6 @@ void NormalizerJob::beginCopyPass() {
 
 void NormalizerJob::scanChunkForPeak(uint32_t bytesRead) {
 	uint32_t frameSize = byteDepth * numChannels;
-	if (frameSize == 0) {
-		return;
-	}
 	uint32_t numFrames = bytesRead / frameSize;
 
 	uint32_t bytesScannedSoFar = totalDataBytes - dataBytesRemaining;
@@ -473,9 +442,6 @@ void NormalizerJob::scanChunkForPeak(uint32_t bytesRead) {
 
 void NormalizerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, uint8_t channels) {
 	uint32_t frameSize = depth * channels;
-	if (frameSize == 0) {
-		return;
-	}
 	uint32_t frames = bytes / frameSize;
 	uint8_t* ptr = buffer;
 
@@ -484,9 +450,6 @@ void NormalizerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth,
 			for (uint8_t c = 0; c < channels; c++) {
 				int16_t sampleVal = (int16_t)(ptr[0] | (ptr[1] << 8));
 				float scaled = (float)sampleVal * normGainRatio_;
-				if (std::isnan(scaled) || std::isinf(scaled)) {
-					scaled = 0.0f;
-				}
 				int32_t outVal = (int32_t)lroundf(scaled);
 
 				if (outVal > 32767) {
@@ -505,14 +468,8 @@ void NormalizerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth,
 	else if (depth == 3) {
 		for (uint32_t f = 0; f < frames; f++) {
 			for (uint8_t c = 0; c < channels; c++) {
-				int32_t sampleVal = (int32_t)(ptr[0] | (ptr[1] << 8) | (ptr[2] << 16));
-				if (sampleVal & 0x800000) {
-					sampleVal |= 0xFF000000;
-				}
+				int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
 				float scaled = (float)sampleVal * normGainRatio_;
-				if (std::isnan(scaled) || std::isinf(scaled)) {
-					scaled = 0.0f;
-				}
 				int32_t outVal = (int32_t)lroundf(scaled);
 
 				if (outVal > 8388607) {
@@ -604,15 +561,11 @@ void NormalizerJob::succeed() {
 	if (holder) {
 		holder->setAudioFile(nullptr);
 	}
-	if (!finalPath.isEmpty()) {
-		audioFileManager.tryToDeleteAudioFileFromMemoryIfItExists(finalPath.get());
-	}
+	audioFileManager.tryToDeleteAudioFileFromMemoryIfItExists(finalPath.get());
 
 	Error error = Error::NONE;
-	Sample* newSample = nullptr;
-	if (!finalPath.isEmpty()) {
-		newSample = (Sample*)audioFileManager.getAudioFileFromFilename(&finalPath, true, &error, nullptr, AudioFileType::SAMPLE);
-	}
+	Sample* newSample =
+	    (Sample*)audioFileManager.getAudioFileFromFilename(&finalPath, true, &error, nullptr, AudioFileType::SAMPLE);
 	if (newSample) {
 		if (holder) {
 			holder->filePath.set(&finalPath);

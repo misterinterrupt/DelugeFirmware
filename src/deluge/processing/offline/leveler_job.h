@@ -21,7 +21,6 @@ public:
 		OPEN,
 		SCAN,
 		SELECT_THRESHOLD,
-		PREPARE_COPY,
 		COPY_HEADER,
 		LEVEL_DATA,
 		FINALIZE,
@@ -94,7 +93,7 @@ private:
 	uint32_t peakValue = 0;
 	uint32_t audioBytesWritten = 0;
 
-	uint8_t waveformOverview[kOverviewColumns];
+	uint8_t waveformOverview[kOverviewColumns]{0};
 };
 
 LevelerJob& levelerJob();
