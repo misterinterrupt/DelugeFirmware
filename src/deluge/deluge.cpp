@@ -61,6 +61,7 @@
 #include "processing/engines/audio_engine.h"
 #include "processing/engines/cv_engine.h"
 #include "processing/offline/gain_job.h"
+#include "processing/offline/leveler_job.h"
 #include "processing/offline/normalize_job.h"
 #include "processing/offline/reverse_job.h"
 #include "storage/audio/audio_file_manager.h"
@@ -610,6 +611,7 @@ void registerTasks() {
 	    []() {
 		    normalizeJob().tick();
 		    gainJob().tick();
+		    levelerJob().tick();
 		    reverseJob().tick();
 	    },
 	    p++, 0.005, 0.005, 0.01, "offline ops");

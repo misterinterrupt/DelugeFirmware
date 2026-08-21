@@ -53,6 +53,20 @@ protected:
 	void drawValue() override;
 };
 
+class LevelerActionMenuItem : public Integer {
+public:
+	LevelerActionMenuItem();
+	std::string_view getName() const override { return "LEVELER"; }
+	MenuItem* selectButtonPress() override;
+	void selectEncoderAction(int32_t offset) override;
+
+protected:
+	int32_t getMaxValue() const override { return 0; }      // 0.00 dB
+	int32_t getMinValue() const override { return -2400; }  // -24.00 dB
+	void drawPixelsForOled() override;
+	void drawValue() override;
+};
+
 class OfflineOperationMenu : public Submenu {
 public:
 	OfflineOperationMenu();

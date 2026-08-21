@@ -1,9 +1,11 @@
 #include "gui/menu_item/offline_operation_menu.h"
 #include "gui/ui/sound_editor.h"
+#include "gui/ui/ui.h"
 #include "hid/display/display.h"
 #include "hid/display/oled.h"
 #include "model/sample/sample.h"
 #include "processing/offline/gain_job.h"
+#include "processing/offline/leveler_job.h"
 #include "processing/offline/normalize_job.h"
 #include "processing/offline/reverse_job.h"
 #include "processing/sound/sound.h"
@@ -17,6 +19,7 @@ static SaveModeMenuItem saveModeMenuItem;
 static NormalizeActionMenuItem normalizeActionMenuItem;
 static ReverseActionMenuItem reverseActionMenuItem;
 static GainActionMenuItem gainActionMenuItem;
+static LevelerActionMenuItem levelerActionMenuItem;
 
 SaveModeMenuItem::SaveModeMenuItem()
     : ToggleBool(deluge::l10n::String::EMPTY_STRING, deluge::l10n::String::EMPTY_STRING, gOfflineJobOverwrite) {
@@ -145,11 +148,100 @@ MenuItem* ReverseActionMenuItem::selectButtonPress() {
 	return nullptr;
 }
 
+LevelerActionMenuItem::LevelerActionMenuItem() : Integer(deluge::l10n::String::EMPTY_STRING) {
+	setValue(-600);
+}
+
+void LevelerActionMenuItem::selectEncoderAction(int32_t offset) {
+	Integer::selectEncoderAction(offset * 50);
+	if (levelerJob().isWaitingForThreshold()) {
+		float threshDb = (float)getValue() / 100.0f;
+		levelerJob().setThresholdDb(threshDb);
+		if (display->haveOLED()) {
+			renderUIsForOled();
+		}
+	}
+}
+
+void LevelerActionMenuItem::drawValue() {
+	float db = (float)getValue() / 100.0f;
+	DEF_STACK_STRING_BUF(buffer, 16);
+	buffer.appendFloat(db, 1, 1);
+	buffer.append("DB");
+	display->setText(buffer.c_str());
+}
+
+void LevelerActionMenuItem::drawPixelsForOled() {
+	if (levelerJob().isWaitingForThreshold()) {
+		deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+
+		canvas.drawString("T THRESH", 0, 0, kTextSpacingX, kTextSpacingY);
+
+		float db = (float)getValue() / 100.0f;
+		DEF_STACK_STRING_BUF(buffer, 16);
+		buffer.appendFloat(db, 1, 1);
+		buffer.append(" dB");
+		canvas.drawStringAlignRight(buffer.c_str(), 0, kTextSpacingX, kTextSpacingY);
+
+		uint8_t const* overview = levelerJob().getWaveformOverview();
+		const int32_t yBase = 36;
+		for (int32_t x = 0; x < 128; x++) {
+			uint8_t h = overview[x];
+			int32_t halfH = h / 2;
+			if (halfH < 1) {
+				halfH = 1;
+			}
+			canvas.drawVerticalLine(x, yBase - halfH, yBase + halfH);
+		}
+
+		float ratio = powf(10.0f, db / 20.0f);
+		int32_t threshOffset = (int32_t)(ratio * 16.0f);
+		if (threshOffset < 1) {
+			threshOffset = 1;
+		}
+
+		int32_t yThreshTop = yBase - threshOffset;
+		int32_t yThreshBot = yBase + threshOffset;
+
+		canvas.drawHorizontalLine(yThreshTop, 0, 127);
+		canvas.drawHorizontalLine(yThreshBot, 0, 127);
+	}
+	else {
+		float db = (float)getValue() / 100.0f;
+		DEF_STACK_STRING_BUF(buffer, 16);
+		buffer.appendFloat(db, 1, 1);
+		buffer.append(" dB");
+
+		deluge::hid::display::OLED::main.drawStringCentred(buffer.c_str(), 18 + OLED_MAIN_TOPMOST_PIXEL, kTextHugeSpacingX,
+		                                                   kTextHugeSizeY);
+	}
+}
+
+MenuItem* LevelerActionMenuItem::selectButtonPress() {
+	Sample* currentSample = getCurrentSample();
+
+	if (!currentSample) {
+		display->displayPopup("NO SAMPLE");
+		return nullptr;
+	}
+
+	if (levelerJob().isWaitingForThreshold()) {
+		float threshDb = (float)getValue() / 100.0f;
+		levelerJob().setThresholdDb(threshDb);
+		levelerJob().confirmThresholdAndRun();
+	}
+	else {
+		levelerJob().start(currentSample, gOfflineJobOverwrite);
+	}
+	return nullptr;
+}
+
 OfflineOperationMenu offlineOperationMenu;
 
 OfflineOperationMenu::OfflineOperationMenu()
     : Submenu(deluge::l10n::String::EMPTY_STRING,
-              {&normalizeActionMenuItem, &gainActionMenuItem, &reverseActionMenuItem, &saveModeMenuItem}) {
+              {&normalizeActionMenuItem, &gainActionMenuItem, &levelerActionMenuItem, &reverseActionMenuItem,
+               &saveModeMenuItem}) {
 }
 
 bool OfflineOperationMenu::isRelevant(ModControllableAudio* modControllable, int32_t /*whichThing*/) {
