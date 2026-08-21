@@ -26,6 +26,22 @@ SaveModeMenuItem::SaveModeMenuItem()
     : ToggleBool(deluge::l10n::String::EMPTY_STRING, deluge::l10n::String::EMPTY_STRING, gOfflineJobOverwrite) {
 }
 
+static void drawSafeHorizontalLine(deluge::hid::display::oled_canvas::Canvas& canvas, int32_t y, int32_t startX, int32_t endX) {
+	if (y >= 0 && y < OLED_MAIN_HEIGHT_PIXELS) {
+		canvas.drawHorizontalLine(y, startX, endX);
+	}
+}
+
+static void drawSafeVerticalLine(deluge::hid::display::oled_canvas::Canvas& canvas, int32_t x, int32_t startY, int32_t endY) {
+	if (x < 0 || x >= OLED_MAIN_WIDTH_PIXELS) return;
+	if (startY < 0) startY = 0;
+	if (startY >= OLED_MAIN_HEIGHT_PIXELS) startY = OLED_MAIN_HEIGHT_PIXELS - 1;
+	if (endY < 0) endY = 0;
+	if (endY >= OLED_MAIN_HEIGHT_PIXELS) endY = OLED_MAIN_HEIGHT_PIXELS - 1;
+	if (startY > endY) std::swap(startY, endY);
+	canvas.drawVerticalLine(x, startY, endY);
+}
+
 static Sample* getCurrentSample() {
 	if (soundEditor.currentMultiRange == nullptr && soundEditor.currentSound != nullptr) {
 		Source* source = &soundEditor.currentSound->sources[soundEditor.currentSourceIndex];
@@ -107,7 +123,7 @@ void NormalizeActionMenuItem::drawPixelsForOled() {
 			if (halfH < 1) {
 				halfH = 1;
 			}
-			canvas.drawVerticalLine(x, yBase - halfH, yBase + halfH);
+			drawSafeVerticalLine(canvas, x, yBase - halfH, yBase + halfH);
 		}
 
 		float ratio = powf(10.0f, db / 20.0f);
@@ -119,8 +135,8 @@ void NormalizeActionMenuItem::drawPixelsForOled() {
 		int32_t yThreshTop = yBase - threshOffset;
 		int32_t yThreshBot = yBase + threshOffset;
 
-		canvas.drawHorizontalLine(yThreshTop, 0, 127);
-		canvas.drawHorizontalLine(yThreshBot, 0, 127);
+		drawSafeHorizontalLine(canvas, yThreshTop, 0, 127);
+		drawSafeHorizontalLine(canvas, yThreshBot, 0, 127);
 	}
 	else if (normalizerJob().isActive()) {
 		canvas.drawString("SCANNING...", 0, topY, kTextSpacingX, kTextSpacingY);
@@ -279,7 +295,7 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 			if (halfH < 1) {
 				halfH = 1;
 			}
-			canvas.drawVerticalLine(x, yBase - halfH, yBase + halfH);
+			drawSafeVerticalLine(canvas, x, yBase - halfH, yBase + halfH);
 		}
 
 		float ratio = powf(10.0f, db / 20.0f);
@@ -291,8 +307,8 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 		int32_t yThreshTop = yBase - threshOffset;
 		int32_t yThreshBot = yBase + threshOffset;
 
-		canvas.drawHorizontalLine(yThreshTop, 0, 127);
-		canvas.drawHorizontalLine(yThreshBot, 0, 127);
+		drawSafeHorizontalLine(canvas, yThreshTop, 0, 127);
+		drawSafeHorizontalLine(canvas, yThreshBot, 0, 127);
 	}
 	else if (levelerJob().isActive()) {
 		canvas.drawString("SCANNING...", 0, topY, kTextSpacingX, kTextSpacingY);
