@@ -66,6 +66,7 @@
 #include "processing/offline/normalize_job.h"
 #include "processing/offline/normalizer_job.h"
 #include "processing/offline/reverse_job.h"
+#include "processing/offline/reverser_job.h"
 #include "storage/audio/audio_file_manager.h"
 #include "storage/flash_storage.h"
 #include "storage/storage_manager.h"
@@ -617,6 +618,7 @@ void registerTasks() {
 		    gainerJob().tick();
 		    levelerJob().tick();
 		    reverseJob().tick();
+		    reverserJob().tick();
 	    },
 	    p++, 0.005, 0.005, 0.01, "offline ops");
 

@@ -35,8 +35,14 @@ class ReverseActionMenuItem : public MenuItem {
 public:
 	ReverseActionMenuItem();
 	std::string_view getName() const override { return "REVERSE"; }
-	void readValueAgain() override;
+	void beginSession(MenuItem* navigatedBackwardFrom = nullptr) override;
 	MenuItem* selectButtonPress() override;
+	void selectEncoderAction(int32_t offset) override;
+	void drawPixelsForOled() override;
+	void readValueAgain() override;
+
+private:
+	int32_t modeVal_ = 0; // -1 = DETECT, 0 = FULL, 1..100 = 1%..100% slices
 };
 
 class GainActionMenuItem : public MenuItem {

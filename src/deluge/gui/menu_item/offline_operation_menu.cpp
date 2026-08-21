@@ -10,6 +10,7 @@
 #include "processing/offline/normalize_job.h"
 #include "processing/offline/normalizer_job.h"
 #include "processing/offline/reverse_job.h"
+#include "processing/offline/reverser_job.h"
 #include "processing/sound/sound.h"
 #include "storage/multi_range/multisample_range.h"
 
@@ -285,10 +286,111 @@ MenuItem* GainActionMenuItem::selectButtonPress() {
 }
 
 ReverseActionMenuItem::ReverseActionMenuItem() : MenuItem(deluge::l10n::String::EMPTY_STRING) {
+	modeVal_ = 0;
+}
+
+void ReverseActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
+	MenuItem::beginSession(navigatedBackwardFrom);
+	Sample* currentSample = getCurrentSample();
+	if (currentSample && !reverserJob().isActive()) {
+		reverserJob().setModeParam(modeVal_);
+		reverserJob().start(currentSample, gOfflineJobOverwrite);
+	}
 }
 
 void ReverseActionMenuItem::readValueAgain() {
 	display->setText("REVERSE");
+}
+
+void ReverseActionMenuItem::selectEncoderAction(int32_t offset) {
+	if (reverserJob().isWaitingForMode()) {
+		modeVal_ += offset;
+		if (modeVal_ > 100) {
+			modeVal_ = 100;
+		}
+		else if (modeVal_ < -1) {
+			modeVal_ = -1;
+		}
+		reverserJob().setModeParam(modeVal_);
+
+		DEF_STACK_STRING_BUF(buffer, 16);
+		if (modeVal_ == -1) {
+			buffer.append("DETECT");
+		}
+		else if (modeVal_ == 0) {
+			buffer.append("FULL");
+		}
+		else {
+			buffer.appendInt(modeVal_);
+			buffer.append("%");
+		}
+		display->setText(buffer.c_str());
+
+		if (display->haveOLED()) {
+			renderUIsForOled();
+		}
+	}
+}
+
+void ReverseActionMenuItem::drawPixelsForOled() {
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
+
+	if (reverserJob().isWaitingForMode()) {
+		canvas.drawString("REV MODE", 0, topY, kTextSpacingX, kTextSpacingY);
+
+		DEF_STACK_STRING_BUF(buffer, 16);
+		if (modeVal_ == -1) {
+			buffer.append("DETECT");
+		}
+		else if (modeVal_ == 0) {
+			buffer.append("FULL (0%)");
+		}
+		else {
+			buffer.appendInt(modeVal_);
+			buffer.append("%");
+		}
+		canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
+
+		uint8_t const* overview = reverserJob().getWaveformOverview();
+		for (int32_t x = 0; x < 128; x++) {
+			uint8_t h = overview[x];
+			int32_t halfH = h / 2;
+			if (halfH < 1) {
+				halfH = 1;
+			}
+			drawSafeVerticalLine(canvas, x, yBase - halfH, yBase + halfH);
+		}
+
+		if (modeVal_ == -1) {
+			uint32_t tCount = reverserJob().getTransientCount();
+			uint32_t const* tFrames = reverserJob().getTransientFrames();
+			uint32_t totalFrames = reverserJob().getTotalFrames();
+			if (totalFrames > 0) {
+				for (uint32_t i = 0; i < tCount; i++) {
+					int32_t xPos = (tFrames[i] * 128u) / totalFrames;
+					if (xPos >= 0 && xPos < 128) {
+						drawSafeVerticalLine(canvas, xPos, yBase - 14, yBase + 14);
+					}
+				}
+			}
+		}
+		else if (modeVal_ > 0) {
+			int32_t stepX = (128 * modeVal_) / 100;
+			if (stepX >= 2) {
+				for (int32_t x = stepX; x < 128; x += stepX) {
+					drawSafeVerticalLine(canvas, x, yBase - 12, yBase + 12);
+				}
+			}
+		}
+	}
+	else if (reverserJob().isActive()) {
+		canvas.drawString("SCANNING...", 0, topY, kTextSpacingX, kTextSpacingY);
+	}
+	else {
+		canvas.drawString("REVERSE", 0, topY, kTextSpacingX, kTextSpacingY);
+	}
 }
 
 MenuItem* ReverseActionMenuItem::selectButtonPress() {
@@ -299,7 +401,17 @@ MenuItem* ReverseActionMenuItem::selectButtonPress() {
 		return nullptr;
 	}
 
-	reverseJob().start(currentSample, gOfflineJobOverwrite);
+	if (reverserJob().isWaitingForMode()) {
+		reverserJob().setModeParam(modeVal_);
+		reverserJob().confirmModeAndRun();
+		return nullptr;
+	}
+	else if (!reverserJob().isActive()) {
+		reverserJob().setModeParam(modeVal_);
+		if (reverserJob().start(currentSample, gOfflineJobOverwrite)) {
+			return NO_NAVIGATION;
+		}
+	}
 	return nullptr;
 }
 
