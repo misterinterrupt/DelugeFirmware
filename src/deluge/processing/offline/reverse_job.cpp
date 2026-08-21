@@ -4,6 +4,7 @@
  * Reverse DSP Job implementation.
  */
 
+#include "gui/menu_item/offline_operation_menu.h"
 #include "processing/engines/audio_engine.h"
 #include "processing/offline/reverse_job.h"
 
@@ -463,6 +464,8 @@ void ReverseJob::succeed() {
 	tempPath.clear();
 	finalPath.clear();
 	sourcePath.clear();
+
+	deluge::gui::menu_item::invalidateSharedWaveformOverview();
 
 	if (overwriteTarget_) {
 		showPopup("OVERWRITTEN");

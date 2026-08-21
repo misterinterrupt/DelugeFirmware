@@ -4,6 +4,7 @@
  * Leveler DSP Job implementation.
  */
 
+#include "gui/menu_item/offline_operation_menu.h"
 #include "processing/engines/audio_engine.h"
 #include "processing/offline/leveler_job.h"
 
@@ -38,8 +39,7 @@ static void showProgressPopup(uint32_t current, uint32_t total, uint32_t passOff
 	}
 	uint32_t passPercent = (current * 100) / total;
 	uint32_t overallPercent = (passOffset * 100 + passPercent) / totalPasses;
-	DEF_STACK_STRING_BUF(buf, 24);
-	buf.append("LEVELING... ");
+	DEF_STACK_STRING_BUF(buf, 16);
 	buf.appendInt(overallPercent);
 	buf.append("%");
 	display->displayPopup(buf.c_str(), 1);
@@ -50,13 +50,13 @@ LevelerJob& levelerJob() {
 	return instance;
 }
 
-bool LevelerJob::setupWaveformPreview(Sample* sample, bool overwrite) {
-	if (isActive() && phase != Phase::SELECT_THRESHOLD) {
+bool LevelerJob::start(Sample* sample, bool overwrite) {
+	if (isActive()) {
 		showPopup("BUSY");
 		return false;
 	}
 
-	if (!sample || !sample->audioDataLengthBytes || !sample->byteDepth || !sample->audioDataStartPosBytes) {
+	if (!sample->audioDataLengthBytes || !sample->byteDepth || !sample->audioDataStartPosBytes) {
 		showPopup("CANT LEVEL");
 		return false;
 	}
@@ -73,6 +73,12 @@ bool LevelerJob::setupWaveformPreview(Sample* sample, bool overwrite) {
 	uint64_t total = sample->audioDataLengthBytes;
 	if (total > 0xFFFFFFFFu) {
 		showPopup("CANT LEVEL");
+		return false;
+	}
+
+	chunkBuffer = (uint8_t*)delugeAlloc(kChunkSize, false);
+	if (!chunkBuffer) {
+		showPopup("MEMORY");
 		return false;
 	}
 
@@ -96,100 +102,15 @@ bool LevelerJob::setupWaveformPreview(Sample* sample, bool overwrite) {
 	peakValue = 0;
 	audioBytesWritten = 0;
 	std::memset(waveformOverview, 0, sizeof(waveformOverview));
-	std::memset(waveformOverviewMin, 0, sizeof(waveformOverviewMin));
-	std::memset(waveformOverviewMax, 0, sizeof(waveformOverviewMax));
 
-	auto opened = FatFS::File::open(sourcePath.get(), FA_READ);
-	if (opened) {
-		opened->lseek(dataStart);
-		uint32_t totalFrames = totalDataBytes / frameSize;
-		uint32_t framesPerBin = totalFrames > 128 ? (totalFrames / 128) : 1;
-
-		uint8_t staticBuf[1024];
-		uint32_t bytesReadTotal = 0;
-		int32_t binIdx = 0;
-		int32_t maxInBin = -32768;
-		int32_t minInBin = 32767;
-		uint32_t binFrames = 0;
-
-		while (bytesReadTotal < totalDataBytes && binIdx < 128) {
-			uint32_t toRead = std::min(totalDataBytes - bytesReadTotal, (uint32_t)sizeof(staticBuf));
-			auto readRes = opened->read({(std::byte*)staticBuf, toRead});
-			if (!readRes || readRes->empty()) break;
-			uint32_t got = readRes->size();
-			bytesReadTotal += got;
-
-			uint32_t framesInChunk = got / frameSize;
-			uint8_t* ptr = staticBuf;
-
-			for (uint32_t f = 0; f < framesInChunk; f++) {
-				int32_t val = 0;
-				if (byteDepth == 2) {
-					int16_t sampleVal = (int16_t)(ptr[0] | (ptr[1] << 8));
-					val = (int32_t)sampleVal;
-				}
-				else if (byteDepth == 3) {
-					int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
-					val = sampleVal >> 8;
-				}
-				ptr += frameSize;
-
-				if (val > maxInBin) maxInBin = val;
-				if (val < minInBin) minInBin = val;
-
-				binFrames++;
-				if (binFrames >= framesPerBin) {
-					int32_t scaledMax = (maxInBin * 32) / 32767;
-					int32_t scaledMin = (minInBin * 32) / 32767;
-					if (scaledMax > 32) scaledMax = 32;
-					if (scaledMin < -32) scaledMin = -32;
-
-					waveformOverviewMax[binIdx] = (int8_t)scaledMax;
-					waveformOverviewMin[binIdx] = (int8_t)scaledMin;
-					uint32_t absPeak = std::max(std::abs(maxInBin), std::abs(minInBin));
-					waveformOverview[binIdx] = (uint8_t)((absPeak * 32) / 32767);
-
-					binIdx++;
-					maxInBin = -32768;
-					minInBin = 32767;
-					binFrames = 0;
-					if (binIdx >= 128) break;
-				}
-			}
-		}
-		while (binIdx < 128) {
-			int32_t scaledMax = (maxInBin * 32) / 32767;
-			int32_t scaledMin = (minInBin * 32) / 32767;
-			if (scaledMax > 32) scaledMax = 32;
-			if (scaledMin < -32) scaledMin = -32;
-
-			waveformOverviewMax[binIdx] = (int8_t)scaledMax;
-			waveformOverviewMin[binIdx] = (int8_t)scaledMin;
-			uint32_t absPeak = std::max(std::abs(maxInBin), std::abs(minInBin));
-			waveformOverview[binIdx] = (uint8_t)((absPeak * 32) / 32767);
-			binIdx++;
-		}
-	}
-
-	phase = Phase::SELECT_THRESHOLD;
+	phase = Phase::OPEN;
+	showPopup("SCANNING...");
 	return true;
-}
-
-bool LevelerJob::start(Sample* sample, bool overwrite) {
-	return setupWaveformPreview(sample, overwrite);
 }
 
 void LevelerJob::confirmThresholdAndRun() {
 	if (phase == Phase::SELECT_THRESHOLD) {
-		if (!chunkBuffer) {
-			chunkBuffer = (uint8_t*)delugeAlloc(kChunkSize, false);
-			if (!chunkBuffer) {
-				fail("MEMORY");
-				return;
-			}
-		}
-		phase = Phase::OPEN;
-		showPopup("LEVELING... 0%");
+		beginCopyPass();
 	}
 }
 
@@ -255,7 +176,10 @@ void LevelerJob::tick() {
 				fail("SILENCE");
 				return;
 			}
-			beginCopyPass();
+			phase = Phase::SELECT_THRESHOLD;
+			if (display->haveOLED()) {
+				renderUIsForOled();
+			}
 		}
 		return;
 	}
@@ -653,6 +577,8 @@ void LevelerJob::succeed() {
 	tempPath.clear();
 	finalPath.clear();
 	sourcePath.clear();
+
+	deluge::gui::menu_item::invalidateSharedWaveformOverview();
 
 	if (overwriteTarget_) {
 		showPopup("OVERWRITTEN");

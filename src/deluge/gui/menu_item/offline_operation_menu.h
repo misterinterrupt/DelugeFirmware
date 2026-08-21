@@ -10,6 +10,7 @@
 namespace deluge::gui::menu_item {
 
 extern bool gOfflineJobOverwrite;
+void invalidateSharedWaveformOverview();
 
 class SaveModeMenuItem : public ToggleBool {
 public:
