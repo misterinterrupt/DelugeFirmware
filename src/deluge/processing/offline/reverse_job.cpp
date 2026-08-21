@@ -4,6 +4,7 @@
  * Reverse DSP Job implementation.
  */
 
+#include "processing/engines/audio_engine.h"
 #include "processing/offline/reverse_job.h"
 
 #include "definitions_cxx.hpp"
@@ -440,6 +441,7 @@ void ReverseJob::succeed() {
 	phase = Phase::IDLE;
 
 	soundEditor.cutSound();
+	AudioEngine::unassignAllVoices();
 
 	AudioFileHolder* holder = soundEditor.getCurrentAudioFileHolder();
 	if (holder) {

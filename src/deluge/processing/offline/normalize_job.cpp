@@ -2,6 +2,7 @@
  * Copyright © 2023 Synthstrom Audible Limited. All rights reserved.
  */
 
+#include "processing/engines/audio_engine.h"
 #include "processing/offline/normalize_job.h"
 
 #include "definitions_cxx.hpp"
@@ -581,6 +582,7 @@ void NormalizeJob::succeed() {
 	phase = Phase::IDLE;
 
 	soundEditor.cutSound();
+	AudioEngine::unassignAllVoices();
 
 	AudioFileHolder* holder = soundEditor.getCurrentAudioFileHolder();
 	if (holder) {

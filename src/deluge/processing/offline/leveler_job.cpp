@@ -4,6 +4,7 @@
  * Leveler DSP Job implementation.
  */
 
+#include "processing/engines/audio_engine.h"
 #include "processing/offline/leveler_job.h"
 
 #include "definitions_cxx.hpp"
@@ -553,6 +554,7 @@ void LevelerJob::succeed() {
 	phase = Phase::IDLE;
 
 	soundEditor.cutSound();
+	AudioEngine::unassignAllVoices();
 
 	AudioFileHolder* holder = soundEditor.getCurrentAudioFileHolder();
 	if (holder) {

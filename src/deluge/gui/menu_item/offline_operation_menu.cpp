@@ -148,27 +148,35 @@ MenuItem* ReverseActionMenuItem::selectButtonPress() {
 	return nullptr;
 }
 
-LevelerActionMenuItem::LevelerActionMenuItem() : Integer(deluge::l10n::String::EMPTY_STRING) {
-	setValue(-600);
+LevelerActionMenuItem::LevelerActionMenuItem() : MenuItem(deluge::l10n::String::EMPTY_STRING) {
+	thresholdVal_ = -600;
+}
+
+void LevelerActionMenuItem::readValueAgain() {
+	display->setText("LEVELER");
 }
 
 void LevelerActionMenuItem::selectEncoderAction(int32_t offset) {
-	Integer::selectEncoderAction(offset * 50);
 	if (levelerJob().isWaitingForThreshold()) {
-		float threshDb = (float)getValue() / 100.0f;
+		thresholdVal_ += offset * 50;
+		if (thresholdVal_ > 0) {
+			thresholdVal_ = 0;
+		}
+		else if (thresholdVal_ < -2400) {
+			thresholdVal_ = -2400;
+		}
+		float threshDb = (float)thresholdVal_ / 100.0f;
 		levelerJob().setThresholdDb(threshDb);
+
+		DEF_STACK_STRING_BUF(buffer, 16);
+		buffer.appendFloat(threshDb, 1, 1);
+		buffer.append("DB");
+		display->setText(buffer.c_str());
+
 		if (display->haveOLED()) {
 			renderUIsForOled();
 		}
 	}
-}
-
-void LevelerActionMenuItem::drawValue() {
-	float db = (float)getValue() / 100.0f;
-	DEF_STACK_STRING_BUF(buffer, 16);
-	buffer.appendFloat(db, 1, 1);
-	buffer.append("DB");
-	display->setText(buffer.c_str());
 }
 
 void LevelerActionMenuItem::drawPixelsForOled() {
@@ -177,7 +185,7 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 
 		canvas.drawString("T THRESH", 0, 0, kTextSpacingX, kTextSpacingY);
 
-		float db = (float)getValue() / 100.0f;
+		float db = (float)thresholdVal_ / 100.0f;
 		DEF_STACK_STRING_BUF(buffer, 16);
 		buffer.appendFloat(db, 1, 1);
 		buffer.append(" dB");
@@ -207,12 +215,7 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 		canvas.drawHorizontalLine(yThreshBot, 0, 127);
 	}
 	else {
-		float db = (float)getValue() / 100.0f;
-		DEF_STACK_STRING_BUF(buffer, 16);
-		buffer.appendFloat(db, 1, 1);
-		buffer.append(" dB");
-
-		deluge::hid::display::OLED::main.drawStringCentred(buffer.c_str(), 18 + OLED_MAIN_TOPMOST_PIXEL, kTextHugeSpacingX,
+		deluge::hid::display::OLED::main.drawStringCentred("LEVELER", 18 + OLED_MAIN_TOPMOST_PIXEL, kTextHugeSpacingX,
 		                                                   kTextHugeSizeY);
 	}
 }
@@ -226,14 +229,18 @@ MenuItem* LevelerActionMenuItem::selectButtonPress() {
 	}
 
 	if (levelerJob().isWaitingForThreshold()) {
-		float threshDb = (float)getValue() / 100.0f;
+		float threshDb = (float)thresholdVal_ / 100.0f;
 		levelerJob().setThresholdDb(threshDb);
 		levelerJob().confirmThresholdAndRun();
+		return nullptr;
 	}
 	else {
-		levelerJob().start(currentSample, gOfflineJobOverwrite);
+		levelerJob().setThresholdDb((float)thresholdVal_ / 100.0f);
+		if (levelerJob().start(currentSample, gOfflineJobOverwrite)) {
+			return NO_NAVIGATION;
+		}
+		return nullptr;
 	}
-	return nullptr;
 }
 
 OfflineOperationMenu offlineOperationMenu;
