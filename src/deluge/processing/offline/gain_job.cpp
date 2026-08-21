@@ -29,6 +29,8 @@ extern "C" {
 extern uint8_t currentlyAccessingCard;
 }
 
+static uint32_t lastReportedPercent = 999;
+
 static void showPopup(char const* message) {
 	if (display->haveOLED()) {
 		display->displayPopup(message);
@@ -36,15 +38,19 @@ static void showPopup(char const* message) {
 }
 
 static void showProgressPopup(uint32_t current, uint32_t total, uint32_t passOffset, uint32_t totalPasses) {
-	if (!display->haveOLED()) {
+	if (!display->haveOLED() || total == 0) {
 		return;
 	}
 	uint32_t passPercent = (current * 100) / total;
 	uint32_t overallPercent = (passOffset * 100 + passPercent) / totalPasses;
-	DEF_STACK_STRING_BUF(buf, 16);
-	buf.appendInt(overallPercent);
-	buf.append("%");
-	display->displayPopup(buf.c_str(), 1);
+	uint32_t roundedPercent = (overallPercent / 5) * 5;
+	if (roundedPercent != lastReportedPercent) {
+		lastReportedPercent = roundedPercent;
+		DEF_STACK_STRING_BUF(buf, 16);
+		buf.appendInt(roundedPercent);
+		buf.append("%");
+		display->displayPopup(buf.c_str(), 1);
+	}
 }
 
 GainJob& gainJob() {
@@ -104,6 +110,7 @@ bool GainJob::start(Sample* sample, bool overwrite) {
 
 	peakValue = 0;
 	audioBytesWritten = 0;
+	lastReportedPercent = 999;
 	std::memset(waveformOverview, 0, sizeof(waveformOverview));
 
 	phase = Phase::OPEN;
@@ -113,7 +120,7 @@ bool GainJob::start(Sample* sample, bool overwrite) {
 
 void GainJob::confirmGainAndRun() {
 	if (phase == Phase::SELECT_GAIN) {
-		beginCopyPass();
+		phase = Phase::PREPARE_COPY;
 	}
 }
 
@@ -186,6 +193,11 @@ void GainJob::tick() {
 				renderUIsForOled();
 			}
 		}
+		return;
+	}
+
+	case Phase::PREPARE_COPY: {
+		beginCopyPass();
 		return;
 	}
 

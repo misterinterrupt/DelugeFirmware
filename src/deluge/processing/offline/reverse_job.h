@@ -21,6 +21,7 @@ public:
 		OPEN,
 		SCAN,
 		CONFIRM_REVERSE,
+		PREPARE_COPY,
 		COPY_HEADER,
 		REVERSE_DATA,
 		FINALIZE,
@@ -54,8 +55,8 @@ public:
 
 private:
 	void beginCopyPass();
-	void scanChunkForPeak(uint32_t bytesRead);
 	void reverseChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, uint8_t channels);
+	void scanChunkForPeak(uint32_t bytesRead);
 
 	char const* siteName(Site site);
 	void fail(char const* message);
@@ -81,13 +82,12 @@ private:
 	uint32_t dataChunkSize = 0;
 	uint8_t numChannels = 1;
 	uint8_t byteDepth = 2;
-
 	bool overwriteTarget_ = false;
 
 	uint32_t peakValue = 0;
 	uint32_t audioBytesWritten = 0;
 
-	uint8_t waveformOverview[kOverviewColumns]{0};
+	uint8_t waveformOverview[kOverviewColumns];
 };
 
 ReverseJob& reverseJob();

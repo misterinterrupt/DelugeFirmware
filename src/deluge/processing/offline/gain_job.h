@@ -21,6 +21,7 @@ public:
 		OPEN,
 		SCAN,
 		SELECT_GAIN,
+		PREPARE_COPY,
 		COPY_HEADER,
 		APPLY_GAIN,
 		FINALIZE,
@@ -92,7 +93,7 @@ private:
 	uint32_t peakValue = 0;
 	uint32_t audioBytesWritten = 0;
 
-	uint8_t waveformOverview[kOverviewColumns]{0};
+	uint8_t waveformOverview[kOverviewColumns];
 };
 
 GainJob& gainJob();

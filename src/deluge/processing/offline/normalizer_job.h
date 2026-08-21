@@ -21,6 +21,7 @@ public:
 		OPEN,
 		SCAN,
 		SELECT_CEILING,
+		PREPARE_COPY,
 		COPY_HEADER,
 		NORMALIZE_DATA,
 		FINALIZE,
@@ -93,7 +94,7 @@ private:
 	uint32_t peakValue = 0;
 	uint32_t audioBytesWritten = 0;
 
-	uint8_t waveformOverview[kOverviewColumns]{0};
+	uint8_t waveformOverview[kOverviewColumns];
 };
 
 NormalizerJob& normalizerJob();
