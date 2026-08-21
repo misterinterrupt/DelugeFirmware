@@ -41,31 +41,122 @@ static Sample* getCurrentSample() {
 	return nullptr;
 }
 
+static int8_t gOfflineWaveformOverviewMax[128];
+static int8_t gOfflineWaveformOverviewMin[128];
+static Sample* gOfflineOverviewCachedSample = nullptr;
+
+static void populateOfflineWaveformOverview(Sample* sample) {
+	if (!sample || gOfflineOverviewCachedSample == sample) {
+		return;
+	}
+	gOfflineOverviewCachedSample = sample;
+	std::memset(gOfflineWaveformOverviewMax, 0, sizeof(gOfflineWaveformOverviewMax));
+	std::memset(gOfflineWaveformOverviewMin, 0, sizeof(gOfflineWaveformOverviewMin));
+
+	if (sample->filePath.isEmpty()) {
+		return;
+	}
+
+	auto opened = FatFS::File::open(sample->filePath.get(), FA_READ);
+	if (!opened) {
+		return;
+	}
+
+	uint32_t dataStart = (uint32_t)sample->audioDataStartPosBytes;
+	uint32_t totalDataBytes = (uint32_t)sample->audioDataLengthBytes;
+	uint8_t byteDepth = sample->byteDepth ? sample->byteDepth : 2;
+	uint8_t numChannels = sample->numChannels > 0 ? sample->numChannels : 1;
+	uint32_t frameSize = byteDepth * numChannels;
+
+	if (!dataStart || !totalDataBytes || !frameSize) {
+		return;
+	}
+
+	opened->lseek(dataStart);
+	uint32_t totalFrames = totalDataBytes / frameSize;
+	uint32_t framesPerBin = totalFrames > 128 ? (totalFrames / 128) : 1;
+
+	uint8_t staticBuf[1024];
+	uint32_t bytesReadTotal = 0;
+	int32_t binIdx = 0;
+	int32_t maxInBin = -32768;
+	int32_t minInBin = 32767;
+	uint32_t binFrames = 0;
+
+	while (bytesReadTotal < totalDataBytes && binIdx < 128) {
+		uint32_t toRead = std::min(totalDataBytes - bytesReadTotal, (uint32_t)sizeof(staticBuf));
+		auto readRes = opened->read({(std::byte*)staticBuf, toRead});
+		if (!readRes || readRes->empty()) break;
+		uint32_t got = readRes->size();
+		bytesReadTotal += got;
+
+		uint32_t framesInChunk = got / frameSize;
+		uint8_t* ptr = staticBuf;
+
+		for (uint32_t f = 0; f < framesInChunk; f++) {
+			int32_t val = 0;
+			if (byteDepth == 2) {
+				int16_t sampleVal = (int16_t)(ptr[0] | (ptr[1] << 8));
+				val = (int32_t)sampleVal;
+			}
+			else if (byteDepth == 3) {
+				int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
+				val = sampleVal >> 8;
+			}
+			ptr += frameSize;
+
+			if (val > maxInBin) maxInBin = val;
+			if (val < minInBin) minInBin = val;
+
+			binFrames++;
+			if (binFrames >= framesPerBin) {
+				int32_t scaledMax = (maxInBin * 32) / 32767;
+				int32_t scaledMin = (minInBin * 32) / 32767;
+				if (scaledMax > 32) scaledMax = 32;
+				if (scaledMin < -32) scaledMin = -32;
+
+				gOfflineWaveformOverviewMax[binIdx] = (int8_t)scaledMax;
+				gOfflineWaveformOverviewMin[binIdx] = (int8_t)scaledMin;
+
+				binIdx++;
+				maxInBin = -32768;
+				minInBin = 32767;
+				binFrames = 0;
+				if (binIdx >= 128) break;
+			}
+		}
+	}
+	while (binIdx < 128) {
+		int32_t scaledMax = (maxInBin * 32) / 32767;
+		int32_t scaledMin = (minInBin * 32) / 32767;
+		if (scaledMax > 32) scaledMax = 32;
+		if (scaledMin < -32) scaledMin = -32;
+
+		gOfflineWaveformOverviewMax[binIdx] = (int8_t)scaledMax;
+		gOfflineWaveformOverviewMin[binIdx] = (int8_t)scaledMin;
+		binIdx++;
+	}
+}
+
 static void renderWaveformOverviewOnCanvas(Sample* sample, int32_t yBase = 43, int32_t maxHalfH = 20) {
 	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
 	if (!sample) {
 		return;
 	}
-	int32_t numClusters = sample->clusters.getNumElements();
+	populateOfflineWaveformOverview(sample);
 	for (int32_t x = 0; x < 128; x++) {
-		int32_t halfH = 1;
-		if (numClusters > 0) {
-			int32_t clusterIdx = (x * numClusters) / 128;
-			if (clusterIdx >= numClusters) {
-				clusterIdx = numClusters - 1;
-			}
-			SampleCluster* sc = sample->clusters.getElement(clusterIdx);
-			if (sc) {
-				int32_t maxVal = std::abs((int32_t)sc->maxValue);
-				int32_t minVal = std::abs((int32_t)sc->minValue);
-				int32_t peak = std::max(maxVal, minVal);
-				halfH = (peak * maxHalfH) / 127;
-			}
+		int8_t maxPeak = gOfflineWaveformOverviewMax[x];
+		int8_t minPeak = gOfflineWaveformOverviewMin[x];
+
+		int32_t yTop = yBase - ((int32_t)maxPeak * maxHalfH) / 32;
+		int32_t yBot = yBase - ((int32_t)minPeak * maxHalfH) / 32;
+
+		if (yTop == yBot) {
+			yTop = yBase - 1;
+			yBot = yBase + 1;
 		}
-		if (halfH < 1) {
-			halfH = 1;
-		}
-		canvas.drawVerticalLine(x, yBase - halfH, yBase + halfH);
+
+		canvas.drawVerticalLine(x, yTop, yBot);
 	}
 }
 

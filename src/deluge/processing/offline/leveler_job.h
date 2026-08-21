@@ -55,6 +55,8 @@ public:
 	void cancel();
 
 	uint8_t const* getWaveformOverview() const { return waveformOverview; }
+	int8_t const* getWaveformOverviewMin() const { return waveformOverviewMin; }
+	int8_t const* getWaveformOverviewMax() const { return waveformOverviewMax; }
 	uint32_t getPeakValue() const { return peakValue; }
 
 private:
@@ -95,6 +97,8 @@ private:
 	uint32_t audioBytesWritten = 0;
 
 	uint8_t waveformOverview[kOverviewColumns]{0};
+	int8_t waveformOverviewMin[kOverviewColumns]{0};
+	int8_t waveformOverviewMax[kOverviewColumns]{0};
 };
 
 LevelerJob& levelerJob();
