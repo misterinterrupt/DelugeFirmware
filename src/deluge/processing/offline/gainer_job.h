@@ -14,6 +14,20 @@
 
 class Sample;
 
+enum class DistortionType : uint8_t {
+	OFF = 0,
+	SATURATE,
+	FOLD,
+	BITCRUSH,
+	RECTIFY,
+};
+
+struct DistortionConfig {
+	DistortionType type = DistortionType::OFF;
+	float param1 = 0.0f;
+	float param2 = 0.0f;
+};
+
 class GainerJob {
 public:
 	enum class Phase {
@@ -49,6 +63,9 @@ public:
 
 	void setGainDb(float db) { gainDb_ = db; }
 	float getGainDb() const { return gainDb_; }
+
+	void setDistortionConfig(DistortionConfig const& config) { distConfig_ = config; }
+	DistortionConfig const& getDistortionConfig() const { return distConfig_; }
 
 	void confirmGainAndRun();
 	void cancel();
@@ -88,6 +105,7 @@ private:
 
 	float gainDb_ = 0.0f;
 	float linearGain_ = 1.0f;
+	DistortionConfig distConfig_;
 	bool overwriteTarget_ = false;
 
 	uint32_t peakValue = 0;

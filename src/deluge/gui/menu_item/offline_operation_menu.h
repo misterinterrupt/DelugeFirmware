@@ -52,11 +52,28 @@ public:
 	void beginSession(MenuItem* navigatedBackwardFrom = nullptr) override;
 	MenuItem* selectButtonPress() override;
 	void selectEncoderAction(int32_t offset) override;
+	ActionResult buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) override;
 	void drawPixelsForOled() override;
 	void readValueAgain() override;
 
 private:
 	int32_t gainVal_ = 0; // 0.00 dB default
+	int32_t activePage_ = 0; // 0 = Page 1 (GAIN/Waveform), 1 = Page 2 (DISTORTION)
+
+	uint8_t distType_ = 0; // 0 = OFF, 1 = SATURATE, 2 = FOLD, 3 = BITCRUSH, 4 = RECTIFY
+	int32_t distSelectedParam_ = 0; // 0 = TYPE, 1 = PARAM1, 2 = PARAM2
+
+	int32_t satDrive_ = 30; // 3.0x
+	int32_t satWarmth_ = 20; // 20%
+
+	int32_t foldFolds_ = 2; // 2 folds
+	int32_t foldBias_ = 0; // 0%
+
+	int32_t crushBits_ = 8; // 8 bit
+	int32_t crushDownsample_ = 4; // 4x
+
+	int32_t rectMode_ = 0; // HALF
+	int32_t rectCrossover_ = 10; // 10%
 };
 
 class LevelerActionMenuItem : public MenuItem {

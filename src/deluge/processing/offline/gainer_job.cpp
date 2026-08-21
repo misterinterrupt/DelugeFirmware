@@ -431,18 +431,97 @@ void GainerJob::scanChunkForPeak(uint32_t bytesRead) {
 	}
 }
 
+static float applySampleDistortion(float sample, DistortionConfig const& cfg) {
+	if (cfg.type == DistortionType::OFF) {
+		if (sample > 1.0f) return 1.0f;
+		if (sample < -1.0f) return -1.0f;
+		return sample;
+	}
+
+	switch (cfg.type) {
+	case DistortionType::SATURATE: {
+		float drive = (cfg.param1 <= 0.1f) ? 1.0f : cfg.param1;
+		float warmth = cfg.param2 * 0.2f;
+		float biased = sample + warmth;
+		float saturated = tanhf(biased * drive) / tanhf(drive);
+		if (saturated > 1.0f) saturated = 1.0f;
+		if (saturated < -1.0f) saturated = -1.0f;
+		return saturated;
+	}
+
+	case DistortionType::FOLD: {
+		float folds = (cfg.param1 <= 0.1f) ? 1.0f : cfg.param1;
+		float biased = sample + cfg.param2;
+		float folded = sinf(biased * folds * 1.57079632679f);
+		if (folded > 1.0f) folded = 1.0f;
+		if (folded < -1.0f) folded = -1.0f;
+		return folded;
+	}
+
+	case DistortionType::BITCRUSH: {
+		float bits = (cfg.param1 < 2.0f) ? 2.0f : cfg.param1;
+		float levels = powf(2.0f, bits - 1.0f);
+		float quantized = lroundf(sample * levels) / levels;
+		if (quantized > 1.0f) quantized = 1.0f;
+		if (quantized < -1.0f) quantized = -1.0f;
+		return quantized;
+	}
+
+	case DistortionType::RECTIFY: {
+		bool fullWave = (cfg.param1 >= 0.5f);
+		float crossover = cfg.param2;
+		float absVal = fabsf(sample);
+
+		if (absVal < crossover) {
+			return 0.0f;
+		}
+
+		if (fullWave) {
+			return absVal;
+		}
+		else {
+			return (sample < 0.0f) ? 0.0f : sample;
+		}
+	}
+
+	case DistortionType::OFF:
+	default:
+		if (sample > 1.0f) return 1.0f;
+		if (sample < -1.0f) return -1.0f;
+		return sample;
+	}
+}
+
 void GainerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, uint8_t channels) {
 	uint32_t frameSize = depth * channels;
 	uint32_t frames = bytes / frameSize;
 	uint8_t* ptr = buffer;
 
+	uint32_t downsampleFactor = (distConfig_.type == DistortionType::BITCRUSH) ? (uint32_t)distConfig_.param2 : 1;
+	if (downsampleFactor < 1) {
+		downsampleFactor = 1;
+	}
+
+	static float holdSample[2] = {0.0f, 0.0f};
+
 	if (depth == 2) {
 		for (uint32_t f = 0; f < frames; f++) {
+			bool updateHold = (f % downsampleFactor == 0);
 			for (uint8_t c = 0; c < channels; c++) {
 				int16_t sampleVal = (int16_t)(ptr[0] | (ptr[1] << 8));
-				float scaled = (float)sampleVal * linearGain_;
-				int32_t outVal = (int32_t)lroundf(scaled);
+				float normSample = ((float)sampleVal / 32767.0f) * linearGain_;
 
+				if (downsampleFactor > 1) {
+					if (updateHold) {
+						holdSample[c & 1] = applySampleDistortion(normSample, distConfig_);
+					}
+					normSample = holdSample[c & 1];
+				}
+				else {
+					normSample = applySampleDistortion(normSample, distConfig_);
+				}
+
+				int32_t outVal = (int32_t)lroundf(normSample * 32767.0f);
 				if (outVal > 32767) {
 					outVal = 32767;
 				}
@@ -458,11 +537,22 @@ void GainerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, uin
 	}
 	else if (depth == 3) {
 		for (uint32_t f = 0; f < frames; f++) {
+			bool updateHold = (f % downsampleFactor == 0);
 			for (uint8_t c = 0; c < channels; c++) {
 				int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
-				float scaled = (float)sampleVal * linearGain_;
-				int32_t outVal = (int32_t)lroundf(scaled);
+				float normSample = ((float)sampleVal / 8388607.0f) * linearGain_;
 
+				if (downsampleFactor > 1) {
+					if (updateHold) {
+						holdSample[c & 1] = applySampleDistortion(normSample, distConfig_);
+					}
+					normSample = holdSample[c & 1];
+				}
+				else {
+					normSample = applySampleDistortion(normSample, distConfig_);
+				}
+
+				int32_t outVal = (int32_t)lroundf(normSample * 8388607.0f);
 				if (outVal > 8388607) {
 					outVal = 8388607;
 				}
