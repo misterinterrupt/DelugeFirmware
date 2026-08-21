@@ -85,6 +85,7 @@ private:
 	uint32_t dataChunkSize = 0;
 	uint8_t numChannels = 1;
 	uint8_t byteDepth = 2;
+	uint8_t rawDataFormat = 0;
 
 	float thresholdDb_ = -6.0f;
 	float linearGain_ = 1.0f;

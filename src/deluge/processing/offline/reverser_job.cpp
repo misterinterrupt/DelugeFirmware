@@ -89,7 +89,7 @@ bool ReverserJob::start(Sample* sample, bool overwrite) {
 		return false;
 	}
 
-	if (sample->byteDepth != 2 && sample->byteDepth != 3) {
+	if (sample->byteDepth < 1 || sample->byteDepth > 4) {
 		showPopup("BAD DEPTH");
 		return false;
 	}
@@ -112,6 +112,7 @@ bool ReverserJob::start(Sample* sample, bool overwrite) {
 	dataBytesRemaining = totalDataBytes;
 	headerBytesRemaining = dataStart;
 	byteDepth = sample->byteDepth;
+	rawDataFormat = sample->rawDataFormat;
 	numChannels = sample->numChannels > 0 ? sample->numChannels : 1;
 
 	uint32_t frameSize = byteDepth * numChannels;
@@ -487,7 +488,7 @@ void ReverserJob::scanChunkForPeakAndTransients(uint32_t bytesRead) {
 	uint32_t numFrames = bytesRead / frameSize;
 
 	uint32_t bytesScannedSoFar = totalDataBytes - dataBytesRemaining;
-	uint32_t maxPossible = (byteDepth == 2) ? 32767u : 8388607u;
+	uint32_t maxPossible = (byteDepth == 1) ? 127u : (byteDepth == 2) ? 32767u : (byteDepth == 3) ? 8388607u : 2147483647u;
 	uint32_t transientThreshold = maxPossible / 5;
 
 	for (size_t i = 0; i < numFrames; i++) {
@@ -496,16 +497,31 @@ void ReverserJob::scanChunkForPeakAndTransients(uint32_t bytesRead) {
 
 		for (size_t c = 0; c < numChannels; c++) {
 			int32_t sampleVal = 0;
-			if (byteDepth == 2) {
-				int16_t raw = (int16_t)(p[0] | (p[1] << 8));
+			if (byteDepth == 1) {
+				int32_t raw = (int32_t)p[0] - 128;
+				sampleVal = (raw < 0) ? -raw : raw;
+			}
+			else if (byteDepth == 2) {
+				int32_t raw = (int16_t)(p[0] | (p[1] << 8));
 				sampleVal = (raw < 0) ? -raw : raw;
 			}
 			else if (byteDepth == 3) {
-				int32_t raw = (int32_t)(p[0] | (p[1] << 8) | (p[2] << 16));
+				int32_t raw = (int32_t)(p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16));
 				if (raw & 0x800000) {
 					raw |= 0xFF000000;
 				}
 				sampleVal = (raw < 0) ? -raw : raw;
+			}
+			else if (byteDepth == 4) {
+				if (rawDataFormat == RAW_DATA_FLOAT) {
+					float f;
+					memcpy(&f, p, 4);
+					sampleVal = (int32_t)(fabsf(f) * 2147483647.0f);
+				}
+				else {
+					int32_t raw = (int32_t)(p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24));
+					sampleVal = (raw == (int32_t)0x80000000) ? 2147483647 : ((raw < 0) ? -raw : raw);
+				}
 			}
 			p += byteDepth;
 
@@ -538,7 +554,11 @@ void ReverserJob::scanChunkForPeakAndTransients(uint32_t bytesRead) {
 			if (col >= kOverviewColumns) {
 				col = kOverviewColumns - 1;
 			}
-			uint32_t scaledPeak = (frameMax * 32) / maxPossible;
+			uint64_t maxP = (byteDepth == 1) ? 127ULL : (byteDepth == 2) ? 32767ULL : (byteDepth == 3) ? 8388607ULL : 2147483647ULL;
+			uint32_t scaledPeak = (uint32_t)(((uint64_t)frameMax * 32ULL) / maxP);
+			if (scaledPeak > 32) {
+				scaledPeak = 32;
+			}
 			if (scaledPeak > waveformOverview[col]) {
 				waveformOverview[col] = (uint8_t)scaledPeak;
 			}

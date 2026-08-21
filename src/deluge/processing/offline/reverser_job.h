@@ -97,6 +97,7 @@ private:
 	uint32_t dataChunkSize = 0;
 	uint8_t numChannels = 1;
 	uint8_t byteDepth = 2;
+	uint8_t rawDataFormat = 0;
 
 	int32_t modeParam_ = 0; // 0 = FULL default
 	bool overwriteTarget_ = false;

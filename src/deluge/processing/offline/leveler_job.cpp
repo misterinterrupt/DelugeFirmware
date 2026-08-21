@@ -64,8 +64,8 @@ bool LevelerJob::start(Sample* sample, bool overwrite) {
 		return false;
 	}
 
-	if ((sample->byteDepth != 2 && sample->byteDepth != 3) || sample->rawDataFormat != 0) {
-		showPopup("CANT LEVEL");
+	if (sample->byteDepth < 1 || sample->byteDepth > 4) {
+		showPopup("BAD DEPTH");
 		return false;
 	}
 
@@ -93,6 +93,7 @@ bool LevelerJob::start(Sample* sample, bool overwrite) {
 	dataBytesRemaining = totalDataBytes;
 	headerBytesRemaining = dataStart;
 	byteDepth = sample->byteDepth;
+	rawDataFormat = sample->rawDataFormat;
 	numChannels = sample->numChannels > 0 ? sample->numChannels : 1;
 
 	uint32_t frameSize = byteDepth * numChannels;
@@ -310,16 +311,31 @@ void LevelerJob::scanChunkForPeak(uint32_t bytesRead) {
 		uint8_t const* p = chunkBuffer + (i * frameSize);
 		for (size_t c = 0; c < numChannels; c++) {
 			int32_t sampleVal = 0;
-			if (byteDepth == 2) {
-				int16_t raw = (int16_t)(p[0] | (p[1] << 8));
+			if (byteDepth == 1) {
+				int32_t raw = (int32_t)p[0] - 128;
+				sampleVal = (raw < 0) ? -raw : raw;
+			}
+			else if (byteDepth == 2) {
+				int32_t raw = (int16_t)(p[0] | (p[1] << 8));
 				sampleVal = (raw < 0) ? -raw : raw;
 			}
 			else if (byteDepth == 3) {
-				int32_t raw = (int32_t)(p[0] | (p[1] << 8) | (p[2] << 16));
+				int32_t raw = (int32_t)(p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16));
 				if (raw & 0x800000) {
 					raw |= 0xFF000000;
 				}
 				sampleVal = (raw < 0) ? -raw : raw;
+			}
+			else if (byteDepth == 4) {
+				if (rawDataFormat == RAW_DATA_FLOAT) {
+					float f;
+					memcpy(&f, p, 4);
+					sampleVal = (int32_t)(fabsf(f) * 2147483647.0f);
+				}
+				else {
+					int32_t raw = (int32_t)(p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24));
+					sampleVal = (raw == (int32_t)0x80000000) ? 2147483647 : ((raw < 0) ? -raw : raw);
+				}
 			}
 			p += byteDepth;
 
@@ -336,7 +352,11 @@ void LevelerJob::scanChunkForPeak(uint32_t bytesRead) {
 				if (col >= kOverviewColumns) {
 					col = kOverviewColumns - 1;
 				}
-				uint32_t scaledPeak = (val * 32) / ((byteDepth == 2) ? 32767u : 8388607u);
+				uint64_t maxPossible = (byteDepth == 1) ? 127ULL : (byteDepth == 2) ? 32767ULL : (byteDepth == 3) ? 8388607ULL : 2147483647ULL;
+				uint32_t scaledPeak = (uint32_t)(((uint64_t)val * 32ULL) / maxPossible);
+				if (scaledPeak > 32) {
+					scaledPeak = 32;
+				}
 				if (scaledPeak > waveformOverview[col]) {
 					waveformOverview[col] = (uint8_t)scaledPeak;
 				}
@@ -427,13 +447,12 @@ void LevelerJob::beginCopyPass() {
 }
 
 void LevelerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, uint8_t channels) {
-	float targetMax = (depth == 2) ? 32767.0f : 8388607.0f;
+	float targetMax = (depth == 1) ? 127.0f : (depth == 2) ? 32767.0f : (depth == 3) ? 8388607.0f : 2147483647.0f;
 	float threshVal = targetMax * powf(10.0f, thresholdDb_ / 20.0f);
 	if (threshVal < 1.0f) {
 		threshVal = 1.0f;
 	}
 
-	// Calculate soft peak compressed max value and makeup gain
 	float peakDiff = (float)peakValue - threshVal;
 	float maxCompressedPeak = (peakDiff > 0.0f) ? (threshVal + peakDiff * 0.25f) : threshVal;
 	float makeupGain = targetMax / maxCompressedPeak;
@@ -445,18 +464,37 @@ void LevelerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, ui
 		uint8_t* p = buffer + (i * frameSize);
 		for (size_t c = 0; c < channels; c++) {
 			int32_t val = 0;
-			if (depth == 2) {
+			float normVal = 0.0f;
+
+			if (depth == 1) {
+				val = (int16_t)p[0] - 128;
+				normVal = (float)val;
+			}
+			else if (depth == 2) {
 				val = (int16_t)(p[0] | (p[1] << 8));
+				normVal = (float)val;
 			}
 			else if (depth == 3) {
-				val = (int32_t)(p[0] | (p[1] << 8) | (p[2] << 16));
+				val = (int32_t)(p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16));
 				if (val & 0x800000) {
 					val |= 0xFF000000;
 				}
+				normVal = (float)val;
+			}
+			else if (depth == 4) {
+				if (rawDataFormat == RAW_DATA_FLOAT) {
+					float f;
+					memcpy(&f, p, 4);
+					normVal = f * 2147483647.0f;
+				}
+				else {
+					val = (int32_t)(p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24));
+					normVal = (float)val;
+				}
 			}
 
-			float absF = fabsf((float)val);
-			float sign = (val >= 0) ? 1.0f : -1.0f;
+			float absF = fabsf(normVal);
+			float sign = (normVal >= 0.0f) ? 1.0f : -1.0f;
 
 			float compressedF = absF;
 			if (absF > threshVal && peakDiff > 0.0f) {
@@ -465,7 +503,6 @@ void LevelerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, ui
 
 			float finalF = compressedF * makeupGain * sign;
 
-			// Clamping
 			if (finalF > targetMax) {
 				finalF = targetMax;
 			}
@@ -473,16 +510,41 @@ void LevelerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, ui
 				finalF = -targetMax;
 			}
 
-			int32_t outVal = (int32_t)finalF;
-			if (depth == 2) {
-				int16_t out16 = (int16_t)outVal;
-				p[0] = (uint8_t)(out16 & 0xFF);
-				p[1] = (uint8_t)((out16 >> 8) & 0xFF);
+			if (depth == 1) {
+				int32_t outVal = (int32_t)lroundf(finalF) + 128;
+				if (outVal > 255) outVal = 255;
+				else if (outVal < 0) outVal = 0;
+				p[0] = (uint8_t)outVal;
+			}
+			else if (depth == 2) {
+				int32_t outVal = (int32_t)lroundf(finalF);
+				if (outVal > 32767) outVal = 32767;
+				else if (outVal < -32768) outVal = -32768;
+				p[0] = (uint8_t)(outVal & 0xFF);
+				p[1] = (uint8_t)((outVal >> 8) & 0xFF);
 			}
 			else if (depth == 3) {
+				int32_t outVal = (int32_t)lroundf(finalF);
+				if (outVal > 8388607) outVal = 8388607;
+				else if (outVal < -8388608) outVal = -8388608;
 				p[0] = (uint8_t)(outVal & 0xFF);
 				p[1] = (uint8_t)((outVal >> 8) & 0xFF);
 				p[2] = (uint8_t)((outVal >> 16) & 0xFF);
+			}
+			else if (depth == 4) {
+				if (rawDataFormat == RAW_DATA_FLOAT) {
+					float outF = finalF / 2147483647.0f;
+					memcpy(p, &outF, 4);
+				}
+				else {
+					int64_t outVal = (int64_t)lroundf(finalF);
+					if (outVal > 2147483647LL) outVal = 2147483647LL;
+					else if (outVal < -2147483648LL) outVal = -2147483648LL;
+					p[0] = (uint8_t)(outVal & 0xFF);
+					p[1] = (uint8_t)((outVal >> 8) & 0xFF);
+					p[2] = (uint8_t)((outVal >> 16) & 0xFF);
+					p[3] = (uint8_t)((outVal >> 24) & 0xFF);
+				}
 			}
 
 			p += depth;

@@ -86,7 +86,7 @@ bool NormalizerJob::start(Sample* sample, bool overwrite) {
 		return false;
 	}
 
-	if (sample->byteDepth != 2 && sample->byteDepth != 3) {
+	if (sample->byteDepth < 1 || sample->byteDepth > 4) {
 		showPopup("BAD DEPTH");
 		return false;
 	}
@@ -109,6 +109,7 @@ bool NormalizerJob::start(Sample* sample, bool overwrite) {
 	dataBytesRemaining = totalDataBytes;
 	headerBytesRemaining = dataStart;
 	byteDepth = sample->byteDepth;
+	rawDataFormat = sample->rawDataFormat;
 	numChannels = sample->numChannels > 0 ? sample->numChannels : 1;
 
 	uint32_t frameSize = byteDepth * numChannels;
@@ -423,16 +424,31 @@ void NormalizerJob::scanChunkForPeak(uint32_t bytesRead) {
 		uint8_t const* p = chunkBuffer + (i * frameSize);
 		for (size_t c = 0; c < numChannels; c++) {
 			int32_t sampleVal = 0;
-			if (byteDepth == 2) {
-				int16_t raw = (int16_t)(p[0] | (p[1] << 8));
+			if (byteDepth == 1) {
+				int32_t raw = (int32_t)p[0] - 128;
+				sampleVal = (raw < 0) ? -raw : raw;
+			}
+			else if (byteDepth == 2) {
+				int32_t raw = (int16_t)(p[0] | (p[1] << 8));
 				sampleVal = (raw < 0) ? -raw : raw;
 			}
 			else if (byteDepth == 3) {
-				int32_t raw = (int32_t)(p[0] | (p[1] << 8) | (p[2] << 16));
+				int32_t raw = (int32_t)(p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16));
 				if (raw & 0x800000) {
 					raw |= 0xFF000000;
 				}
 				sampleVal = (raw < 0) ? -raw : raw;
+			}
+			else if (byteDepth == 4) {
+				if (rawDataFormat == RAW_DATA_FLOAT) {
+					float f;
+					memcpy(&f, p, 4);
+					sampleVal = (int32_t)(fabsf(f) * 2147483647.0f);
+				}
+				else {
+					int32_t raw = (int32_t)(p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24));
+					sampleVal = (raw == (int32_t)0x80000000) ? 2147483647 : ((raw < 0) ? -raw : raw);
+				}
 			}
 			p += byteDepth;
 
@@ -449,7 +465,11 @@ void NormalizerJob::scanChunkForPeak(uint32_t bytesRead) {
 				if (col >= kOverviewColumns) {
 					col = kOverviewColumns - 1;
 				}
-				uint32_t scaledPeak = (val * 32) / ((byteDepth == 2) ? 32767u : 8388607u);
+				uint64_t maxPossible = (byteDepth == 1) ? 127ULL : (byteDepth == 2) ? 32767ULL : (byteDepth == 3) ? 8388607ULL : 2147483647ULL;
+				uint32_t scaledPeak = (uint32_t)(((uint64_t)val * 32ULL) / maxPossible);
+				if (scaledPeak > 32) {
+					scaledPeak = 32;
+				}
 				if (scaledPeak > waveformOverview[col]) {
 					waveformOverview[col] = (uint8_t)scaledPeak;
 				}
@@ -463,7 +483,22 @@ void NormalizerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth,
 	uint32_t frames = bytes / frameSize;
 	uint8_t* ptr = buffer;
 
-	if (depth == 2) {
+	if (depth == 1) {
+		for (uint32_t f = 0; f < frames; f++) {
+			for (uint8_t c = 0; c < channels; c++) {
+				int16_t sampleVal = (int16_t)ptr[0] - 128;
+				float scaled = (float)sampleVal * normGainRatio_;
+				int32_t outVal = (int32_t)lroundf(scaled) + 128;
+
+				if (outVal > 255) outVal = 255;
+				else if (outVal < 0) outVal = 0;
+
+				ptr[0] = (uint8_t)outVal;
+				ptr += 1;
+			}
+		}
+	}
+	else if (depth == 2) {
 		for (uint32_t f = 0; f < frames; f++) {
 			for (uint8_t c = 0; c < channels; c++) {
 				int16_t sampleVal = (int16_t)(ptr[0] | (ptr[1] << 8));
@@ -486,7 +521,10 @@ void NormalizerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth,
 	else if (depth == 3) {
 		for (uint32_t f = 0; f < frames; f++) {
 			for (uint8_t c = 0; c < channels; c++) {
-				int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
+				int32_t sampleVal = (int32_t)(ptr[0] | ((uint32_t)ptr[1] << 8) | ((uint32_t)ptr[2] << 16));
+				if (sampleVal & 0x800000) {
+					sampleVal |= 0xFF000000;
+				}
 				float scaled = (float)sampleVal * normGainRatio_;
 				int32_t outVal = (int32_t)lroundf(scaled);
 
@@ -501,6 +539,32 @@ void NormalizerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth,
 				ptr[1] = (uint8_t)((outVal >> 8) & 0xFF);
 				ptr[2] = (uint8_t)((outVal >> 16) & 0xFF);
 				ptr += 3;
+			}
+		}
+	}
+	else if (depth == 4) {
+		for (uint32_t f = 0; f < frames; f++) {
+			for (uint8_t c = 0; c < channels; c++) {
+				if (rawDataFormat == RAW_DATA_FLOAT) {
+					float sampleVal;
+					memcpy(&sampleVal, ptr, 4);
+					sampleVal *= normGainRatio_;
+					memcpy(ptr, &sampleVal, 4);
+				}
+				else {
+					int32_t sampleVal = (int32_t)(ptr[0] | ((uint32_t)ptr[1] << 8) | ((uint32_t)ptr[2] << 16) | ((uint32_t)ptr[3] << 24));
+					float scaled = (float)sampleVal * normGainRatio_;
+					int64_t outVal = (int64_t)lroundf(scaled);
+
+					if (outVal > 2147483647LL) outVal = 2147483647LL;
+					else if (outVal < -2147483648LL) outVal = -2147483648LL;
+
+					ptr[0] = (uint8_t)(outVal & 0xFF);
+					ptr[1] = (uint8_t)((outVal >> 8) & 0xFF);
+					ptr[2] = (uint8_t)((outVal >> 16) & 0xFF);
+					ptr[3] = (uint8_t)((outVal >> 24) & 0xFF);
+				}
+				ptr += 4;
 			}
 		}
 	}
