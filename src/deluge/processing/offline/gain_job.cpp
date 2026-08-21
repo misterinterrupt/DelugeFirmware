@@ -1,5 +1,7 @@
 /*
- * Copyright © 2023 Synthstrom Audible Limited. All rights reserved.
+ * Copyright © 2026 Synthstrom Audible Limited. All rights reserved.
+ *
+ * Offline sample manual gain job implementation.
  */
 
 #include "processing/engines/audio_engine.h"
@@ -9,6 +11,7 @@
 #include "fatfs/fatfs.hpp"
 #include "gui/ui/browser/sample_browser.h"
 #include "gui/ui/sound_editor.h"
+#include "gui/ui/ui.h"
 #include "hid/display/display.h"
 #include "io/debug/log.h"
 #include "memory/memory_allocator_interface.h"
@@ -16,26 +19,30 @@
 #include "processing/sound/sound.h"
 #include "storage/audio/audio_file_holder.h"
 #include "storage/audio/audio_file_manager.h"
+
+#include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <utility>
 
 extern "C" {
-extern volatile int lastSdDriverError;
-extern volatile int sdReentryDetected;
 extern uint8_t currentlyAccessingCard;
 }
 
-static void showPopup(char const* text) {
-	display->displayPopup(text);
+static void showPopup(char const* message) {
+	if (display->haveOLED()) {
+		display->displayPopup(message);
+	}
 }
 
-static void showProgressPopup(uint32_t current, uint32_t total) {
-	if (total == 0) {
+static void showProgressPopup(uint32_t current, uint32_t total, uint32_t passOffset, uint32_t totalPasses) {
+	if (!display->haveOLED()) {
 		return;
 	}
-	uint32_t percent = (current * 100) / total;
+	uint32_t passPercent = (current * 100) / total;
+	uint32_t overallPercent = (passOffset * 100 + passPercent) / totalPasses;
 	DEF_STACK_STRING_BUF(buf, 16);
-	buf.appendInt(percent);
+	buf.appendInt(overallPercent);
 	buf.append("%");
 	display->displayPopup(buf.c_str(), 1);
 }
@@ -45,7 +52,7 @@ GainJob& gainJob() {
 	return instance;
 }
 
-bool GainJob::start(Sample* sample, float gainDb, bool overwrite) {
+bool GainJob::start(Sample* sample, bool overwrite) {
 	if (isActive()) {
 		showPopup("BUSY");
 		return false;
@@ -55,19 +62,15 @@ bool GainJob::start(Sample* sample, float gainDb, bool overwrite) {
 		showPopup("CANT GAIN");
 		return false;
 	}
-	if (sample->filePath.isEmpty()) {
-		showPopup("CANT GAIN");
-		return false;
-	}
-
-	if ((sample->byteDepth != 2 && sample->byteDepth != 3) || sample->rawDataFormat != 0) {
-		showPopup("CANT GAIN");
-		return false;
-	}
 
 	uint64_t total = sample->audioDataLengthBytes;
-	if (total > 0xFFFFFFFFu) {
-		showPopup("CANT GAIN");
+	if (total == 0) {
+		showPopup("EMPTY FILE");
+		return false;
+	}
+
+	if (sample->byteDepth != 2 && sample->byteDepth != 3) {
+		showPopup("BAD DEPTH");
 		return false;
 	}
 
@@ -89,23 +92,32 @@ bool GainJob::start(Sample* sample, float gainDb, bool overwrite) {
 	dataBytesRemaining = totalDataBytes;
 	headerBytesRemaining = dataStart;
 	byteDepth = sample->byteDepth;
-	dataChunkSize = (kChunkSize / byteDepth) * byteDepth;
-	chunksSinceProgressPopup = 0;
+	numChannels = sample->numChannels > 0 ? sample->numChannels : 1;
+
+	uint32_t frameSize = byteDepth * numChannels;
+	dataChunkSize = (kChunkSize / frameSize) * frameSize;
+
+	peakValue = 0;
 	audioBytesWritten = 0;
-
-	userGainDb_ = gainDb;
-	linearGain_ = powf(10.0f, gainDb / 20.0f);
-
-	lastSdDriverError = 0;
-	sdReentryDetected = 0;
+	std::memset(waveformOverview, 0, sizeof(waveformOverview));
 
 	phase = Phase::OPEN;
-	showPopup("GAIN...");
+	showPopup("SCANNING...");
 	return true;
 }
 
+void GainJob::confirmGainAndRun() {
+	if (phase == Phase::SELECT_GAIN) {
+		beginCopyPass();
+	}
+}
+
+void GainJob::cancel() {
+	fail("CANCELLED");
+}
+
 void GainJob::tick() {
-	if (phase == Phase::IDLE) {
+	if (phase == Phase::IDLE || phase == Phase::SELECT_GAIN) {
 		return;
 	}
 
@@ -116,85 +128,34 @@ void GainJob::tick() {
 	switch (phase) {
 
 	case Phase::IDLE:
+	case Phase::SELECT_GAIN:
 		return;
 
 	case Phase::OPEN: {
-		auto srcOpened = FatFS::File::open(sourcePath.get(), FA_READ);
-		if (!srcOpened) {
-			failIO(Site::OP, srcOpened.error());
+		auto opened = FatFS::File::open(sourcePath.get(), FA_READ);
+		if (!opened) {
+			failIO(Site::OP, opened.error());
 			return;
 		}
-		sourceFile.emplace(std::move(*srcOpened));
+		sourceFile.emplace(std::move(*opened));
+
 		auto seekRes = sourceFile->lseek(dataStart);
 		if (!seekRes) {
 			failIO(Site::SK, seekRes.error());
 			return;
 		}
 
-		uint32_t fileSize = (uint32_t)sourceFile->size();
-		if (fileSize <= dataStart) {
-			fail("CANT GAIN");
-			return;
-		}
-		uint32_t bytesOnDisk = fileSize - dataStart;
-		if (bytesOnDisk < totalDataBytes) {
-			totalDataBytes = bytesOnDisk;
-		}
-		totalDataBytes = (totalDataBytes / byteDepth) * byteDepth;
-		if (totalDataBytes == 0) {
-			fail("SILENCE");
-			return;
-		}
+		phase = Phase::SCAN;
 		dataBytesRemaining = totalDataBytes;
-
-		beginCopyPass();
 		return;
 	}
 
-	case Phase::COPY_HEADER: {
-		uint32_t chunk = kChunkSize;
-		if (chunk > headerBytesRemaining) {
-			chunk = headerBytesRemaining;
-		}
+	case Phase::SCAN: {
+		uint32_t chunk = (dataBytesRemaining < dataChunkSize) ? dataBytesRemaining : dataChunkSize;
 		if (chunk != 0) {
 			auto readRes = sourceFile->read({(std::byte*)chunkBuffer, chunk});
 			if (!readRes) {
-				failIO(Site::R2, readRes.error());
-				return;
-			}
-			if (readRes->size() == 0) {
-				fail("READ ERR");
-				return;
-			}
-			auto writeRes = destFile->write({(std::byte*)chunkBuffer, readRes->size()});
-			if (!writeRes) {
-				failIO(Site::W2, writeRes.error());
-				return;
-			}
-			if (*writeRes != readRes->size()) {
-				fail("WRITE ERR");
-				return;
-			}
-			headerBytesRemaining -= *writeRes;
-		}
-
-		if (headerBytesRemaining == 0) {
-			phase = Phase::COPY_DATA;
-			dataBytesRemaining = totalDataBytes;
-			chunksSinceProgressPopup = 0;
-		}
-		return;
-	}
-
-	case Phase::COPY_DATA: {
-		uint32_t chunk = dataChunkSize;
-		if (chunk > dataBytesRemaining) {
-			chunk = (dataBytesRemaining / byteDepth) * byteDepth;
-		}
-		if (chunk != 0) {
-			auto readRes = sourceFile->read({(std::byte*)chunkBuffer, chunk});
-			if (!readRes) {
-				failIO(Site::R3, readRes.error());
+				failIO(Site::R1, readRes.error());
 				return;
 			}
 			uint32_t got = readRes->size();
@@ -202,8 +163,60 @@ void GainJob::tick() {
 				dataBytesRemaining = 0;
 			}
 			else {
-				got = (got / byteDepth) * byteDepth;
-				applyGainToChunk(got);
+				scanChunkForPeak(got);
+				dataBytesRemaining -= got;
+				showProgressPopup(totalDataBytes - dataBytesRemaining, totalDataBytes, 0, 2);
+			}
+		}
+
+		if (dataBytesRemaining == 0) {
+			phase = Phase::SELECT_GAIN;
+			if (display->haveOLED()) {
+				renderUIsForOled();
+			}
+		}
+		return;
+	}
+
+	case Phase::COPY_HEADER: {
+		uint32_t toRead = (headerBytesRemaining < kChunkSize) ? headerBytesRemaining : kChunkSize;
+		auto r1 = sourceFile->read({(std::byte*)chunkBuffer, toRead});
+		if (!r1) {
+			failIO(Site::R2, r1.error());
+			return;
+		}
+		if (r1->empty()) {
+			fail("READ EOF");
+			return;
+		}
+		auto w2 = destFile->write(r1.value());
+		if (!w2) {
+			failIO(Site::W2, w2.error());
+			return;
+		}
+
+		headerBytesRemaining -= r1->size();
+		if (headerBytesRemaining == 0) {
+			phase = Phase::APPLY_GAIN;
+			dataBytesRemaining = totalDataBytes;
+		}
+		return;
+	}
+
+	case Phase::APPLY_GAIN: {
+		uint32_t chunk = (dataBytesRemaining < dataChunkSize) ? dataBytesRemaining : dataChunkSize;
+		if (chunk != 0) {
+			auto r3 = sourceFile->read({(std::byte*)chunkBuffer, chunk});
+			if (!r3) {
+				failIO(Site::R3, r3.error());
+				return;
+			}
+			uint32_t got = r3->size();
+			if (got == 0) {
+				dataBytesRemaining = 0;
+			}
+			else {
+				processChunk(chunkBuffer, got, byteDepth, numChannels);
 
 				auto writeRes = destFile->write({(std::byte*)chunkBuffer, got});
 				if (!writeRes) {
@@ -219,7 +232,7 @@ void GainJob::tick() {
 			}
 		}
 
-		showProgressPopup(totalDataBytes - dataBytesRemaining, totalDataBytes);
+		showProgressPopup(totalDataBytes - dataBytesRemaining, totalDataBytes, 1, 2);
 
 		if (dataBytesRemaining == 0) {
 			phase = Phase::FINALIZE;
@@ -233,8 +246,8 @@ void GainJob::tick() {
 			failIO(Site::FZ, seek1.error());
 			return;
 		}
-		uint32_t riffSize = audioBytesWritten + dataStart - 8;
-		auto w1 = destFile->write({(std::byte*)&riffSize, 4});
+		uint32_t riffLength = audioBytesWritten + dataStart - 8;
+		auto w1 = destFile->write({(std::byte*)&riffLength, 4});
 		if (!w1) {
 			failIO(Site::FZ, w1.error());
 			return;
@@ -264,6 +277,7 @@ void GainJob::tick() {
 			failIO(Site::FZ, synced.error());
 			return;
 		}
+
 		if (overwriteTarget_) {
 			FatFS::unlink(finalPath.get());
 		}
@@ -279,6 +293,8 @@ void GainJob::tick() {
 }
 
 void GainJob::beginCopyPass() {
+	linearGain_ = powf(10.0f, gainDb_ / 20.0f);
+
 	char const* src = sourcePath.get();
 	char const* lastDot = strrchr(src, '.');
 	char const* lastSlash = strrchr(src, '/');
@@ -293,10 +309,6 @@ void GainJob::beginCopyPass() {
 	memcpy(stemBuf, src, stemLength);
 	stemBuf[stemLength] = '\0';
 
-	bool found = false;
-	String finalPathScratch;
-	String tempPathScratch;
-
 	if (overwriteTarget_) {
 		finalPath.set(sourcePath.get());
 		DEF_STACK_STRING_BUF(tempBuf, 256);
@@ -305,41 +317,16 @@ void GainJob::beginCopyPass() {
 		tempPath.set(tempBuf.c_str());
 	}
 	else {
+		bool found = false;
+		String finalPathScratch;
+		String tempPathScratch;
 
-	for (char c = 'A'; c <= 'Z'; c++) {
-		DEF_STACK_STRING_BUF(candidateBuf, 256);
-		candidateBuf.append(stemBuf);
-		candidateBuf.append("_");
-		char suffixStr[2] = {c, '\0'};
-		candidateBuf.append(suffixStr);
-		candidateBuf.append(ext);
-
-		auto statRes = FatFS::stat(candidateBuf.c_str());
-		if (!statRes.has_value()) {
-			if (statRes.error() != FatFS::Error::NO_FILE && statRes.error() != FatFS::Error::NO_PATH) {
-				failIO(Site::OP, statRes.error());
-				return;
-			}
-			finalPathScratch.set(candidateBuf.c_str());
-
-			DEF_STACK_STRING_BUF(tempBuf, 256);
-			tempBuf.append(stemBuf);
-			tempBuf.append("_");
-			tempBuf.append(suffixStr);
-			tempBuf.append(".TMP");
-			tempPathScratch.set(tempBuf.c_str());
-
-			found = true;
-			break;
-		}
-	}
-
-	if (!found) {
-		for (int32_t num = 1; num <= 999; num++) {
+		for (char c = 'A'; c <= 'Z'; c++) {
 			DEF_STACK_STRING_BUF(candidateBuf, 256);
 			candidateBuf.append(stemBuf);
-			candidateBuf.append("_");
-			candidateBuf.appendInt(num);
+			candidateBuf.append("_GAIN_");
+			char suffixStr[2] = {c, '\0'};
+			candidateBuf.append(suffixStr);
 			candidateBuf.append(ext);
 
 			auto statRes = FatFS::stat(candidateBuf.c_str());
@@ -352,8 +339,8 @@ void GainJob::beginCopyPass() {
 
 				DEF_STACK_STRING_BUF(tempBuf, 256);
 				tempBuf.append(stemBuf);
-				tempBuf.append("_");
-				tempBuf.appendInt(num);
+				tempBuf.append("_GAIN_");
+				tempBuf.append(suffixStr);
 				tempBuf.append(".TMP");
 				tempPathScratch.set(tempBuf.c_str());
 
@@ -361,68 +348,129 @@ void GainJob::beginCopyPass() {
 				break;
 			}
 		}
-	}
 
-		if (!found || finalPathScratch.isEmpty() || tempPathScratch.isEmpty()) {
-			fail("SD ERR");
+		if (!found) {
+			fail("NO SUFFIX");
 			return;
 		}
 
-		finalPath.set(&finalPathScratch);
-		tempPath.set(&tempPathScratch);
+		finalPath.set(finalPathScratch.get());
+		tempPath.set(tempPathScratch.get());
 	}
 
-	auto rewindRes = sourceFile->lseek(0);
-	if (!rewindRes) {
-		failIO(Site::SK, rewindRes.error());
-		return;
-	}
+	sourceFile.reset();
+	destFile.reset();
 
-	auto destOpened = FatFS::File::open(tempPath.get(), FA_CREATE_ALWAYS | FA_WRITE);
-	if (!destOpened) {
-		failIO(Site::OP, destOpened.error());
+	auto sFile = FatFS::File::open(sourcePath.get(), FA_READ);
+	if (!sFile) {
+		failIO(Site::OP, sFile.error());
 		return;
 	}
-	destFile.emplace(std::move(*destOpened));
+	sourceFile.emplace(std::move(*sFile));
+
+	auto dFile = FatFS::File::open(tempPath.get(), FA_WRITE | FA_CREATE_ALWAYS);
+	if (!dFile) {
+		failIO(Site::FZ, dFile.error());
+		return;
+	}
+	destFile.emplace(std::move(*dFile));
 
 	phase = Phase::COPY_HEADER;
 	headerBytesRemaining = dataStart;
+	audioBytesWritten = 0;
+
+	showPopup("APPLYING GAIN...");
 }
 
-void GainJob::applyGainToChunk(uint32_t bytes) {
-	uint8_t* p = chunkBuffer;
-	uint8_t* end = chunkBuffer + bytes;
-	float gain = linearGain_;
+void GainJob::scanChunkForPeak(uint32_t bytesRead) {
+	uint32_t frameSize = byteDepth * numChannels;
+	uint32_t numFrames = bytesRead / frameSize;
 
-	if (byteDepth == 2) {
-		while (p + 2 <= end) {
-			int32_t value = (int32_t)(int16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
-			int32_t normalized = (int32_t)roundf((float)value * gain);
-			if (normalized > 32767) {
-				normalized = 32767;
+	uint32_t bytesScannedSoFar = totalDataBytes - dataBytesRemaining;
+
+	for (size_t i = 0; i < numFrames; i++) {
+		uint8_t const* p = chunkBuffer + (i * frameSize);
+		for (size_t c = 0; c < numChannels; c++) {
+			int32_t sampleVal = 0;
+			if (byteDepth == 2) {
+				int16_t raw = (int16_t)(p[0] | (p[1] << 8));
+				sampleVal = (raw < 0) ? -raw : raw;
 			}
-			else if (normalized < -32768) {
-				normalized = -32768;
+			else if (byteDepth == 3) {
+				int32_t raw = (int32_t)(p[0] | (p[1] << 8) | (p[2] << 16));
+				if (raw & 0x800000) {
+					raw |= 0xFF000000;
+				}
+				sampleVal = (raw < 0) ? -raw : raw;
 			}
-			p[0] = (uint8_t)(normalized & 0xFF);
-			p[1] = (uint8_t)((normalized >> 8) & 0xFF);
-			p += 2;
+			p += byteDepth;
+
+			uint32_t val = (uint32_t)sampleVal;
+			if (val > peakValue) {
+				peakValue = val;
+			}
+
+			// Map sample position to 128 overview columns
+			uint32_t totalFramePos = (bytesScannedSoFar + i * frameSize) / frameSize;
+			uint32_t totalFrames = totalDataBytes / frameSize;
+			if (totalFrames > 0) {
+				uint32_t col = (totalFramePos * kOverviewColumns) / totalFrames;
+				if (col >= kOverviewColumns) {
+					col = kOverviewColumns - 1;
+				}
+				uint32_t scaledPeak = (val * 32) / ((byteDepth == 2) ? 32767u : 8388607u);
+				if (scaledPeak > waveformOverview[col]) {
+					waveformOverview[col] = (uint8_t)scaledPeak;
+				}
+			}
 		}
 	}
-	else {
-		while (p + 3 <= end) {
-			int32_t value = ((int32_t)p[0]) | ((int32_t)p[1] << 8) | ((int32_t)(int8_t)p[2] << 16);
-			int32_t normalized = (int32_t)roundf((float)value * gain);
-			if (normalized > 8388607) {
-				normalized = 8388607;
+}
+
+void GainJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, uint8_t channels) {
+	uint32_t frameSize = depth * channels;
+	uint32_t frames = bytes / frameSize;
+	uint8_t* ptr = buffer;
+
+	if (depth == 2) {
+		for (uint32_t f = 0; f < frames; f++) {
+			for (uint8_t c = 0; c < channels; c++) {
+				int16_t sampleVal = (int16_t)(ptr[0] | (ptr[1] << 8));
+				float scaled = (float)sampleVal * linearGain_;
+				int32_t outVal = (int32_t)lroundf(scaled);
+
+				if (outVal > 32767) {
+					outVal = 32767;
+				}
+				else if (outVal < -32768) {
+					outVal = -32768;
+				}
+
+				ptr[0] = (uint8_t)(outVal & 0xFF);
+				ptr[1] = (uint8_t)((outVal >> 8) & 0xFF);
+				ptr += 2;
 			}
-			else if (normalized < -8388608) {
-				normalized = -8388608;
+		}
+	}
+	else if (depth == 3) {
+		for (uint32_t f = 0; f < frames; f++) {
+			for (uint8_t c = 0; c < channels; c++) {
+				int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
+				float scaled = (float)sampleVal * linearGain_;
+				int32_t outVal = (int32_t)lroundf(scaled);
+
+				if (outVal > 8388607) {
+					outVal = 8388607;
+				}
+				else if (outVal < -8388608) {
+					outVal = -8388608;
+				}
+
+				ptr[0] = (uint8_t)(outVal & 0xFF);
+				ptr[1] = (uint8_t)((outVal >> 8) & 0xFF);
+				ptr[2] = (uint8_t)((outVal >> 16) & 0xFF);
+				ptr += 3;
 			}
-			p[0] = (uint8_t)(normalized & 0xFF);
-			p[1] = (uint8_t)((normalized >> 8) & 0xFF);
-			p[2] = (uint8_t)((normalized >> 16) & 0xFF);
-			p += 3;
 		}
 	}
 }
@@ -430,23 +478,25 @@ void GainJob::applyGainToChunk(uint32_t bytes) {
 char const* GainJob::siteName(Site site) {
 	switch (site) {
 	case Site::OP:
-		return "OP";
+		return "OPEN";
 	case Site::SK:
-		return "SK";
+		return "SEEK";
+	case Site::R1:
+		return "READ1";
 	case Site::R2:
-		return "R2";
+		return "READ2";
 	case Site::W2:
-		return "W2";
+		return "WRITE2";
 	case Site::R3:
-		return "R3";
+		return "READ3";
 	case Site::W3:
-		return "W3";
+		return "WRITE3";
 	case Site::FZ:
-		return "FZ";
+		return "FINALIZE";
 	case Site::RN:
-		return "RN";
+		return "RENAME";
 	}
-	return "?";
+	return "UNK";
 }
 
 void GainJob::fail(char const* message) {
@@ -458,20 +508,12 @@ void GainJob::fail(char const* message) {
 	}
 	if (!tempPath.isEmpty()) {
 		FatFS::unlink(tempPath.get());
-		tempPath.clear();
 	}
-	finalPath.clear();
-	sourcePath.clear();
 	phase = Phase::IDLE;
 	showPopup(message);
 }
 
 void GainJob::failIO(Site site, FatFS::Error error) {
-	DEF_STACK_STRING_BUF(msg, 16);
-	msg.append(siteName(site));
-	msg.append("  ");
-	msg.appendInt((int32_t)error);
-
 	sourceFile.reset();
 	destFile.reset();
 	if (chunkBuffer) {
@@ -480,12 +522,14 @@ void GainJob::failIO(Site site, FatFS::Error error) {
 	}
 	if (!tempPath.isEmpty()) {
 		FatFS::unlink(tempPath.get());
-		tempPath.clear();
 	}
-	finalPath.clear();
-	sourcePath.clear();
 	phase = Phase::IDLE;
-	showPopup(msg.c_str());
+
+	DEF_STACK_STRING_BUF(buf, 24);
+	buf.append(siteName(site));
+	buf.append(" ");
+	buf.appendInt((int32_t)error);
+	showPopup(buf.c_str());
 }
 
 void GainJob::succeed() {
@@ -517,15 +561,5 @@ void GainJob::succeed() {
 		sampleBrowser.lastFilePathLoaded.set(&finalPath);
 	}
 
-	tempPath.clear();
-	finalPath.clear();
-	sourcePath.clear();
-
-	DEF_STACK_STRING_BUF(buffer, 32);
-	if (userGainDb_ >= 0.0f) {
-		buffer.append("+");
-	}
-	buffer.appendFloat(userGainDb_, 2, 2);
-	buffer.append(" DB");
-	showPopup(buffer.c_str());
+	showPopup(overwriteTarget_ ? "OVERWRITTEN" : "GAINED");
 }

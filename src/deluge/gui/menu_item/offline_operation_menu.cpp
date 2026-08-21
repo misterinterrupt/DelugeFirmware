@@ -170,36 +170,94 @@ MenuItem* NormalizeActionMenuItem::selectButtonPress() {
 	return nullptr;
 }
 
-GainActionMenuItem::GainActionMenuItem() : Integer(deluge::l10n::String::EMPTY_STRING) {
-	setValue(0);
+GainActionMenuItem::GainActionMenuItem() : MenuItem(deluge::l10n::String::EMPTY_STRING) {
+	gainVal_ = 0;
+}
+
+void GainActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
+	MenuItem::beginSession(navigatedBackwardFrom);
+	Sample* currentSample = getCurrentSample();
+	if (currentSample && !gainJob().isActive()) {
+		gainJob().setGainDb((float)gainVal_ / 100.0f);
+		gainJob().start(currentSample, gOfflineJobOverwrite);
+	}
+}
+
+void GainActionMenuItem::readValueAgain() {
+	display->setText("GAIN");
 }
 
 void GainActionMenuItem::selectEncoderAction(int32_t offset) {
-	Integer::selectEncoderAction(offset * 10);
-}
+	if (gainJob().isWaitingForGain()) {
+		gainVal_ += offset * 50;
+		if (gainVal_ > 2400) {
+			gainVal_ = 2400;
+		}
+		else if (gainVal_ < -2400) {
+			gainVal_ = -2400;
+		}
+		float gainDb = (float)gainVal_ / 100.0f;
+		gainJob().setGainDb(gainDb);
 
-void GainActionMenuItem::drawValue() {
-	float db = (float)getValue() / 100.0f;
-	DEF_STACK_STRING_BUF(buffer, 16);
-	if (db >= 0.0f) {
-		buffer.append("+");
+		DEF_STACK_STRING_BUF(buffer, 16);
+		if (gainDb >= 0.0f) {
+			buffer.append("+");
+		}
+		buffer.appendFloat(gainDb, 1, 1);
+		buffer.append("DB");
+		display->setText(buffer.c_str());
+
+		if (display->haveOLED()) {
+			renderUIsForOled();
+		}
 	}
-	buffer.appendFloat(db, 2, 2);
-	buffer.append("DB");
-	display->setText(buffer.c_str());
 }
 
 void GainActionMenuItem::drawPixelsForOled() {
-	float db = (float)getValue() / 100.0f;
-	DEF_STACK_STRING_BUF(buffer, 16);
-	if (db >= 0.0f) {
-		buffer.append("+");
-	}
-	buffer.appendFloat(db, 2, 2);
-	buffer.append(" dB");
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
 
-	deluge::hid::display::OLED::main.drawStringCentred(buffer.c_str(), 18 + OLED_MAIN_TOPMOST_PIXEL, kTextHugeSpacingX,
-	                                                   kTextHugeSizeY);
+	if (gainJob().isWaitingForGain()) {
+		canvas.drawString("GAIN ADJ", 0, topY, kTextSpacingX, kTextSpacingY);
+
+		float db = (float)gainVal_ / 100.0f;
+		DEF_STACK_STRING_BUF(buffer, 16);
+		if (db >= 0.0f) {
+			buffer.append("+");
+		}
+		buffer.appendFloat(db, 1, 1);
+		buffer.append(" dB");
+		canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
+
+		uint8_t const* overview = gainJob().getWaveformOverview();
+		for (int32_t x = 0; x < 128; x++) {
+			uint8_t h = overview[x];
+			int32_t halfH = h / 2;
+			if (halfH < 1) {
+				halfH = 1;
+			}
+			drawSafeVerticalLine(canvas, x, yBase - halfH, yBase + halfH);
+		}
+
+		float ratio = powf(10.0f, db / 20.0f);
+		int32_t threshOffset = (int32_t)(ratio * 14.0f);
+		if (threshOffset < 1) {
+			threshOffset = 1;
+		}
+
+		int32_t yThreshTop = yBase - threshOffset;
+		int32_t yThreshBot = yBase + threshOffset;
+
+		drawSafeHorizontalLine(canvas, yThreshTop, 0, 127);
+		drawSafeHorizontalLine(canvas, yThreshBot, 0, 127);
+	}
+	else if (gainJob().isActive()) {
+		canvas.drawString("SCANNING...", 0, topY, kTextSpacingX, kTextSpacingY);
+	}
+	else {
+		canvas.drawString("GAIN", 0, topY, kTextSpacingX, kTextSpacingY);
+	}
 }
 
 MenuItem* GainActionMenuItem::selectButtonPress() {
@@ -210,16 +268,61 @@ MenuItem* GainActionMenuItem::selectButtonPress() {
 		return nullptr;
 	}
 
-	float gainDb = (float)getValue() / 100.0f;
-	gainJob().start(currentSample, gainDb, gOfflineJobOverwrite);
+	if (gainJob().isWaitingForGain()) {
+		float gainDb = (float)gainVal_ / 100.0f;
+		gainJob().setGainDb(gainDb);
+		gainJob().confirmGainAndRun();
+		return nullptr;
+	}
+	else if (!gainJob().isActive()) {
+		gainJob().setGainDb((float)gainVal_ / 100.0f);
+		if (gainJob().start(currentSample, gOfflineJobOverwrite)) {
+			return NO_NAVIGATION;
+		}
+	}
 	return nullptr;
 }
 
 ReverseActionMenuItem::ReverseActionMenuItem() : MenuItem(deluge::l10n::String::EMPTY_STRING) {
 }
 
+void ReverseActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
+	MenuItem::beginSession(navigatedBackwardFrom);
+	Sample* currentSample = getCurrentSample();
+	if (currentSample && !reverseJob().isActive()) {
+		reverseJob().start(currentSample, gOfflineJobOverwrite);
+	}
+}
+
 void ReverseActionMenuItem::readValueAgain() {
 	display->setText("REVERSE");
+}
+
+void ReverseActionMenuItem::drawPixelsForOled() {
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
+
+	if (reverseJob().isWaitingForConfirm()) {
+		canvas.drawString("REVERSE?", 0, topY, kTextSpacingX, kTextSpacingY);
+		canvas.drawStringAlignRight("PRESS SEL", topY, kTextSpacingX, kTextSpacingY);
+
+		uint8_t const* overview = reverseJob().getWaveformOverview();
+		for (int32_t x = 0; x < 128; x++) {
+			uint8_t h = overview[x];
+			int32_t halfH = h / 2;
+			if (halfH < 1) {
+				halfH = 1;
+			}
+			drawSafeVerticalLine(canvas, x, yBase - halfH, yBase + halfH);
+		}
+	}
+	else if (reverseJob().isActive()) {
+		canvas.drawString("SCANNING...", 0, topY, kTextSpacingX, kTextSpacingY);
+	}
+	else {
+		canvas.drawString("REVERSE", 0, topY, kTextSpacingX, kTextSpacingY);
+	}
 }
 
 MenuItem* ReverseActionMenuItem::selectButtonPress() {
@@ -230,7 +333,15 @@ MenuItem* ReverseActionMenuItem::selectButtonPress() {
 		return nullptr;
 	}
 
-	reverseJob().start(currentSample, gOfflineJobOverwrite);
+	if (reverseJob().isWaitingForConfirm()) {
+		reverseJob().confirmReverseAndRun();
+		return nullptr;
+	}
+	else if (!reverseJob().isActive()) {
+		if (reverseJob().start(currentSample, gOfflineJobOverwrite)) {
+			return NO_NAVIGATION;
+		}
+	}
 	return nullptr;
 }
 
