@@ -109,7 +109,7 @@ bool LevelerJob::setupWaveformPreview(Sample* sample, bool overwrite) {
 				int32_t maxVal = std::abs((int32_t)sc->maxValue);
 				int32_t minVal = std::abs((int32_t)sc->minValue);
 				int32_t peak = std::max(maxVal, minVal);
-				uint8_t h = (uint8_t)((peak * 16) / 127);
+				uint8_t h = (uint8_t)((peak * 11) / 127);
 				if (h < 2) {
 					h = 2;
 				}
