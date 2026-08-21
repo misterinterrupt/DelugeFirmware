@@ -96,59 +96,25 @@ bool LevelerJob::setupWaveformPreview(Sample* sample, bool overwrite) {
 	peakValue = 0;
 	audioBytesWritten = 0;
 	std::memset(waveformOverview, 0, sizeof(waveformOverview));
-
-	auto opened = FatFS::File::open(sourcePath.get(), FA_READ);
-	if (opened) {
-		opened->lseek(dataStart);
-		uint32_t totalFrames = totalDataBytes / frameSize;
-		uint32_t framesPerBin = totalFrames > 128 ? (totalFrames / 128) : 1;
-
-		uint8_t staticBuf[1024];
-		uint32_t bytesReadTotal = 0;
-		int32_t binIdx = 0;
-		int32_t binPeak = 0;
-		uint32_t binFrames = 0;
-
-		while (bytesReadTotal < totalDataBytes && binIdx < 128) {
-			uint32_t toRead = std::min(totalDataBytes - bytesReadTotal, (uint32_t)sizeof(staticBuf));
-			auto readRes = opened->read({(std::byte*)staticBuf, toRead});
-			if (!readRes || readRes->empty()) break;
-			uint32_t got = readRes->size();
-			bytesReadTotal += got;
-
-			uint32_t framesInChunk = got / frameSize;
-			uint8_t* ptr = staticBuf;
-
-			for (uint32_t f = 0; f < framesInChunk; f++) {
-				int32_t val = 0;
-				if (byteDepth == 2) {
-					int16_t sampleVal = (int16_t)(ptr[0] | (ptr[1] << 8));
-					val = std::abs((int32_t)sampleVal);
-				}
-				else if (byteDepth == 3) {
-					int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
-					val = std::abs(sampleVal) >> 8;
-				}
-				ptr += frameSize;
-
-				if (val > binPeak) binPeak = val;
-
-				binFrames++;
-				if (binFrames >= framesPerBin) {
-				uint8_t h = (uint8_t)((binPeak * 32) / ((byteDepth == 2) ? 32767u : 8388607u));
-				waveformOverview[binIdx] = h;
-
-					binIdx++;
-					binPeak = 0;
-					binFrames = 0;
-					if (binIdx >= 128) break;
-				}
+	int32_t numClusters = sample->clusters.getNumElements();
+	if (numClusters > 0) {
+		for (int32_t x = 0; x < 128; x++) {
+			int32_t clusterIdx = (x * numClusters) / 128;
+			if (clusterIdx >= numClusters) {
+				clusterIdx = numClusters - 1;
 			}
-		}
-		while (binIdx < 128) {
-			uint8_t h = (uint8_t)((binPeak * 32) / ((byteDepth == 2) ? 32767u : 8388607u));
-			waveformOverview[binIdx] = h;
-			binIdx++;
+			SampleCluster* sc = sample->clusters.getElement(clusterIdx);
+			if (sc) {
+				int32_t maxVal = std::abs((int32_t)sc->maxValue);
+				int32_t minVal = std::abs((int32_t)sc->minValue);
+				int32_t peak = std::max(maxVal, minVal);
+				uint8_t h = (uint8_t)((peak * 40) / 127);
+				if (h < 2) h = 2;
+				waveformOverview[x] = h;
+			}
+			else {
+				waveformOverview[x] = 2;
+			}
 		}
 	}
 
