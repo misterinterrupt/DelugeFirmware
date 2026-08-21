@@ -61,6 +61,7 @@
 #include "processing/engines/audio_engine.h"
 #include "processing/engines/cv_engine.h"
 #include "processing/offline/gain_job.h"
+#include "processing/offline/gainer_job.h"
 #include "processing/offline/leveler_job.h"
 #include "processing/offline/normalize_job.h"
 #include "processing/offline/normalizer_job.h"
@@ -613,6 +614,7 @@ void registerTasks() {
 		    normalizeJob().tick();
 		    normalizerJob().tick();
 		    gainJob().tick();
+		    gainerJob().tick();
 		    levelerJob().tick();
 		    reverseJob().tick();
 	    },

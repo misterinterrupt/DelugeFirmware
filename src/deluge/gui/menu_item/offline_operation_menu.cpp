@@ -5,6 +5,7 @@
 #include "hid/display/oled.h"
 #include "model/sample/sample.h"
 #include "processing/offline/gain_job.h"
+#include "processing/offline/gainer_job.h"
 #include "processing/offline/leveler_job.h"
 #include "processing/offline/normalize_job.h"
 #include "processing/offline/normalizer_job.h"
@@ -170,36 +171,94 @@ MenuItem* NormalizeActionMenuItem::selectButtonPress() {
 	return nullptr;
 }
 
-GainActionMenuItem::GainActionMenuItem() : Integer(deluge::l10n::String::EMPTY_STRING) {
-	setValue(0);
+GainActionMenuItem::GainActionMenuItem() : MenuItem(deluge::l10n::String::EMPTY_STRING) {
+	gainVal_ = 0;
+}
+
+void GainActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
+	MenuItem::beginSession(navigatedBackwardFrom);
+	Sample* currentSample = getCurrentSample();
+	if (currentSample && !gainerJob().isActive()) {
+		gainerJob().setGainDb((float)gainVal_ / 100.0f);
+		gainerJob().start(currentSample, gOfflineJobOverwrite);
+	}
+}
+
+void GainActionMenuItem::readValueAgain() {
+	display->setText("GAIN");
 }
 
 void GainActionMenuItem::selectEncoderAction(int32_t offset) {
-	Integer::selectEncoderAction(offset * 10);
-}
+	if (gainerJob().isWaitingForGain()) {
+		gainVal_ += offset * 50;
+		if (gainVal_ > 2400) {
+			gainVal_ = 2400;
+		}
+		else if (gainVal_ < -2400) {
+			gainVal_ = -2400;
+		}
+		float gainDb = (float)gainVal_ / 100.0f;
+		gainerJob().setGainDb(gainDb);
 
-void GainActionMenuItem::drawValue() {
-	float db = (float)getValue() / 100.0f;
-	DEF_STACK_STRING_BUF(buffer, 16);
-	if (db >= 0.0f) {
-		buffer.append("+");
+		DEF_STACK_STRING_BUF(buffer, 16);
+		if (gainDb >= 0.0f) {
+			buffer.append("+");
+		}
+		buffer.appendFloat(gainDb, 1, 1);
+		buffer.append("DB");
+		display->setText(buffer.c_str());
+
+		if (display->haveOLED()) {
+			renderUIsForOled();
+		}
 	}
-	buffer.appendFloat(db, 2, 2);
-	buffer.append("DB");
-	display->setText(buffer.c_str());
 }
 
 void GainActionMenuItem::drawPixelsForOled() {
-	float db = (float)getValue() / 100.0f;
-	DEF_STACK_STRING_BUF(buffer, 16);
-	if (db >= 0.0f) {
-		buffer.append("+");
-	}
-	buffer.appendFloat(db, 2, 2);
-	buffer.append(" dB");
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
 
-	deluge::hid::display::OLED::main.drawStringCentred(buffer.c_str(), 18 + OLED_MAIN_TOPMOST_PIXEL, kTextHugeSpacingX,
-	                                                   kTextHugeSizeY);
+	if (gainerJob().isWaitingForGain()) {
+		canvas.drawString("GAIN ADJ", 0, topY, kTextSpacingX, kTextSpacingY);
+
+		float db = (float)gainVal_ / 100.0f;
+		DEF_STACK_STRING_BUF(buffer, 16);
+		if (db >= 0.0f) {
+			buffer.append("+");
+		}
+		buffer.appendFloat(db, 1, 1);
+		buffer.append(" dB");
+		canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
+
+		uint8_t const* overview = gainerJob().getWaveformOverview();
+		for (int32_t x = 0; x < 128; x++) {
+			uint8_t h = overview[x];
+			int32_t halfH = h / 2;
+			if (halfH < 1) {
+				halfH = 1;
+			}
+			drawSafeVerticalLine(canvas, x, yBase - halfH, yBase + halfH);
+		}
+
+		float ratio = powf(10.0f, db / 20.0f);
+		int32_t threshOffset = (int32_t)(ratio * 14.0f);
+		if (threshOffset < 1) {
+			threshOffset = 1;
+		}
+
+		int32_t yThreshTop = yBase - threshOffset;
+		int32_t yThreshBot = yBase + threshOffset;
+
+		drawSafeHorizontalLine(canvas, yThreshTop, 0, 127);
+		drawSafeHorizontalLine(canvas, yThreshBot, 0, 127);
+	}
+	else if (gainerJob().isActive()) {
+		canvas.drawString("SCANNING...", 0, topY, kTextSpacingX, kTextSpacingY);
+	}
+	else {
+		canvas.drawString("GAIN", 0, topY, kTextSpacingX, kTextSpacingY);
+	}
 }
 
 MenuItem* GainActionMenuItem::selectButtonPress() {
@@ -210,8 +269,18 @@ MenuItem* GainActionMenuItem::selectButtonPress() {
 		return nullptr;
 	}
 
-	float gainDb = (float)getValue() / 100.0f;
-	gainJob().start(currentSample, gainDb, gOfflineJobOverwrite);
+	if (gainerJob().isWaitingForGain()) {
+		float gainDb = (float)gainVal_ / 100.0f;
+		gainerJob().setGainDb(gainDb);
+		gainerJob().confirmGainAndRun();
+		return nullptr;
+	}
+	else if (!gainerJob().isActive()) {
+		gainerJob().setGainDb((float)gainVal_ / 100.0f);
+		if (gainerJob().start(currentSample, gOfflineJobOverwrite)) {
+			return NO_NAVIGATION;
+		}
+	}
 	return nullptr;
 }
 
