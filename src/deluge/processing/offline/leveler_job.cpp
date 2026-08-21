@@ -4,12 +4,12 @@
  * Leveler DSP Job implementation.
  */
 
-#include "gui/menu_item/offline_operation_menu.h"
 #include "processing/engines/audio_engine.h"
 #include "processing/offline/leveler_job.h"
 
 #include "definitions_cxx.hpp"
 #include "fatfs/fatfs.hpp"
+#include "gui/menu_item/offline_operation_menu.h"
 #include "gui/ui/browser/sample_browser.h"
 #include "gui/ui/sound_editor.h"
 #include "gui/ui/ui.h"
@@ -577,8 +577,7 @@ void LevelerJob::succeed() {
 	tempPath.clear();
 	finalPath.clear();
 	sourcePath.clear();
-
-	deluge::gui::menu_item::invalidateSharedWaveformOverview();
+	deluge::gui::menu_item::gOfflineWaveformCache.invalidate();
 
 	if (overwriteTarget_) {
 		showPopup("OVERWRITTEN");
