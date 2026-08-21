@@ -188,6 +188,10 @@ void GainJob::tick() {
 		}
 
 		if (dataBytesRemaining == 0) {
+			if (peakValue == 0) {
+				fail("SILENCE");
+				return;
+			}
 			phase = Phase::SELECT_GAIN;
 			if (display->haveOLED()) {
 				renderUIsForOled();
