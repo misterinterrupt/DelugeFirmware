@@ -183,19 +183,21 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 	if (levelerJob().isWaitingForThreshold()) {
 		deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
 
-		canvas.drawString("T THRESH", 0, 0, kTextSpacingX, kTextSpacingY);
-
+		// Draw current threshold dB on the top right
 		float db = (float)thresholdVal_ / 100.0f;
 		DEF_STACK_STRING_BUF(buffer, 16);
 		buffer.appendFloat(db, 1, 1);
 		buffer.append(" dB");
 		canvas.drawStringAlignRight(buffer.c_str(), 0, kTextSpacingX, kTextSpacingY);
 
+		// Waveform overview centered at yBase = 38, max height +/- 14px
 		uint8_t const* overview = levelerJob().getWaveformOverview();
-		const int32_t yBase = 36;
+		const int32_t yBase = 38;
+		const int32_t maxHalfH = 14;
+
 		for (int32_t x = 0; x < 128; x++) {
 			uint8_t h = overview[x];
-			int32_t halfH = h / 2;
+			int32_t halfH = (h * maxHalfH) / 32;
 			if (halfH < 1) {
 				halfH = 1;
 			}
@@ -203,7 +205,7 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 		}
 
 		float ratio = powf(10.0f, db / 20.0f);
-		int32_t threshOffset = (int32_t)(ratio * 16.0f);
+		int32_t threshOffset = (int32_t)(ratio * (float)maxHalfH);
 		if (threshOffset < 1) {
 			threshOffset = 1;
 		}
@@ -213,10 +215,6 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 
 		canvas.drawHorizontalLine(yThreshTop, 0, 127);
 		canvas.drawHorizontalLine(yThreshBot, 0, 127);
-	}
-	else {
-		deluge::hid::display::OLED::main.drawStringCentred("LEVELER", 18 + OLED_MAIN_TOPMOST_PIXEL, kTextHugeSpacingX,
-		                                                   kTextHugeSizeY);
 	}
 }
 
