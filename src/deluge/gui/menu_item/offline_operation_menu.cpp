@@ -152,6 +152,15 @@ LevelerActionMenuItem::LevelerActionMenuItem() : MenuItem(deluge::l10n::String::
 	thresholdVal_ = -600;
 }
 
+void LevelerActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
+	MenuItem::beginSession(navigatedBackwardFrom);
+	Sample* currentSample = getCurrentSample();
+	if (currentSample && !levelerJob().isActive()) {
+		levelerJob().setThresholdDb((float)thresholdVal_ / 100.0f);
+		levelerJob().start(currentSample, gOfflineJobOverwrite);
+	}
+}
+
 void LevelerActionMenuItem::readValueAgain() {
 	display->setText("LEVELER");
 }
@@ -180,24 +189,23 @@ void LevelerActionMenuItem::selectEncoderAction(int32_t offset) {
 }
 
 void LevelerActionMenuItem::drawPixelsForOled() {
-	if (levelerJob().isWaitingForThreshold()) {
-		deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
 
-		// Draw current threshold dB on the top right
+	if (levelerJob().isWaitingForThreshold()) {
+		canvas.drawString("T THRESH", 0, topY, kTextSpacingX, kTextSpacingY);
+
 		float db = (float)thresholdVal_ / 100.0f;
 		DEF_STACK_STRING_BUF(buffer, 16);
 		buffer.appendFloat(db, 1, 1);
 		buffer.append(" dB");
-		canvas.drawStringAlignRight(buffer.c_str(), 0, kTextSpacingX, kTextSpacingY);
+		canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
 
-		// Waveform overview centered at yBase = 38, max height +/- 14px
 		uint8_t const* overview = levelerJob().getWaveformOverview();
-		const int32_t yBase = 38;
-		const int32_t maxHalfH = 14;
-
 		for (int32_t x = 0; x < 128; x++) {
 			uint8_t h = overview[x];
-			int32_t halfH = (h * maxHalfH) / 32;
+			int32_t halfH = h / 2;
 			if (halfH < 1) {
 				halfH = 1;
 			}
@@ -205,7 +213,7 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 		}
 
 		float ratio = powf(10.0f, db / 20.0f);
-		int32_t threshOffset = (int32_t)(ratio * (float)maxHalfH);
+		int32_t threshOffset = (int32_t)(ratio * 14.0f);
 		if (threshOffset < 1) {
 			threshOffset = 1;
 		}
@@ -215,6 +223,12 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 
 		canvas.drawHorizontalLine(yThreshTop, 0, 127);
 		canvas.drawHorizontalLine(yThreshBot, 0, 127);
+	}
+	else if (levelerJob().isActive()) {
+		canvas.drawString("SCANNING...", 0, topY, kTextSpacingX, kTextSpacingY);
+	}
+	else {
+		canvas.drawString("LEVELER", 0, topY, kTextSpacingX, kTextSpacingY);
 	}
 }
 
@@ -232,13 +246,13 @@ MenuItem* LevelerActionMenuItem::selectButtonPress() {
 		levelerJob().confirmThresholdAndRun();
 		return nullptr;
 	}
-	else {
+	else if (!levelerJob().isActive()) {
 		levelerJob().setThresholdDb((float)thresholdVal_ / 100.0f);
 		if (levelerJob().start(currentSample, gOfflineJobOverwrite)) {
 			return NO_NAVIGATION;
 		}
-		return nullptr;
 	}
+	return nullptr;
 }
 
 OfflineOperationMenu offlineOperationMenu;

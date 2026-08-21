@@ -57,6 +57,7 @@ class LevelerActionMenuItem : public MenuItem {
 public:
 	LevelerActionMenuItem();
 	std::string_view getName() const override { return "LEVELER"; }
+	void beginSession(MenuItem* navigatedBackwardFrom = nullptr) override;
 	MenuItem* selectButtonPress() override;
 	void selectEncoderAction(int32_t offset) override;
 	void drawPixelsForOled() override;
