@@ -41,8 +41,7 @@ static Sample* getCurrentSample() {
 	return nullptr;
 }
 
-static int8_t gOfflineWaveformOverviewMax[128];
-static int8_t gOfflineWaveformOverviewMin[128];
+static uint8_t gOfflineWaveformOverview[128];
 static Sample* gOfflineOverviewCachedSample = nullptr;
 
 static void populateOfflineWaveformOverview(Sample* sample) {
@@ -50,8 +49,7 @@ static void populateOfflineWaveformOverview(Sample* sample) {
 		return;
 	}
 	gOfflineOverviewCachedSample = sample;
-	std::memset(gOfflineWaveformOverviewMax, 0, sizeof(gOfflineWaveformOverviewMax));
-	std::memset(gOfflineWaveformOverviewMin, 0, sizeof(gOfflineWaveformOverviewMin));
+	std::memset(gOfflineWaveformOverview, 0, sizeof(gOfflineWaveformOverview));
 
 	if (sample->filePath.isEmpty()) {
 		return;
@@ -79,8 +77,7 @@ static void populateOfflineWaveformOverview(Sample* sample) {
 	uint8_t staticBuf[1024];
 	uint32_t bytesReadTotal = 0;
 	int32_t binIdx = 0;
-	int32_t maxInBin = -32768;
-	int32_t minInBin = 32767;
+	int32_t binPeak = 0;
 	uint32_t binFrames = 0;
 
 	while (bytesReadTotal < totalDataBytes && binIdx < 128) {
@@ -97,43 +94,31 @@ static void populateOfflineWaveformOverview(Sample* sample) {
 			int32_t val = 0;
 			if (byteDepth == 2) {
 				int16_t sampleVal = (int16_t)(ptr[0] | (ptr[1] << 8));
-				val = (int32_t)sampleVal;
+				val = std::abs((int32_t)sampleVal);
 			}
 			else if (byteDepth == 3) {
 				int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
-				val = sampleVal >> 8;
+				val = std::abs(sampleVal) >> 8;
 			}
 			ptr += frameSize;
 
-			if (val > maxInBin) maxInBin = val;
-			if (val < minInBin) minInBin = val;
+			if (val > binPeak) binPeak = val;
 
 			binFrames++;
 			if (binFrames >= framesPerBin) {
-				int32_t scaledMax = (maxInBin * 32) / 32767;
-				int32_t scaledMin = (minInBin * 32) / 32767;
-				if (scaledMax > 32) scaledMax = 32;
-				if (scaledMin < -32) scaledMin = -32;
-
-				gOfflineWaveformOverviewMax[binIdx] = (int8_t)scaledMax;
-				gOfflineWaveformOverviewMin[binIdx] = (int8_t)scaledMin;
+				uint8_t h = (uint8_t)((binPeak * 32) / ((byteDepth == 2) ? 32767u : 8388607u));
+				gOfflineWaveformOverview[binIdx] = h;
 
 				binIdx++;
-				maxInBin = -32768;
-				minInBin = 32767;
+				binPeak = 0;
 				binFrames = 0;
 				if (binIdx >= 128) break;
 			}
 		}
 	}
 	while (binIdx < 128) {
-		int32_t scaledMax = (maxInBin * 32) / 32767;
-		int32_t scaledMin = (minInBin * 32) / 32767;
-		if (scaledMax > 32) scaledMax = 32;
-		if (scaledMin < -32) scaledMin = -32;
-
-		gOfflineWaveformOverviewMax[binIdx] = (int8_t)scaledMax;
-		gOfflineWaveformOverviewMin[binIdx] = (int8_t)scaledMin;
+		uint8_t h = (uint8_t)((binPeak * 32) / ((byteDepth == 2) ? 32767u : 8388607u));
+		gOfflineWaveformOverview[binIdx] = h;
 		binIdx++;
 	}
 }
@@ -145,18 +130,12 @@ static void renderWaveformOverviewOnCanvas(Sample* sample, int32_t yBase = 43, i
 	}
 	populateOfflineWaveformOverview(sample);
 	for (int32_t x = 0; x < 128; x++) {
-		int8_t maxPeak = gOfflineWaveformOverviewMax[x];
-		int8_t minPeak = gOfflineWaveformOverviewMin[x];
-
-		int32_t yTop = yBase - ((int32_t)maxPeak * maxHalfH) / 32;
-		int32_t yBot = yBase - ((int32_t)minPeak * maxHalfH) / 32;
-
-		if (yTop == yBot) {
-			yTop = yBase - 1;
-			yBot = yBase + 1;
+		uint8_t h = gOfflineWaveformOverview[x];
+		int32_t halfH = (h * maxHalfH) / 32;
+		if (halfH < 1) {
+			halfH = 1;
 		}
-
-		canvas.drawVerticalLine(x, yTop, yBot);
+		canvas.drawVerticalLine(x, yBase - halfH, yBase + halfH);
 	}
 }
 
