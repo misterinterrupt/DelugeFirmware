@@ -38,7 +38,8 @@ static void showProgressPopup(uint32_t current, uint32_t total, uint32_t passOff
 	}
 	uint32_t passPercent = (current * 100) / total;
 	uint32_t overallPercent = (passOffset * 100 + passPercent) / totalPasses;
-	DEF_STACK_STRING_BUF(buf, 16);
+	DEF_STACK_STRING_BUF(buf, 24);
+	buf.append("LEVELING... ");
 	buf.appendInt(overallPercent);
 	buf.append("%");
 	display->displayPopup(buf.c_str(), 1);
@@ -49,13 +50,13 @@ LevelerJob& levelerJob() {
 	return instance;
 }
 
-bool LevelerJob::start(Sample* sample, bool overwrite) {
-	if (isActive()) {
+bool LevelerJob::setupWaveformPreview(Sample* sample, bool overwrite) {
+	if (isActive() && phase != Phase::SELECT_THRESHOLD) {
 		showPopup("BUSY");
 		return false;
 	}
 
-	if (!sample->audioDataLengthBytes || !sample->byteDepth || !sample->audioDataStartPosBytes) {
+	if (!sample || !sample->audioDataLengthBytes || !sample->byteDepth || !sample->audioDataStartPosBytes) {
 		showPopup("CANT LEVEL");
 		return false;
 	}
@@ -72,12 +73,6 @@ bool LevelerJob::start(Sample* sample, bool overwrite) {
 	uint64_t total = sample->audioDataLengthBytes;
 	if (total > 0xFFFFFFFFu) {
 		showPopup("CANT LEVEL");
-		return false;
-	}
-
-	chunkBuffer = (uint8_t*)delugeAlloc(kChunkSize, false);
-	if (!chunkBuffer) {
-		showPopup("MEMORY");
 		return false;
 	}
 
@@ -102,14 +97,54 @@ bool LevelerJob::start(Sample* sample, bool overwrite) {
 	audioBytesWritten = 0;
 	std::memset(waveformOverview, 0, sizeof(waveformOverview));
 
-	phase = Phase::OPEN;
-	showPopup("SCANNING...");
+	int32_t numClusters = sample->clusters.getNumElements();
+	if (numClusters > 0) {
+		for (int32_t x = 0; x < 128; x++) {
+			int32_t clusterIdx = (x * numClusters) / 128;
+			if (clusterIdx >= numClusters) {
+				clusterIdx = numClusters - 1;
+			}
+			SampleCluster* sc = sample->clusters.getElement(clusterIdx);
+			if (sc) {
+				int32_t maxVal = std::abs((int32_t)sc->maxValue);
+				int32_t minVal = std::abs((int32_t)sc->minValue);
+				int32_t peak = std::max(maxVal, minVal);
+				uint8_t h = (uint8_t)((peak * 16) / 127);
+				if (h < 2) {
+					h = 2;
+				}
+				waveformOverview[x] = h;
+			}
+			else {
+				waveformOverview[x] = 8;
+			}
+		}
+	}
+	else {
+		for (int32_t x = 0; x < 128; x++) {
+			waveformOverview[x] = 8;
+		}
+	}
+
+	phase = Phase::SELECT_THRESHOLD;
 	return true;
+}
+
+bool LevelerJob::start(Sample* sample, bool overwrite) {
+	return setupWaveformPreview(sample, overwrite);
 }
 
 void LevelerJob::confirmThresholdAndRun() {
 	if (phase == Phase::SELECT_THRESHOLD) {
-		beginCopyPass();
+		if (!chunkBuffer) {
+			chunkBuffer = (uint8_t*)delugeAlloc(kChunkSize, false);
+			if (!chunkBuffer) {
+				fail("MEMORY");
+				return;
+			}
+		}
+		phase = Phase::OPEN;
+		showPopup("LEVELING... 0%");
 	}
 }
 
@@ -175,10 +210,7 @@ void LevelerJob::tick() {
 				fail("SILENCE");
 				return;
 			}
-			phase = Phase::SELECT_THRESHOLD;
-			if (display->haveOLED()) {
-				renderUIsForOled();
-			}
+			beginCopyPass();
 		}
 		return;
 	}

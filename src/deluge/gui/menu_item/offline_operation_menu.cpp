@@ -25,12 +25,59 @@ SaveModeMenuItem::SaveModeMenuItem()
     : ToggleBool(deluge::l10n::String::EMPTY_STRING, deluge::l10n::String::EMPTY_STRING, gOfflineJobOverwrite) {
 }
 
+
+
+static Sample* getCurrentSample() {
+	if (soundEditor.currentMultiRange == nullptr && soundEditor.currentSound != nullptr) {
+		Source* source = &soundEditor.currentSound->sources[soundEditor.currentSourceIndex];
+		if (source != nullptr) {
+			soundEditor.currentMultiRange = source->getOrCreateFirstRange();
+		}
+	}
+	AudioFileHolder* holder = soundEditor.getCurrentAudioFileHolder();
+	if (holder && holder->audioFile && holder->audioFileType == AudioFileType::SAMPLE) {
+		return (Sample*)holder->audioFile;
+	}
+	return nullptr;
+}
+
+static void renderWaveformOverviewOnCanvas(Sample* sample, int32_t yBase, int32_t maxBarH = 8) {
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	if (!sample) {
+		return;
+	}
+	int32_t numClusters = sample->clusters.getNumElements();
+	for (int32_t x = 0; x < 128; x++) {
+		int32_t h = 8;
+		if (numClusters > 0) {
+			int32_t clusterIdx = (x * numClusters) / 128;
+			if (clusterIdx >= numClusters) {
+				clusterIdx = numClusters - 1;
+			}
+			SampleCluster* sc = sample->clusters.getElement(clusterIdx);
+			if (sc) {
+				int32_t maxVal = std::abs((int32_t)sc->maxValue);
+				int32_t minVal = std::abs((int32_t)sc->minValue);
+				int32_t peak = std::max(maxVal, minVal);
+				h = (peak * maxBarH) / 127;
+			}
+		}
+		if (h < 1) {
+			h = 1;
+		}
+		canvas.drawVerticalLine(x, yBase - h, yBase + h);
+	}
+}
+
 NormalizeActionMenuItem::NormalizeActionMenuItem() : Integer(deluge::l10n::String::EMPTY_STRING) {
 	setValue(0);
 }
 
 void NormalizeActionMenuItem::selectEncoderAction(int32_t offset) {
 	Integer::selectEncoderAction(offset * 10);
+	if (display->haveOLED()) {
+		renderUIsForOled();
+	}
 }
 
 void NormalizeActionMenuItem::drawValue() {
@@ -45,30 +92,35 @@ void NormalizeActionMenuItem::drawValue() {
 }
 
 void NormalizeActionMenuItem::drawPixelsForOled() {
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 28;
+
+	canvas.drawString("NORM TARGET", 0, topY, kTextSpacingX, kTextSpacingY);
+
 	float db = (float)getValue() / 100.0f;
 	DEF_STACK_STRING_BUF(buffer, 16);
-	if (db >= 0.0f) {
+	if (db > 0.0f) {
 		buffer.append("+");
 	}
-	buffer.appendFloat(db, 2, 2);
+	buffer.appendFloat(db, 1, 1);
 	buffer.append(" dB");
+	canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
 
-	deluge::hid::display::OLED::main.drawStringCentred(buffer.c_str(), 18 + OLED_MAIN_TOPMOST_PIXEL, kTextHugeSpacingX,
-	                                                   kTextHugeSizeY);
-}
+	Sample* currentSample = getCurrentSample();
+	renderWaveformOverviewOnCanvas(currentSample, yBase);
 
-static Sample* getCurrentSample() {
-	if (soundEditor.currentMultiRange == nullptr && soundEditor.currentSound != nullptr) {
-		Source* source = &soundEditor.currentSound->sources[soundEditor.currentSourceIndex];
-		if (source != nullptr) {
-			soundEditor.currentMultiRange = source->getOrCreateFirstRange();
-		}
+	float ratio = powf(10.0f, db / 20.0f);
+	int32_t targetOffset = (int32_t)(ratio * 8.0f);
+	if (targetOffset < 1) {
+		targetOffset = 1;
 	}
-	AudioFileHolder* holder = soundEditor.getCurrentAudioFileHolder();
-	if (holder && holder->audioFile && holder->audioFileType == AudioFileType::SAMPLE) {
-		return (Sample*)holder->audioFile;
-	}
-	return nullptr;
+
+	int32_t yTop = yBase - targetOffset;
+	int32_t yBot = yBase + targetOffset;
+
+	canvas.drawHorizontalLine(yTop, 0, 127);
+	canvas.drawHorizontalLine(yBot, 0, 127);
 }
 
 MenuItem* NormalizeActionMenuItem::selectButtonPress() {
@@ -90,6 +142,9 @@ GainActionMenuItem::GainActionMenuItem() : Integer(deluge::l10n::String::EMPTY_S
 
 void GainActionMenuItem::selectEncoderAction(int32_t offset) {
 	Integer::selectEncoderAction(offset * 10);
+	if (display->haveOLED()) {
+		renderUIsForOled();
+	}
 }
 
 void GainActionMenuItem::drawValue() {
@@ -104,16 +159,35 @@ void GainActionMenuItem::drawValue() {
 }
 
 void GainActionMenuItem::drawPixelsForOled() {
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 28;
+
+	canvas.drawString("GAIN BOOST", 0, topY, kTextSpacingX, kTextSpacingY);
+
 	float db = (float)getValue() / 100.0f;
 	DEF_STACK_STRING_BUF(buffer, 16);
-	if (db >= 0.0f) {
+	if (db > 0.0f) {
 		buffer.append("+");
 	}
-	buffer.appendFloat(db, 2, 2);
+	buffer.appendFloat(db, 1, 1);
 	buffer.append(" dB");
+	canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
 
-	deluge::hid::display::OLED::main.drawStringCentred(buffer.c_str(), 18 + OLED_MAIN_TOPMOST_PIXEL, kTextHugeSpacingX,
-	                                                   kTextHugeSizeY);
+	Sample* currentSample = getCurrentSample();
+	renderWaveformOverviewOnCanvas(currentSample, yBase);
+
+	float ratio = powf(10.0f, db / 20.0f);
+	int32_t gainOffset = (int32_t)(ratio * 8.0f);
+	if (gainOffset < 1) {
+		gainOffset = 1;
+	}
+
+	int32_t yTop = yBase - gainOffset;
+	int32_t yBot = yBase + gainOffset;
+
+	canvas.drawHorizontalLine(yTop, 0, 127);
+	canvas.drawHorizontalLine(yBot, 0, 127);
 }
 
 MenuItem* GainActionMenuItem::selectButtonPress() {
@@ -136,6 +210,20 @@ void ReverseActionMenuItem::readValueAgain() {
 	display->setText("REVERSE");
 }
 
+void ReverseActionMenuItem::drawPixelsForOled() {
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 28;
+
+	canvas.drawString("REVERSE", 0, topY, kTextSpacingX, kTextSpacingY);
+	canvas.drawStringAlignRight("APPLY", topY, kTextSpacingX, kTextSpacingY);
+
+	Sample* currentSample = getCurrentSample();
+	renderWaveformOverviewOnCanvas(currentSample, yBase);
+
+	canvas.drawHorizontalLine(yBase, 0, 127);
+}
+
 MenuItem* ReverseActionMenuItem::selectButtonPress() {
 	Sample* currentSample = getCurrentSample();
 
@@ -155,9 +243,9 @@ LevelerActionMenuItem::LevelerActionMenuItem() : MenuItem(deluge::l10n::String::
 void LevelerActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
 	MenuItem::beginSession(navigatedBackwardFrom);
 	Sample* currentSample = getCurrentSample();
-	if (currentSample && !levelerJob().isActive()) {
+	if (currentSample) {
 		levelerJob().setThresholdDb((float)thresholdVal_ / 100.0f);
-		levelerJob().start(currentSample, gOfflineJobOverwrite);
+		levelerJob().setupWaveformPreview(currentSample, gOfflineJobOverwrite);
 	}
 }
 
@@ -191,7 +279,7 @@ void LevelerActionMenuItem::selectEncoderAction(int32_t offset) {
 void LevelerActionMenuItem::drawPixelsForOled() {
 	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
 	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
-	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 28;
 
 	if (levelerJob().isWaitingForThreshold()) {
 		canvas.drawString("T THRESH", 0, topY, kTextSpacingX, kTextSpacingY);
@@ -213,7 +301,7 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 		}
 
 		float ratio = powf(10.0f, db / 20.0f);
-		int32_t threshOffset = (int32_t)(ratio * 14.0f);
+		int32_t threshOffset = (int32_t)(ratio * 8.0f);
 		if (threshOffset < 1) {
 			threshOffset = 1;
 		}

@@ -41,6 +41,7 @@ public:
 	static constexpr uint32_t kChunkSize = 4096;
 	static constexpr uint32_t kOverviewColumns = 128;
 
+	bool setupWaveformPreview(Sample* sample, bool overwrite = false);
 	bool start(Sample* sample, bool overwrite = false);
 	void tick();
 

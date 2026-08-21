@@ -36,6 +36,7 @@ public:
 	ReverseActionMenuItem();
 	std::string_view getName() const override { return "REVERSE"; }
 	void readValueAgain() override;
+	void drawPixelsForOled() override;
 	MenuItem* selectButtonPress() override;
 };
 
