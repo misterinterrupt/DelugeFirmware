@@ -46,7 +46,7 @@ NormalizeJob& normalizeJob() {
 	return instance;
 }
 
-bool NormalizeJob::start(Sample* sample, bool overwrite) {
+bool NormalizeJob::start(Sample* sample, float targetCeilingDb, bool overwrite) {
 	if (isActive()) {
 		showPopup("BUSY");
 		return false;
@@ -83,6 +83,7 @@ bool NormalizeJob::start(Sample* sample, bool overwrite) {
 	sourcePath.clear();
 
 	sourcePath.set(&sample->filePath);
+	targetCeilingDb_ = targetCeilingDb;
 	overwriteTarget_ = overwrite;
 
 	dataStart = (uint32_t)sample->audioDataStartPosBytes;
@@ -296,6 +297,9 @@ void NormalizeJob::tick() {
 			failIO(Site::FZ, synced.error());
 			return;
 		}
+		if (overwriteTarget_) {
+			FatFS::unlink(finalPath.get());
+		}
 		auto renamed = FatFS::rename(tempPath.get(), finalPath.get());
 		if (!renamed) {
 			failIO(Site::RN, renamed.error());
@@ -312,12 +316,15 @@ void NormalizeJob::beginCopyPass() {
 		fail("SILENCE");
 		return;
 	}
-	uint32_t targetMax = (byteDepth == 2) ? 32767u : 8388607u;
-	if (peakValue >= targetMax) {
+	float targetMax = (byteDepth == 2) ? 32767.0f : 8388607.0f;
+	float normGain = targetMax / (float)peakValue;
+	float offsetGain = powf(10.0f, targetCeilingDb_ / 20.0f);
+	linearGain_ = normGain * offsetGain;
+
+	if (fabsf(linearGain_ - 1.0f) < 0.0001f) {
 		fail("NO GAIN");
 		return;
 	}
-	linearGain_ = (float)targetMax / (float)peakValue;
 
 	char const* src = sourcePath.get();
 	char const* lastDot = strrchr(src, '.');
@@ -556,15 +563,10 @@ void NormalizeJob::failIO(Site site, FatFS::Error error) {
 }
 
 float NormalizeJob::getGainDb() const {
-	if (peakValue == 0) {
+	if (peakValue == 0 || linearGain_ <= 0.0f) {
 		return 0.0f;
 	}
-	float targetMax = (byteDepth == 2) ? 32767.0f : 8388607.0f;
-	float ratio = targetMax / (float)peakValue;
-	if (ratio <= 1.0f) {
-		return 0.0f;
-	}
-	return 20.0f * log10f(ratio);
+	return 20.0f * log10f(linearGain_);
 }
 
 void NormalizeJob::succeed() {
@@ -580,11 +582,16 @@ void NormalizeJob::succeed() {
 
 	soundEditor.cutSound();
 
+	AudioFileHolder* holder = soundEditor.getCurrentAudioFileHolder();
+	if (holder) {
+		holder->setAudioFile(nullptr);
+	}
+	audioFileManager.tryToDeleteAudioFileFromMemoryIfItExists(finalPath.get());
+
 	Error error = Error::NONE;
 	Sample* newSample =
 	    (Sample*)audioFileManager.getAudioFileFromFilename(&finalPath, true, &error, nullptr, AudioFileType::SAMPLE);
 	if (newSample) {
-		AudioFileHolder* holder = soundEditor.getCurrentAudioFileHolder();
 		if (holder) {
 			holder->filePath.set(&finalPath);
 			holder->setAudioFile(newSample, false, true);

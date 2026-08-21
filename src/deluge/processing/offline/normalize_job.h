@@ -24,7 +24,7 @@ public:
 
 	/// Returns false (and shows a popup explaining why) if the job could not
 	/// be started. On success, the job proceeds via tick().
-	bool start(Sample* sample, bool overwrite = false);
+	bool start(Sample* sample, float targetCeilingDb = 0.0f, bool overwrite = false);
 
 	/// Called regularly from the task scheduler. Does at most one chunk of
 	/// card I/O per call. Cheap no-op when idle.
@@ -84,6 +84,7 @@ private:
 	uint32_t audioBytesWritten = 0;
 
 	uint8_t byteDepth = 2;
+	float targetCeilingDb_ = 0.0f;
 	float linearGain_ = 1.0f;
 	bool overwriteTarget_ = false;
 

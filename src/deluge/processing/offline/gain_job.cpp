@@ -263,6 +263,9 @@ void GainJob::tick() {
 			failIO(Site::FZ, synced.error());
 			return;
 		}
+		if (overwriteTarget_) {
+			FatFS::unlink(finalPath.get());
+		}
 		auto renamed = FatFS::rename(tempPath.get(), finalPath.get());
 		if (!renamed) {
 			failIO(Site::RN, renamed.error());
@@ -495,11 +498,16 @@ void GainJob::succeed() {
 
 	soundEditor.cutSound();
 
+	AudioFileHolder* holder = soundEditor.getCurrentAudioFileHolder();
+	if (holder) {
+		holder->setAudioFile(nullptr);
+	}
+	audioFileManager.tryToDeleteAudioFileFromMemoryIfItExists(finalPath.get());
+
 	Error error = Error::NONE;
 	Sample* newSample =
 	    (Sample*)audioFileManager.getAudioFileFromFilename(&finalPath, true, &error, nullptr, AudioFileType::SAMPLE);
 	if (newSample) {
-		AudioFileHolder* holder = soundEditor.getCurrentAudioFileHolder();
 		if (holder) {
 			holder->filePath.set(&finalPath);
 			holder->setAudioFile(newSample, false, true);

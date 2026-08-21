@@ -17,12 +17,18 @@ public:
 	std::string_view getName() const override { return "OVERWRITE"; }
 };
 
-class NormalizeActionMenuItem : public MenuItem {
+class NormalizeActionMenuItem : public Integer {
 public:
 	NormalizeActionMenuItem();
 	std::string_view getName() const override { return "NORMALIZE"; }
-	void readValueAgain() override;
 	MenuItem* selectButtonPress() override;
+	void selectEncoderAction(int32_t offset) override;
+
+protected:
+	int32_t getMaxValue() const override { return 300; }   // +3.00 dB
+	int32_t getMinValue() const override { return -2400; } // -24.00 dB
+	void drawPixelsForOled() override;
+	void drawValue() override;
 };
 
 class ReverseActionMenuItem : public MenuItem {

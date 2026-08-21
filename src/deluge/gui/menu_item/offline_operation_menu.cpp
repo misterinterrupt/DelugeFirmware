@@ -22,11 +22,36 @@ SaveModeMenuItem::SaveModeMenuItem()
     : ToggleBool(deluge::l10n::String::EMPTY_STRING, deluge::l10n::String::EMPTY_STRING, gOfflineJobOverwrite) {
 }
 
-NormalizeActionMenuItem::NormalizeActionMenuItem() : MenuItem(deluge::l10n::String::EMPTY_STRING) {
+NormalizeActionMenuItem::NormalizeActionMenuItem() : Integer(deluge::l10n::String::EMPTY_STRING) {
+	setValue(0);
 }
 
-void NormalizeActionMenuItem::readValueAgain() {
-	display->setText("NORMALIZE");
+void NormalizeActionMenuItem::selectEncoderAction(int32_t offset) {
+	Integer::selectEncoderAction(offset * 10);
+}
+
+void NormalizeActionMenuItem::drawValue() {
+	float db = (float)getValue() / 100.0f;
+	DEF_STACK_STRING_BUF(buffer, 16);
+	if (db >= 0.0f) {
+		buffer.append("+");
+	}
+	buffer.appendFloat(db, 2, 2);
+	buffer.append("DB");
+	display->setText(buffer.c_str());
+}
+
+void NormalizeActionMenuItem::drawPixelsForOled() {
+	float db = (float)getValue() / 100.0f;
+	DEF_STACK_STRING_BUF(buffer, 16);
+	if (db >= 0.0f) {
+		buffer.append("+");
+	}
+	buffer.appendFloat(db, 2, 2);
+	buffer.append(" dB");
+
+	deluge::hid::display::OLED::main.drawStringCentred(buffer.c_str(), 18 + OLED_MAIN_TOPMOST_PIXEL, kTextHugeSpacingX,
+	                                                   kTextHugeSizeY);
 }
 
 static Sample* getCurrentSample() {
@@ -51,7 +76,8 @@ MenuItem* NormalizeActionMenuItem::selectButtonPress() {
 		return nullptr;
 	}
 
-	normalizeJob().start(currentSample, gOfflineJobOverwrite);
+	float ceilingDb = (float)getValue() / 100.0f;
+	normalizeJob().start(currentSample, ceilingDb, gOfflineJobOverwrite);
 	return nullptr;
 }
 
