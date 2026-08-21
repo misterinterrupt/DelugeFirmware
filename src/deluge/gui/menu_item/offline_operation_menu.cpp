@@ -65,9 +65,12 @@ NormalizeActionMenuItem::NormalizeActionMenuItem() : MenuItem(deluge::l10n::Stri
 void NormalizeActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
 	MenuItem::beginSession(navigatedBackwardFrom);
 	Sample* currentSample = getCurrentSample();
-	if (currentSample && !normalizerJob().isActive()) {
-		normalizerJob().setTargetCeilingDb((float)targetCeilingVal_ / 100.0f);
-		normalizerJob().start(currentSample, gOfflineJobOverwrite);
+	if (currentSample) {
+		if (normalizerJob().isWaitingForCeiling() || !normalizerJob().isActive()) {
+			normalizerJob().reset();
+			normalizerJob().setTargetCeilingDb((float)targetCeilingVal_ / 100.0f);
+			normalizerJob().start(currentSample, gOfflineJobOverwrite);
+		}
 	}
 }
 
@@ -184,9 +187,12 @@ void GainActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
 	activePage_ = 0;
 	distSelectedParam_ = 0;
 	Sample* currentSample = getCurrentSample();
-	if (currentSample && !gainerJob().isActive()) {
-		gainerJob().setGainDb((float)gainVal_ / 100.0f);
-		gainerJob().start(currentSample, gOfflineJobOverwrite);
+	if (currentSample) {
+		if (gainerJob().isWaitingForGain() || !gainerJob().isActive()) {
+			gainerJob().reset();
+			gainerJob().setGainDb((float)gainVal_ / 100.0f);
+			gainerJob().start(currentSample, gOfflineJobOverwrite);
+		}
 	}
 }
 
@@ -503,9 +509,12 @@ ReverseActionMenuItem::ReverseActionMenuItem() : MenuItem(deluge::l10n::String::
 void ReverseActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
 	MenuItem::beginSession(navigatedBackwardFrom);
 	Sample* currentSample = getCurrentSample();
-	if (currentSample && !reverserJob().isActive()) {
-		reverserJob().setModeParam(modeVal_);
-		reverserJob().start(currentSample, gOfflineJobOverwrite);
+	if (currentSample) {
+		if (reverserJob().isWaitingForMode() || !reverserJob().isActive()) {
+			reverserJob().reset();
+			reverserJob().setModeParam(modeVal_);
+			reverserJob().start(currentSample, gOfflineJobOverwrite);
+		}
 	}
 }
 

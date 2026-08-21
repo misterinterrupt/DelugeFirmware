@@ -52,10 +52,27 @@ NormalizerJob& normalizerJob() {
 	return instance;
 }
 
+void NormalizerJob::reset() {
+	sourceFile.reset();
+	destFile.reset();
+	if (chunkBuffer) {
+		delugeDealloc(chunkBuffer);
+		chunkBuffer = nullptr;
+	}
+	std::memset(waveformOverview, 0, sizeof(waveformOverview));
+	peakValue = 0;
+	phase = Phase::IDLE;
+}
+
 bool NormalizerJob::start(Sample* sample, bool overwrite) {
 	if (isActive()) {
-		showPopup("BUSY");
-		return false;
+		if (isWaitingForCeiling()) {
+			reset();
+		}
+		else {
+			showPopup("BUSY");
+			return false;
+		}
 	}
 
 	if (!sample->audioDataLengthBytes || !sample->byteDepth || !sample->audioDataStartPosBytes) {
@@ -113,7 +130,8 @@ void NormalizerJob::confirmCeilingAndRun() {
 }
 
 void NormalizerJob::cancel() {
-	fail("CANCELLED");
+	reset();
+	showPopup("CANCELLED");
 }
 
 void NormalizerJob::tick() {

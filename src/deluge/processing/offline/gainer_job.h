@@ -69,6 +69,7 @@ public:
 
 	void confirmGainAndRun();
 	void cancel();
+	void reset();
 
 	uint8_t const* getWaveformOverview() const { return waveformOverview; }
 	uint32_t getPeakValue() const { return peakValue; }

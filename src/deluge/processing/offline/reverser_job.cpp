@@ -52,10 +52,30 @@ ReverserJob& reverserJob() {
 	return instance;
 }
 
+void ReverserJob::reset() {
+	sourceFile.reset();
+	destFile.reset();
+	if (chunkBuffer) {
+		delugeDealloc(chunkBuffer);
+		chunkBuffer = nullptr;
+	}
+	std::memset(waveformOverview, 0, sizeof(waveformOverview));
+	std::memset(transientFrames_, 0, sizeof(transientFrames_));
+	peakValue = 0;
+	transientCount_ = 0;
+	prevSampleMag_ = 0;
+	phase = Phase::IDLE;
+}
+
 bool ReverserJob::start(Sample* sample, bool overwrite) {
 	if (isActive()) {
-		showPopup("BUSY");
-		return false;
+		if (isWaitingForMode()) {
+			reset();
+		}
+		else {
+			showPopup("BUSY");
+			return false;
+		}
 	}
 
 	if (!sample->audioDataLengthBytes || !sample->byteDepth || !sample->audioDataStartPosBytes) {
@@ -116,7 +136,8 @@ void ReverserJob::confirmModeAndRun() {
 }
 
 void ReverserJob::cancel() {
-	fail("CANCELLED");
+	reset();
+	showPopup("CANCELLED");
 }
 
 void ReverserJob::tick() {

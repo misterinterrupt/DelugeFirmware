@@ -52,10 +52,27 @@ GainerJob& gainerJob() {
 	return instance;
 }
 
+void GainerJob::reset() {
+	sourceFile.reset();
+	destFile.reset();
+	if (chunkBuffer) {
+		delugeDealloc(chunkBuffer);
+		chunkBuffer = nullptr;
+	}
+	std::memset(waveformOverview, 0, sizeof(waveformOverview));
+	peakValue = 0;
+	phase = Phase::IDLE;
+}
+
 bool GainerJob::start(Sample* sample, bool overwrite) {
 	if (isActive()) {
-		showPopup("BUSY");
-		return false;
+		if (isWaitingForGain()) {
+			reset();
+		}
+		else {
+			showPopup("BUSY");
+			return false;
+		}
 	}
 
 	if (!sample->audioDataLengthBytes || !sample->byteDepth || !sample->audioDataStartPosBytes) {
@@ -113,7 +130,8 @@ void GainerJob::confirmGainAndRun() {
 }
 
 void GainerJob::cancel() {
-	fail("CANCELLED");
+	reset();
+	showPopup("CANCELLED");
 }
 
 void GainerJob::tick() {
@@ -438,11 +456,18 @@ static float applySampleDistortion(float sample, DistortionConfig const& cfg) {
 		return sample;
 	}
 
+	float mag = fabsf(sample);
+	float sgn = (sample >= 0.0f) ? 1.0f : -1.0f;
+
+	if (mag <= 1.0f && cfg.type != DistortionType::BITCRUSH && cfg.type != DistortionType::RECTIFY) {
+		return sample;
+	}
+
 	switch (cfg.type) {
 	case DistortionType::SATURATE: {
 		float drive = (cfg.param1 <= 0.1f) ? 1.0f : cfg.param1;
 		float warmth = cfg.param2 * 0.2f;
-		float biased = sample + warmth;
+		float biased = sample + warmth * sgn;
 		float saturated = tanhf(biased * drive) / tanhf(drive);
 		if (saturated > 1.0f) saturated = 1.0f;
 		if (saturated < -1.0f) saturated = -1.0f;
@@ -451,11 +476,9 @@ static float applySampleDistortion(float sample, DistortionConfig const& cfg) {
 
 	case DistortionType::FOLD: {
 		float folds = (cfg.param1 <= 0.1f) ? 1.0f : cfg.param1;
-		float biased = sample + cfg.param2;
-		float folded = sinf(biased * folds * 1.57079632679f);
-		if (folded > 1.0f) folded = 1.0f;
-		if (folded < -1.0f) folded = -1.0f;
-		return folded;
+		float over = (mag - 1.0f) * folds;
+		float foldedMag = 1.0f - fabsf(sinf(over * 1.57079632679f));
+		return sgn * foldedMag;
 	}
 
 	case DistortionType::BITCRUSH: {
@@ -470,18 +493,19 @@ static float applySampleDistortion(float sample, DistortionConfig const& cfg) {
 	case DistortionType::RECTIFY: {
 		bool fullWave = (cfg.param1 >= 0.5f);
 		float crossover = cfg.param2;
-		float absVal = fabsf(sample);
 
-		if (absVal < crossover) {
-			return 0.0f;
+		if (mag < crossover) {
+			return sample * 0.5f;
 		}
 
-		if (fullWave) {
-			return absVal;
+		if (mag <= 1.0f) {
+			return fullWave ? mag : sample;
 		}
-		else {
-			return (sample < 0.0f) ? 0.0f : sample;
-		}
+
+		float over = mag - 1.0f;
+		float foldedPeak = 1.0f - over;
+		if (foldedPeak < -1.0f) foldedPeak = -1.0f;
+		return fullWave ? fabsf(foldedPeak) : sgn * foldedPeak;
 	}
 
 	case DistortionType::OFF:
@@ -539,8 +563,11 @@ void GainerJob::processChunk(uint8_t* buffer, uint32_t bytes, uint8_t depth, uin
 		for (uint32_t f = 0; f < frames; f++) {
 			bool updateHold = (f % downsampleFactor == 0);
 			for (uint8_t c = 0; c < channels; c++) {
-				int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
-				float normSample = ((float)sampleVal / 8388607.0f) * linearGain_;
+				int32_t raw = (int32_t)(ptr[0] | ((uint32_t)ptr[1] << 8) | ((uint32_t)ptr[2] << 16));
+				if (raw & 0x800000) {
+					raw |= 0xFF000000;
+				}
+				float normSample = ((float)raw / 8388607.0f) * linearGain_;
 
 				if (downsampleFactor > 1) {
 					if (updateHold) {
