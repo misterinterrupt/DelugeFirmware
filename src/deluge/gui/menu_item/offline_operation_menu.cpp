@@ -2,7 +2,6 @@
 #include "fatfs/fatfs.hpp"
 #include "gui/ui/sound_editor.h"
 #include "gui/ui/ui.h"
-#include "hid/button.h"
 #include "hid/display/display.h"
 #include "hid/display/oled.h"
 #include "model/sample/sample.h"
@@ -19,11 +18,158 @@ namespace deluge::gui::menu_item {
 
 bool gOfflineJobOverwrite = false;
 
+struct SharedWaveformOverview {
+	uint8_t overview[128]{0};
+	bool valid = false;
+	String samplePath;
+};
+
+static SharedWaveformOverview gSharedWaveform;
+
+void invalidateSharedWaveform() {
+	gSharedWaveform.valid = false;
+	gSharedWaveform.samplePath.clear();
+}
+
+static bool scanSampleWaveformOverview(Sample* sample, uint8_t* overviewOut128) {
+	if (!sample || !sample->audioDataLengthBytes || !sample->byteDepth || !sample->audioDataStartPosBytes) {
+		return false;
+	}
+
+	uint32_t dataStart = (uint32_t)sample->audioDataStartPosBytes;
+	uint32_t totalDataBytes = (uint32_t)sample->audioDataLengthBytes;
+	uint32_t byteDepth = sample->byteDepth;
+	uint32_t numChannels = sample->numChannels > 0 ? sample->numChannels : 1;
+	uint32_t frameSize = byteDepth * numChannels;
+
+	auto opened = FatFS::File::open(sample->filePath.get(), FA_READ);
+	if (!opened) {
+		return false;
+	}
+
+	opened->lseek(dataStart);
+	uint32_t totalFrames = totalDataBytes / frameSize;
+	uint32_t framesPerBin = totalFrames > 128 ? (totalFrames / 128) : 1;
+
+	uint8_t staticBuf[1024];
+	uint32_t bytesReadTotal = 0;
+	int32_t binIdx = 0;
+	int32_t maxInBin = 0;
+	uint32_t binFrames = 0;
+
+	std::memset(overviewOut128, 0, 128);
+
+	while (bytesReadTotal < totalDataBytes && binIdx < 128) {
+		uint32_t toRead = std::min(totalDataBytes - bytesReadTotal, (uint32_t)sizeof(staticBuf));
+		auto readRes = opened->read({(std::byte*)staticBuf, toRead});
+		if (!readRes || readRes->empty()) break;
+		uint32_t got = readRes->size();
+		bytesReadTotal += got;
+
+		uint32_t framesInChunk = got / frameSize;
+		uint8_t* ptr = staticBuf;
+
+		for (uint32_t f = 0; f < framesInChunk; f++) {
+			int32_t val = 0;
+			if (byteDepth == 2) {
+				int16_t sampleVal = (int16_t)(ptr[0] | (ptr[1] << 8));
+				val = std::abs((int32_t)sampleVal);
+			}
+			else if (byteDepth == 3) {
+				int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
+				val = std::abs(sampleVal >> 8);
+			}
+			ptr += frameSize;
+
+			if (val > maxInBin) maxInBin = val;
+
+			binFrames++;
+			if (binFrames >= framesPerBin) {
+				uint32_t scaled = (maxInBin * 28) / 32767;
+				if (scaled > 28) scaled = 28;
+				overviewOut128[binIdx] = (uint8_t)scaled;
+
+				binIdx++;
+				maxInBin = 0;
+				binFrames = 0;
+				if (binIdx >= 128) break;
+			}
+		}
+	}
+	while (binIdx < 128) {
+		uint32_t scaled = (maxInBin * 28) / 32767;
+		if (scaled > 28) scaled = 28;
+		overviewOut128[binIdx] = (uint8_t)scaled;
+		binIdx++;
+	}
+	return true;
+}
+
+static void drawSharedWaveformOverview(int32_t yBase, int32_t maxHalfH) {
+	if (!gSharedWaveform.valid) {
+		return;
+	}
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	for (int32_t x = 0; x < 128; x++) {
+		uint8_t h = gSharedWaveform.overview[x];
+		int32_t halfH = (h * maxHalfH) / 28;
+		if (halfH < 1) {
+			halfH = 1;
+		}
+		canvas.drawVerticalLine(x, yBase - halfH, yBase + halfH);
+	}
+}
+
 static SaveModeMenuItem saveModeMenuItem;
 static NormalizeActionMenuItem normalizeActionMenuItem;
 static ReverseActionMenuItem reverseActionMenuItem;
 static GainActionMenuItem gainActionMenuItem;
 static LevelerActionMenuItem levelerActionMenuItem;
+
+SaveModeMenuItem::SaveModeMenuItem()
+    : ToggleBool(deluge::l10n::String::EMPTY_STRING, deluge::l10n::String::EMPTY_STRING, gOfflineJobOverwrite) {
+}
+
+NormalizeActionMenuItem::NormalizeActionMenuItem() : Integer(deluge::l10n::String::EMPTY_STRING) {
+	setValue(0);
+}
+
+void NormalizeActionMenuItem::selectEncoderAction(int32_t offset) {
+	Integer::selectEncoderAction(offset * 10);
+	if (display->haveOLED()) {
+		renderUIsForOled();
+	}
+}
+
+void NormalizeActionMenuItem::drawValue() {
+	float db = (float)getValue() / 100.0f;
+	DEF_STACK_STRING_BUF(buffer, 16);
+	if (db >= 0.0f) {
+		buffer.append("+");
+	}
+	buffer.appendFloat(db, 2, 2);
+	buffer.append("DB");
+	display->setText(buffer.c_str());
+}
+
+void NormalizeActionMenuItem::drawPixelsForOled() {
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
+
+	canvas.drawString("NORMALIZE", 0, topY, kTextSpacingX, kTextSpacingY);
+
+	float db = (float)getValue() / 100.0f;
+	DEF_STACK_STRING_BUF(buffer, 16);
+	if (db >= 0.0f) {
+		buffer.append("+");
+	}
+	buffer.appendFloat(db, 2, 2);
+	buffer.append(" dB");
+	canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
+
+	drawSharedWaveformOverview(yBase, 14);
+}
 
 static Sample* getCurrentSample() {
 	if (soundEditor.currentMultiRange == nullptr && soundEditor.currentSound != nullptr) {
@@ -39,96 +185,6 @@ static Sample* getCurrentSample() {
 	return nullptr;
 }
 
-static void drawOfflineWaveformCanvas(const char* titleText,
-                                     const char* valueText,
-                                     bool showThreshold = false,
-                                     float thresholdDb = 0.0f)
-{
-	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
-	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
-	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
-
-	if (titleText) {
-		canvas.drawString(titleText, 0, topY, kTextSpacingX, kTextSpacingY);
-	}
-	if (valueText) {
-		canvas.drawStringAlignRight(valueText, topY, kTextSpacingX, kTextSpacingY);
-	}
-
-	uint8_t const* overview = levelerJob().getWaveformOverview();
-	for (int32_t x = 0; x < 128; x++) {
-		uint8_t h = overview[x];
-		int32_t halfH = h / 2;
-		if (halfH < 1) {
-			halfH = 1;
-		}
-		canvas.drawVerticalLine(x, yBase - halfH, yBase + halfH);
-	}
-
-	if (showThreshold) {
-		float ratio = powf(10.0f, thresholdDb / 20.0f);
-		int32_t threshOffset = (int32_t)(ratio * 14.0f);
-		if (threshOffset < 1) {
-			threshOffset = 1;
-		}
-
-		int32_t yThreshTop = yBase - threshOffset;
-		int32_t yThreshBot = yBase + threshOffset;
-
-		canvas.drawHorizontalLine(yThreshTop, 0, 127);
-		canvas.drawHorizontalLine(yThreshBot, 0, 127);
-	}
-}
-
-SaveModeMenuItem::SaveModeMenuItem()
-    : ToggleBool(deluge::l10n::String::EMPTY_STRING, deluge::l10n::String::EMPTY_STRING, gOfflineJobOverwrite) {
-}
-
-NormalizeActionMenuItem::NormalizeActionMenuItem() : Integer(deluge::l10n::String::EMPTY_STRING) {
-	setValue(0);
-}
-
-void NormalizeActionMenuItem::selectEncoderAction(int32_t offset) {
-	Integer::selectEncoderAction(offset * 10);
-}
-
-void NormalizeActionMenuItem::drawValue() {
-	float db = (float)getValue() / 100.0f;
-	DEF_STACK_STRING_BUF(buffer, 16);
-	if (db >= 0.0f) {
-		buffer.append("+");
-	}
-	buffer.appendFloat(db, 2, 2);
-	buffer.append("DB");
-	display->setText(buffer.c_str());
-}
-
-void NormalizeActionMenuItem::drawPixelsForOled() {
-	float db = (float)getValue() / 100.0f;
-	DEF_STACK_STRING_BUF(buffer, 16);
-	if (db >= 0.0f) {
-		buffer.append("+");
-	}
-	buffer.appendFloat(db, 2, 2);
-	buffer.append(" dB");
-
-	drawOfflineWaveformCanvas("NORMALIZE", buffer.c_str(), true, db);
-}
-
-ActionResult NormalizeActionMenuItem::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
-	if (b == deluge::hid::button::RECORD && on) {
-		Sample* s = getCurrentSample();
-		if (s) {
-			levelerJob().start(s, gOfflineJobOverwrite);
-			if (display->haveOLED()) {
-				renderUIsForOled();
-			}
-		}
-		return ActionResult::DEALT_WITH;
-	}
-	return MenuItem::buttonAction(b, on, inCardRoutine);
-}
-
 MenuItem* NormalizeActionMenuItem::selectButtonPress() {
 	Sample* currentSample = getCurrentSample();
 
@@ -137,6 +193,7 @@ MenuItem* NormalizeActionMenuItem::selectButtonPress() {
 		return nullptr;
 	}
 
+	invalidateSharedWaveform();
 	float ceilingDb = (float)getValue() / 100.0f;
 	normalizeJob().start(currentSample, ceilingDb, gOfflineJobOverwrite);
 	return nullptr;
@@ -148,6 +205,9 @@ GainActionMenuItem::GainActionMenuItem() : Integer(deluge::l10n::String::EMPTY_S
 
 void GainActionMenuItem::selectEncoderAction(int32_t offset) {
 	Integer::selectEncoderAction(offset * 10);
+	if (display->haveOLED()) {
+		renderUIsForOled();
+	}
 }
 
 void GainActionMenuItem::drawValue() {
@@ -162,6 +222,12 @@ void GainActionMenuItem::drawValue() {
 }
 
 void GainActionMenuItem::drawPixelsForOled() {
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
+
+	canvas.drawString("GAIN", 0, topY, kTextSpacingX, kTextSpacingY);
+
 	float db = (float)getValue() / 100.0f;
 	DEF_STACK_STRING_BUF(buffer, 16);
 	if (db >= 0.0f) {
@@ -169,22 +235,9 @@ void GainActionMenuItem::drawPixelsForOled() {
 	}
 	buffer.appendFloat(db, 2, 2);
 	buffer.append(" dB");
+	canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
 
-	drawOfflineWaveformCanvas("GAIN", buffer.c_str(), true, db);
-}
-
-ActionResult GainActionMenuItem::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
-	if (b == deluge::hid::button::RECORD && on) {
-		Sample* s = getCurrentSample();
-		if (s) {
-			levelerJob().start(s, gOfflineJobOverwrite);
-			if (display->haveOLED()) {
-				renderUIsForOled();
-			}
-		}
-		return ActionResult::DEALT_WITH;
-	}
-	return MenuItem::buttonAction(b, on, inCardRoutine);
+	drawSharedWaveformOverview(yBase, 14);
 }
 
 MenuItem* GainActionMenuItem::selectButtonPress() {
@@ -195,6 +248,7 @@ MenuItem* GainActionMenuItem::selectButtonPress() {
 		return nullptr;
 	}
 
+	invalidateSharedWaveform();
 	float gainDb = (float)getValue() / 100.0f;
 	gainJob().start(currentSample, gainDb, gOfflineJobOverwrite);
 	return nullptr;
@@ -208,21 +262,12 @@ void ReverseActionMenuItem::readValueAgain() {
 }
 
 void ReverseActionMenuItem::drawPixelsForOled() {
-	drawOfflineWaveformCanvas("REVERSE", "EXECUTE", false, 0.0f);
-}
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
 
-ActionResult ReverseActionMenuItem::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
-	if (b == deluge::hid::button::RECORD && on) {
-		Sample* s = getCurrentSample();
-		if (s) {
-			levelerJob().start(s, gOfflineJobOverwrite);
-			if (display->haveOLED()) {
-				renderUIsForOled();
-			}
-		}
-		return ActionResult::DEALT_WITH;
-	}
-	return MenuItem::buttonAction(b, on, inCardRoutine);
+	canvas.drawString("REVERSE", 0, topY, kTextSpacingX, kTextSpacingY);
+	drawSharedWaveformOverview(yBase, 14);
 }
 
 MenuItem* ReverseActionMenuItem::selectButtonPress() {
@@ -233,20 +278,13 @@ MenuItem* ReverseActionMenuItem::selectButtonPress() {
 		return nullptr;
 	}
 
+	invalidateSharedWaveform();
 	reverseJob().start(currentSample, gOfflineJobOverwrite);
 	return nullptr;
 }
 
 LevelerActionMenuItem::LevelerActionMenuItem() : MenuItem(deluge::l10n::String::EMPTY_STRING) {
 	thresholdVal_ = -600;
-}
-
-void LevelerActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
-	MenuItem::beginSession(navigatedBackwardFrom);
-	Sample* currentSample = getCurrentSample();
-	if (currentSample && !levelerJob().isActive()) {
-		levelerJob().start(currentSample, gOfflineJobOverwrite);
-	}
 }
 
 void LevelerActionMenuItem::readValueAgain() {
@@ -262,7 +300,6 @@ void LevelerActionMenuItem::selectEncoderAction(int32_t offset) {
 		thresholdVal_ = -2400;
 	}
 	float threshDb = (float)thresholdVal_ / 100.0f;
-	levelerJob().setThresholdDb(threshDb);
 
 	DEF_STACK_STRING_BUF(buffer, 16);
 	buffer.appendFloat(threshDb, 1, 1);
@@ -275,26 +312,31 @@ void LevelerActionMenuItem::selectEncoderAction(int32_t offset) {
 }
 
 void LevelerActionMenuItem::drawPixelsForOled() {
+	deluge::hid::display::oled_canvas::Canvas& canvas = deluge::hid::display::OLED::main;
+	const int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 1;
+	const int32_t yBase = OLED_MAIN_TOPMOST_PIXEL + 22;
+
+	canvas.drawString("T THRESH", 0, topY, kTextSpacingX, kTextSpacingY);
+
 	float db = (float)thresholdVal_ / 100.0f;
 	DEF_STACK_STRING_BUF(buffer, 16);
 	buffer.appendFloat(db, 1, 1);
 	buffer.append(" dB");
+	canvas.drawStringAlignRight(buffer.c_str(), topY, kTextSpacingX, kTextSpacingY);
 
-	drawOfflineWaveformCanvas("T THRESH", buffer.c_str(), true, db);
-}
+	drawSharedWaveformOverview(yBase, 14);
 
-ActionResult LevelerActionMenuItem::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
-	if (b == deluge::hid::button::RECORD && on) {
-		Sample* s = getCurrentSample();
-		if (s) {
-			levelerJob().start(s, gOfflineJobOverwrite);
-			if (display->haveOLED()) {
-				renderUIsForOled();
-			}
-		}
-		return ActionResult::DEALT_WITH;
+	float ratio = powf(10.0f, db / 20.0f);
+	int32_t threshOffset = (int32_t)(ratio * 14.0f);
+	if (threshOffset < 1) {
+		threshOffset = 1;
 	}
-	return MenuItem::buttonAction(b, on, inCardRoutine);
+
+	int32_t yThreshTop = yBase - threshOffset;
+	int32_t yThreshBot = yBase + threshOffset;
+
+	canvas.drawHorizontalLine(yThreshTop, 0, 127);
+	canvas.drawHorizontalLine(yThreshBot, 0, 127);
 }
 
 MenuItem* LevelerActionMenuItem::selectButtonPress() {
@@ -305,6 +347,7 @@ MenuItem* LevelerActionMenuItem::selectButtonPress() {
 		return nullptr;
 	}
 
+	invalidateSharedWaveform();
 	float threshDb = (float)thresholdVal_ / 100.0f;
 	levelerJob().setThresholdDb(threshDb);
 	levelerJob().start(currentSample, gOfflineJobOverwrite);
@@ -317,6 +360,19 @@ OfflineOperationMenu::OfflineOperationMenu()
     : Submenu(deluge::l10n::String::EMPTY_STRING,
               {&normalizeActionMenuItem, &gainActionMenuItem, &levelerActionMenuItem, &reverseActionMenuItem,
                &saveModeMenuItem}) {
+}
+
+void OfflineOperationMenu::beginSession(MenuItem* navigatedBackwardFrom) {
+	Submenu::beginSession(navigatedBackwardFrom);
+	Sample* currentSample = getCurrentSample();
+	if (currentSample) {
+		if (!gSharedWaveform.valid || !gSharedWaveform.samplePath.equals(&currentSample->filePath)) {
+			if (scanSampleWaveformOverview(currentSample, gSharedWaveform.overview)) {
+				gSharedWaveform.samplePath.set(&currentSample->filePath);
+				gSharedWaveform.valid = true;
+			}
+		}
+	}
 }
 
 bool OfflineOperationMenu::isRelevant(ModControllableAudio* modControllable, int32_t /*whichThing*/) {

@@ -23,7 +23,6 @@ public:
 	std::string_view getName() const override { return "NORMALIZE"; }
 	MenuItem* selectButtonPress() override;
 	void selectEncoderAction(int32_t offset) override;
-	ActionResult buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) override;
 
 protected:
 	int32_t getMaxValue() const override { return 300; }   // +3.00 dB
@@ -37,9 +36,8 @@ public:
 	ReverseActionMenuItem();
 	std::string_view getName() const override { return "REVERSE"; }
 	void readValueAgain() override;
-	MenuItem* selectButtonPress() override;
 	void drawPixelsForOled() override;
-	ActionResult buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) override;
+	MenuItem* selectButtonPress() override;
 };
 
 class GainActionMenuItem : public Integer {
@@ -48,7 +46,6 @@ public:
 	std::string_view getName() const override { return "GAIN"; }
 	MenuItem* selectButtonPress() override;
 	void selectEncoderAction(int32_t offset) override;
-	ActionResult buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) override;
 
 protected:
 	int32_t getMaxValue() const override { return 600; }  // +6.00 dB
@@ -61,12 +58,10 @@ class LevelerActionMenuItem : public MenuItem {
 public:
 	LevelerActionMenuItem();
 	std::string_view getName() const override { return "LEVELER"; }
-	void beginSession(MenuItem* navigatedBackwardFrom = nullptr) override;
 	MenuItem* selectButtonPress() override;
 	void selectEncoderAction(int32_t offset) override;
 	void drawPixelsForOled() override;
 	void readValueAgain() override;
-	ActionResult buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) override;
 
 private:
 	int32_t thresholdVal_ = -600; // -6.00 dB default
@@ -75,6 +70,7 @@ private:
 class OfflineOperationMenu : public Submenu {
 public:
 	OfflineOperationMenu();
+	void beginSession(MenuItem* navigatedBackwardFrom = nullptr) override;
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override;
 	MenuPermission checkPermissionToBeginSession(ModControllableAudio* modControllable, int32_t whichThing,
 	                                             ::MultiRange** currentRange) override;
