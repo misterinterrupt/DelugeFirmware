@@ -18,7 +18,6 @@
 namespace deluge::gui::menu_item {
 
 bool gOfflineJobOverwrite = false;
-OfflineWaveformCache gOfflineWaveformCache;
 
 static SaveModeMenuItem saveModeMenuItem;
 static NormalizeActionMenuItem normalizeActionMenuItem;
@@ -40,111 +39,8 @@ static Sample* getCurrentSample() {
 	return nullptr;
 }
 
-bool OfflineWaveformCache::scanSample(Sample* sample) {
-	if (!sample || !sample->audioDataLengthBytes || !sample->byteDepth || !sample->audioDataStartPosBytes) {
-		return false;
-	}
-
-	auto opened = FatFS::File::open(sample->filePath.get(), FA_READ);
-	if (!opened) {
-		return false;
-	}
-
-	uint32_t dataStart = (uint32_t)sample->audioDataStartPosBytes;
-	uint32_t totalDataBytes = (uint32_t)sample->audioDataLengthBytes;
-	uint32_t byteDepth = sample->byteDepth;
-	uint32_t numChannels = sample->numChannels > 0 ? sample->numChannels : 1;
-	uint32_t frameSize = byteDepth * numChannels;
-
-	opened->lseek(dataStart);
-
-	uint32_t totalFrames = totalDataBytes / frameSize;
-	if (totalFrames == 0) {
-		return false;
-	}
-
-	uint32_t framesPerBin = totalFrames > kOverviewColumns ? (totalFrames / kOverviewColumns) : 1;
-
-	uint8_t staticBuf[1024];
-	uint32_t bytesReadTotal = 0;
-	uint32_t binIdx = 0;
-	int32_t maxInBin = -32768;
-	int32_t minInBin = 32767;
-	uint32_t binFrames = 0;
-
-	std::memset(waveformOverview_, 0, sizeof(waveformOverview_));
-	std::memset(waveformOverviewMin_, 0, sizeof(waveformOverviewMin_));
-	std::memset(waveformOverviewMax_, 0, sizeof(waveformOverviewMax_));
-
-	while (bytesReadTotal < totalDataBytes && binIdx < kOverviewColumns) {
-		uint32_t toRead = std::min(totalDataBytes - bytesReadTotal, (uint32_t)sizeof(staticBuf));
-		auto readRes = opened->read({(std::byte*)staticBuf, toRead});
-		if (!readRes || readRes->empty()) {
-			break;
-		}
-		uint32_t got = readRes->size();
-		bytesReadTotal += got;
-
-		uint32_t framesInChunk = got / frameSize;
-		uint8_t* ptr = staticBuf;
-
-		for (uint32_t f = 0; f < framesInChunk; f++) {
-			int32_t val = 0;
-			if (byteDepth == 2) {
-				int16_t sampleVal = (int16_t)(ptr[0] | (ptr[1] << 8));
-				val = (int32_t)sampleVal;
-			}
-			else if (byteDepth == 3) {
-				int32_t sampleVal = (int32_t)((ptr[0] << 8) | (ptr[1] << 16) | (ptr[2] << 24)) >> 8;
-				val = sampleVal >> 8;
-			}
-			ptr += frameSize;
-
-			if (val > maxInBin) maxInBin = val;
-			if (val < minInBin) minInBin = val;
-
-			binFrames++;
-			if (binFrames >= framesPerBin) {
-				int32_t scaledMax = (maxInBin * 14) / 32767;
-				int32_t scaledMin = (minInBin * 14) / 32767;
-				if (scaledMax > 14) scaledMax = 14;
-				if (scaledMin < -14) scaledMin = -14;
-
-				waveformOverviewMax_[binIdx] = (int8_t)scaledMax;
-				waveformOverviewMin_[binIdx] = (int8_t)scaledMin;
-				uint32_t absPeak = std::max(std::abs(maxInBin), std::abs(minInBin));
-				waveformOverview_[binIdx] = (uint8_t)((absPeak * 14) / 32767);
-
-				binIdx++;
-				maxInBin = -32768;
-				minInBin = 32767;
-				binFrames = 0;
-				if (binIdx >= kOverviewColumns) break;
-			}
-		}
-	}
-
-	while (binIdx < kOverviewColumns) {
-		int32_t scaledMax = (maxInBin * 14) / 32767;
-		int32_t scaledMin = (minInBin * 14) / 32767;
-		if (scaledMax > 14) scaledMax = 14;
-		if (scaledMin < -14) scaledMin = -14;
-
-		waveformOverviewMax_[binIdx] = (int8_t)scaledMax;
-		waveformOverviewMin_[binIdx] = (int8_t)scaledMin;
-		uint32_t absPeak = std::max(std::abs(maxInBin), std::abs(minInBin));
-		waveformOverview_[binIdx] = (uint8_t)((absPeak * 14) / 32767);
-		binIdx++;
-	}
-
-	scanned_ = true;
-	scannedSample_ = sample;
-	return true;
-}
-
 static void drawOfflineWaveformCanvas(const char* titleText,
                                      const char* valueText,
-                                     Sample* currentSample,
                                      bool showThreshold = false,
                                      float thresholdDb = 0.0f)
 {
@@ -159,34 +55,14 @@ static void drawOfflineWaveformCanvas(const char* titleText,
 		canvas.drawStringAlignRight(valueText, topY, kTextSpacingX, kTextSpacingY);
 	}
 
-	if (currentSample) {
-		if (!gOfflineWaveformCache.hasValidScan(currentSample)) {
-			gOfflineWaveformCache.scanSample(currentSample);
+	uint8_t const* overview = levelerJob().getWaveformOverview();
+	for (int32_t x = 0; x < 128; x++) {
+		uint8_t h = overview[x];
+		int32_t halfH = h / 2;
+		if (halfH < 1) {
+			halfH = 1;
 		}
-	}
-
-	if (gOfflineWaveformCache.hasValidScan(currentSample)) {
-		int8_t const* minOverview = gOfflineWaveformCache.getOverviewMin();
-		int8_t const* maxOverview = gOfflineWaveformCache.getOverviewMax();
-
-		for (int32_t x = 0; x < 128; x++) {
-			int32_t maxH = maxOverview[x];
-			int32_t minH = minOverview[x];
-			int32_t yTop = yBase - maxH;
-			int32_t yBot = yBase - minH;
-			if (yTop > yBot) {
-				std::swap(yTop, yBot);
-			}
-			if (yTop == yBot) {
-				canvas.drawVerticalLine(x, yBase, yBase);
-			}
-			else {
-				canvas.drawVerticalLine(x, yTop, yBot);
-			}
-		}
-	}
-	else {
-		canvas.drawStringCentred("PRESS REC TO SCAN", yBase - 4, kTextSpacingX, kTextSpacingY);
+		canvas.drawVerticalLine(x, yBase - halfH, yBase + halfH);
 	}
 
 	if (showThreshold) {
@@ -236,14 +112,14 @@ void NormalizeActionMenuItem::drawPixelsForOled() {
 	buffer.appendFloat(db, 2, 2);
 	buffer.append(" dB");
 
-	drawOfflineWaveformCanvas("NORMALIZE", buffer.c_str(), getCurrentSample(), true, db);
+	drawOfflineWaveformCanvas("NORMALIZE", buffer.c_str(), true, db);
 }
 
 ActionResult NormalizeActionMenuItem::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
 	if (b == deluge::hid::button::RECORD && on) {
 		Sample* s = getCurrentSample();
 		if (s) {
-			gOfflineWaveformCache.scanSample(s);
+			levelerJob().start(s, gOfflineJobOverwrite);
 			if (display->haveOLED()) {
 				renderUIsForOled();
 			}
@@ -294,14 +170,14 @@ void GainActionMenuItem::drawPixelsForOled() {
 	buffer.appendFloat(db, 2, 2);
 	buffer.append(" dB");
 
-	drawOfflineWaveformCanvas("GAIN", buffer.c_str(), getCurrentSample(), true, db);
+	drawOfflineWaveformCanvas("GAIN", buffer.c_str(), true, db);
 }
 
 ActionResult GainActionMenuItem::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
 	if (b == deluge::hid::button::RECORD && on) {
 		Sample* s = getCurrentSample();
 		if (s) {
-			gOfflineWaveformCache.scanSample(s);
+			levelerJob().start(s, gOfflineJobOverwrite);
 			if (display->haveOLED()) {
 				renderUIsForOled();
 			}
@@ -332,14 +208,14 @@ void ReverseActionMenuItem::readValueAgain() {
 }
 
 void ReverseActionMenuItem::drawPixelsForOled() {
-	drawOfflineWaveformCanvas("REVERSE", "EXECUTE", getCurrentSample(), false, 0.0f);
+	drawOfflineWaveformCanvas("REVERSE", "EXECUTE", false, 0.0f);
 }
 
 ActionResult ReverseActionMenuItem::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
 	if (b == deluge::hid::button::RECORD && on) {
 		Sample* s = getCurrentSample();
 		if (s) {
-			gOfflineWaveformCache.scanSample(s);
+			levelerJob().start(s, gOfflineJobOverwrite);
 			if (display->haveOLED()) {
 				renderUIsForOled();
 			}
@@ -368,8 +244,8 @@ LevelerActionMenuItem::LevelerActionMenuItem() : MenuItem(deluge::l10n::String::
 void LevelerActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
 	MenuItem::beginSession(navigatedBackwardFrom);
 	Sample* currentSample = getCurrentSample();
-	if (currentSample && !gOfflineWaveformCache.hasValidScan(currentSample)) {
-		gOfflineWaveformCache.scanSample(currentSample);
+	if (currentSample && !levelerJob().isActive()) {
+		levelerJob().start(currentSample, gOfflineJobOverwrite);
 	}
 }
 
@@ -404,14 +280,14 @@ void LevelerActionMenuItem::drawPixelsForOled() {
 	buffer.appendFloat(db, 1, 1);
 	buffer.append(" dB");
 
-	drawOfflineWaveformCanvas("T THRESH", buffer.c_str(), getCurrentSample(), true, db);
+	drawOfflineWaveformCanvas("T THRESH", buffer.c_str(), true, db);
 }
 
 ActionResult LevelerActionMenuItem::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
 	if (b == deluge::hid::button::RECORD && on) {
 		Sample* s = getCurrentSample();
 		if (s) {
-			gOfflineWaveformCache.scanSample(s);
+			levelerJob().start(s, gOfflineJobOverwrite);
 			if (display->haveOLED()) {
 				renderUIsForOled();
 			}

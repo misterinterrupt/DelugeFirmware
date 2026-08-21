@@ -7,7 +7,6 @@
 
 #include "definitions_cxx.hpp"
 #include "fatfs/fatfs.hpp"
-#include "gui/menu_item/offline_operation_menu.h"
 #include "gui/ui/browser/sample_browser.h"
 #include "gui/ui/sound_editor.h"
 #include "hid/display/display.h"
@@ -521,7 +520,6 @@ void GainJob::succeed() {
 	tempPath.clear();
 	finalPath.clear();
 	sourcePath.clear();
-	deluge::gui::menu_item::gOfflineWaveformCache.invalidate();
 
 	DEF_STACK_STRING_BUF(buffer, 32);
 	if (userGainDb_ >= 0.0f) {
