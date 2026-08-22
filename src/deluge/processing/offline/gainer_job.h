@@ -20,12 +20,15 @@ enum class DistortionType : uint8_t {
 	FOLD,
 	BITCRUSH,
 	RECTIFY,
+	FM_FEEDBACK,
+	RINGMOD_OVERUNITY,
 };
 
 struct DistortionConfig {
 	DistortionType type = DistortionType::OFF;
 	float param1 = 0.0f;
 	float param2 = 0.0f;
+	float outputGainDb = 0.0f;
 };
 
 class GainerJob {
@@ -73,6 +76,16 @@ public:
 
 	uint8_t const* getWaveformOverview() const { return waveformOverview; }
 	uint32_t getPeakValue() const { return peakValue; }
+	float getFilePeakNorm() const {
+		if (peakValue == 0) return 1.0f;
+		uint64_t maxPossible = (byteDepth == 1) ? 127ULL : (byteDepth == 2) ? 32767ULL : (byteDepth == 3) ? 8388607ULL : 2147483647ULL;
+		float peak = (float)peakValue / (float)maxPossible;
+		if (peak < 0.001f) peak = 0.001f;
+		return peak;
+	}
+
+	static float applySampleDistortion(float sample, DistortionConfig const& cfg, uint8_t channel = 0);
+	static void resetDistortionState();
 
 private:
 	void beginCopyPass();

@@ -49,6 +49,9 @@
 #include "processing/sound/sound.h"
 #include "processing/sound/sound_drum.h"
 #include "processing/sound/sound_instrument.h"
+#include "processing/offline/gainer_job.h"
+#include "gui/menu_item/offline_operation_menu.h"
+#include "gui/ui/sound_editor.h"
 #include "processing/stem_export/stem_export.h"
 #include "storage/audio/audio_file_manager.h"
 #include "storage/flash_storage.h"
@@ -615,6 +618,45 @@ void renderAudio(size_t numSamples) {
 	renderReverb(numSamples);
 
 	renderSamplePreview(numSamples);
+
+	if (gainerJob().isWaitingForGain()) {
+		if (getCurrentUI() == &soundEditor && soundEditor.getCurrentMenuItem() == deluge::gui::menu_item::getGainActionMenuItem()) {
+			DistortionConfig const& cfg = gainerJob().getDistortionConfig();
+			float gainDb = gainerJob().getGainDb();
+			float gainMultiplier = powf(10.0f, gainDb / 20.0f);
+			float outGainMultiplier = powf(10.0f, cfg.outputGainDb / 20.0f);
+
+			if (gainDb != 0.0f || cfg.type != DistortionType::OFF || cfg.outputGainDb != 0.0f) {
+				StereoSample* s = renderingBuffer.data();
+				for (size_t i = 0; i < numSamples; i++) {
+					// 1. Compensate voice headroom to recover raw signal
+					float rawNormL = ((float)s[i].l / 2147483648.0f) * 4.0f;
+					float rawNormR = ((float)s[i].r / 2147483648.0f) * 4.0f;
+
+					// 2. Stage 1: Input Gain (Drive)
+					float driveL = rawNormL * gainMultiplier;
+					float driveR = rawNormR * gainMultiplier;
+
+					// 3. Stage 2: Distortion / Overdrive Engine
+					float distL = GainerJob::applySampleDistortion(driveL, cfg, 0);
+					float distR = GainerJob::applySampleDistortion(driveR, cfg, 1);
+
+					// 4. Stage 3: Output Gain Attenuation / Boost
+					float outL = distL * outGainMultiplier;
+					float outR = distR * outGainMultiplier;
+
+					int32_t finalL = (int32_t)(outL * (2147483647.0f / 4.0f));
+					int32_t finalR = (int32_t)(outR * (2147483647.0f / 4.0f));
+
+					s[i].l = finalL;
+					s[i].r = finalR;
+				}
+			}
+		}
+		else {
+			gainerJob().reset();
+		}
+	}
 
 	renderSongFX(numSamples);
 

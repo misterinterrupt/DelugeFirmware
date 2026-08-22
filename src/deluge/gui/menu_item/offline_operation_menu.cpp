@@ -182,10 +182,46 @@ GainActionMenuItem::GainActionMenuItem() : MenuItem(deluge::l10n::String::EMPTY_
 	distSelectedParam_ = 0;
 }
 
+MenuItem* getGainActionMenuItem() {
+	return &gainActionMenuItem;
+}
+
+void GainActionMenuItem::updateDistortionConfig() {
+	DistortionConfig cfg;
+	cfg.type = static_cast<DistortionType>(distType_);
+	cfg.outputGainDb = (float)distOutGainVal_ / 100.0f;
+	if (distType_ == 1) {
+		cfg.param1 = (float)satDrive_ / 10.0f;
+		cfg.param2 = (float)satWarmth_ / 100.0f;
+	}
+	else if (distType_ == 2) {
+		cfg.param1 = (float)foldFolds_;
+		cfg.param2 = (float)foldBias_ / 100.0f;
+	}
+	else if (distType_ == 3) {
+		cfg.param1 = (float)crushBits_;
+		cfg.param2 = (float)crushDownsample_;
+	}
+	else if (distType_ == 4) {
+		cfg.param1 = (float)rectMode_;
+		cfg.param2 = (float)rectCrossover_ / 100.0f;
+	}
+	else if (distType_ == 5) {
+		cfg.param1 = (float)fmDepth_ / 10.0f;
+		cfg.param2 = (float)fmFeedback_ / 100.0f;
+	}
+	else if (distType_ == 6) {
+		cfg.param1 = (float)ringFreq_;
+		cfg.param2 = (float)ringMix_ / 100.0f;
+	}
+	gainerJob().setDistortionConfig(cfg);
+}
+
 void GainActionMenuItem::beginSession(MenuItem* navigatedBackwardFrom) {
 	MenuItem::beginSession(navigatedBackwardFrom);
 	activePage_ = 0;
 	distSelectedParam_ = 0;
+	updateDistortionConfig();
 	Sample* currentSample = getCurrentSample();
 	if (currentSample) {
 		if (gainerJob().isWaitingForGain() || !gainerJob().isActive()) {
@@ -237,11 +273,11 @@ void GainActionMenuItem::selectEncoderAction(int32_t offset) {
 
 	if (activePage_ == 0) {
 		gainVal_ += offset * 50;
-		if (gainVal_ > 2400) {
-			gainVal_ = 2400;
+		if (gainVal_ > 4800) {
+			gainVal_ = 4800;
 		}
-		else if (gainVal_ < -2400) {
-			gainVal_ = -2400;
+		else if (gainVal_ < -4800) {
+			gainVal_ = -4800;
 		}
 		float gainDb = (float)gainVal_ / 100.0f;
 		gainerJob().setGainDb(gainDb);
@@ -262,8 +298,20 @@ void GainActionMenuItem::selectEncoderAction(int32_t offset) {
 		if (distSelectedParam_ == 0) {
 			int32_t newType = (int32_t)distType_ + offset;
 			if (newType < 0) newType = 0;
-			if (newType > 4) newType = 4;
+			if (newType > 6) newType = 6;
 			distType_ = (uint8_t)newType;
+		}
+		else if (distSelectedParam_ == 3) {
+			distOutGainVal_ += offset * 50;
+			if (distOutGainVal_ > 4800) distOutGainVal_ = 4800;
+			if (distOutGainVal_ < -4800) distOutGainVal_ = -4800;
+
+			DEF_STACK_STRING_BUF(buffer, 16);
+			float db = (float)distOutGainVal_ / 100.0f;
+			if (db >= 0.0f) buffer.append("+");
+			buffer.appendFloat(db, 1, 1);
+			buffer.append("DB");
+			display->setText(buffer.c_str());
 		}
 		else if (distType_ == 1) {
 			if (distSelectedParam_ == 1) {
@@ -292,13 +340,13 @@ void GainActionMenuItem::selectEncoderAction(int32_t offset) {
 		else if (distType_ == 3) {
 			if (distSelectedParam_ == 1) {
 				crushBits_ += offset;
-				if (crushBits_ < 2) crushBits_ = 2;
+				if (crushBits_ < 1) crushBits_ = 1;
 				if (crushBits_ > 16) crushBits_ = 16;
 			}
 			else if (distSelectedParam_ == 2) {
 				crushDownsample_ += offset;
 				if (crushDownsample_ < 1) crushDownsample_ = 1;
-				if (crushDownsample_ > 16) crushDownsample_ = 16;
+				if (crushDownsample_ > 32) crushDownsample_ = 32;
 			}
 		}
 		else if (distType_ == 4) {
@@ -311,6 +359,32 @@ void GainActionMenuItem::selectEncoderAction(int32_t offset) {
 				if (rectCrossover_ > 100) rectCrossover_ = 100;
 			}
 		}
+		else if (distType_ == 5) {
+			if (distSelectedParam_ == 1) {
+				fmDepth_ += offset * 5;
+				if (fmDepth_ < 10) fmDepth_ = 10;
+				if (fmDepth_ > 100) fmDepth_ = 100;
+			}
+			else if (distSelectedParam_ == 2) {
+				fmFeedback_ += offset * 5;
+				if (fmFeedback_ < 0) fmFeedback_ = 0;
+				if (fmFeedback_ > 90) fmFeedback_ = 90;
+			}
+		}
+		else if (distType_ == 6) {
+			if (distSelectedParam_ == 1) {
+				ringFreq_ += offset * 20;
+				if (ringFreq_ < 20) ringFreq_ = 20;
+				if (ringFreq_ > 2000) ringFreq_ = 2000;
+			}
+			else if (distSelectedParam_ == 2) {
+				ringMix_ += offset * 5;
+				if (ringMix_ < 10) ringMix_ = 10;
+				if (ringMix_ > 100) ringMix_ = 100;
+			}
+		}
+
+		updateDistortionConfig();
 
 		if (display->haveOLED()) {
 			renderUIsForOled();
@@ -369,7 +443,7 @@ void GainActionMenuItem::drawPixelsForOled() {
 		canvas.drawString("DISTORT", 0, topY, kTextSpacingX, kTextSpacingY);
 		canvas.drawStringAlignRight("[KIT]", topY, kTextSpacingX, kTextSpacingY);
 
-		const int32_t line1Y = topY + 10;
+		const int32_t line1Y = topY + 9;
 		DEF_STACK_STRING_BUF(tBuf, 24);
 		if (distSelectedParam_ == 0) {
 			tBuf.append(">TYPE: ");
@@ -384,11 +458,13 @@ void GainActionMenuItem::drawPixelsForOled() {
 		case 2: tBuf.append("WAVEFOLD"); break;
 		case 3: tBuf.append("BITCRUSH"); break;
 		case 4: tBuf.append("RECTIFY"); break;
+		case 5: tBuf.append("FM FEEDBK"); break;
+		case 6: tBuf.append("RING MOD"); break;
 		}
 		canvas.drawString(tBuf.c_str(), 0, line1Y, kTextSpacingX, kTextSpacingY);
 
-		const int32_t line2Y = topY + 19;
-		const int32_t line3Y = topY + 28;
+		const int32_t line2Y = topY + 18;
+		const int32_t line3Y = topY + 27;
 
 		if (distType_ == 1) {
 			DEF_STACK_STRING_BUF(p1Buf, 24);
@@ -424,7 +500,7 @@ void GainActionMenuItem::drawPixelsForOled() {
 			canvas.drawString(p1Buf.c_str(), 0, line2Y, kTextSpacingX, kTextSpacingY);
 
 			DEF_STACK_STRING_BUF(p2Buf, 24);
-			p2Buf.append(distSelectedParam_ == 2 ? ">DOWNSAM: " : " DOWNSAM: ");
+			p2Buf.append(distSelectedParam_ == 2 ? ">DECIMAT: " : " DECIMAT: ");
 			p2Buf.appendInt(crushDownsample_);
 			p2Buf.append("x");
 			canvas.drawString(p2Buf.c_str(), 0, line3Y, kTextSpacingX, kTextSpacingY);
@@ -440,6 +516,43 @@ void GainActionMenuItem::drawPixelsForOled() {
 			p2Buf.appendInt(rectCrossover_);
 			p2Buf.append("%");
 			canvas.drawString(p2Buf.c_str(), 0, line3Y, kTextSpacingX, kTextSpacingY);
+		}
+		else if (distType_ == 5) {
+			DEF_STACK_STRING_BUF(p1Buf, 24);
+			p1Buf.append(distSelectedParam_ == 1 ? ">DEPTH: " : " DEPTH: ");
+			p1Buf.appendFloat((float)fmDepth_ / 10.0f, 1, 1);
+			p1Buf.append("x");
+			canvas.drawString(p1Buf.c_str(), 0, line2Y, kTextSpacingX, kTextSpacingY);
+
+			DEF_STACK_STRING_BUF(p2Buf, 24);
+			p2Buf.append(distSelectedParam_ == 2 ? ">FEEDBK: " : " FEEDBK: ");
+			p2Buf.appendInt(fmFeedback_);
+			p2Buf.append("%");
+			canvas.drawString(p2Buf.c_str(), 0, line3Y, kTextSpacingX, kTextSpacingY);
+		}
+		else if (distType_ == 6) {
+			DEF_STACK_STRING_BUF(p1Buf, 24);
+			p1Buf.append(distSelectedParam_ == 1 ? ">FREQ: " : " FREQ: ");
+			p1Buf.appendInt(ringFreq_);
+			p1Buf.append(" Hz");
+			canvas.drawString(p1Buf.c_str(), 0, line2Y, kTextSpacingX, kTextSpacingY);
+
+			DEF_STACK_STRING_BUF(p2Buf, 24);
+			p2Buf.append(distSelectedParam_ == 2 ? ">PEAKMIX: " : " PEAKMIX: ");
+			p2Buf.appendInt(ringMix_);
+			p2Buf.append("%");
+			canvas.drawString(p2Buf.c_str(), 0, line3Y, kTextSpacingX, kTextSpacingY);
+		}
+
+		if (distType_ > 0) {
+			const int32_t line4Y = topY + 36;
+			DEF_STACK_STRING_BUF(ogBuf, 24);
+			ogBuf.append(distSelectedParam_ == 3 ? ">OUTGAIN: " : " OUTGAIN: ");
+			float ogDb = (float)distOutGainVal_ / 100.0f;
+			if (ogDb >= 0.0f) ogBuf.append("+");
+			ogBuf.appendFloat(ogDb, 1, 1);
+			ogBuf.append("dB");
+			canvas.drawString(ogBuf.c_str(), 0, line4Y, kTextSpacingX, kTextSpacingY);
 		}
 	}
 }
@@ -457,7 +570,7 @@ MenuItem* GainActionMenuItem::selectButtonPress() {
 			distSelectedParam_ = 0;
 		}
 		else {
-			distSelectedParam_ = (distSelectedParam_ + 1) % 3;
+			distSelectedParam_ = (distSelectedParam_ + 1) % 4;
 		}
 
 		if (display->haveOLED()) {
@@ -470,31 +583,13 @@ MenuItem* GainActionMenuItem::selectButtonPress() {
 		float gainDb = (float)gainVal_ / 100.0f;
 		gainerJob().setGainDb(gainDb);
 
-		DistortionConfig cfg;
-		cfg.type = (DistortionType)distType_;
-		if (distType_ == 1) {
-			cfg.param1 = (float)satDrive_ / 10.0f;
-			cfg.param2 = (float)satWarmth_ / 100.0f;
-		}
-		else if (distType_ == 2) {
-			cfg.param1 = (float)foldFolds_;
-			cfg.param2 = (float)foldBias_ / 100.0f;
-		}
-		else if (distType_ == 3) {
-			cfg.param1 = (float)crushBits_;
-			cfg.param2 = (float)crushDownsample_;
-		}
-		else if (distType_ == 4) {
-			cfg.param1 = (float)rectMode_;
-			cfg.param2 = (float)rectCrossover_ / 100.0f;
-		}
-
-		gainerJob().setDistortionConfig(cfg);
+		updateDistortionConfig();
 		gainerJob().confirmGainAndRun();
 		return nullptr;
 	}
 	else if (!gainerJob().isActive()) {
 		gainerJob().setGainDb((float)gainVal_ / 100.0f);
+		updateDistortionConfig();
 		if (gainerJob().start(currentSample, gOfflineJobOverwrite)) {
 			return NO_NAVIGATION;
 		}

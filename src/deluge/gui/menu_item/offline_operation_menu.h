@@ -57,6 +57,7 @@ public:
 	void readValueAgain() override;
 
 private:
+	void updateDistortionConfig();
 	int32_t gainVal_ = 0; // 0.00 dB default
 	int32_t activePage_ = 0; // 0 = Page 1 (GAIN/Waveform), 1 = Page 2 (DISTORTION)
 
@@ -74,7 +75,17 @@ private:
 
 	int32_t rectMode_ = 0; // HALF
 	int32_t rectCrossover_ = 10; // 10%
+
+	int32_t fmDepth_ = 30; // 3.0x
+	int32_t fmFeedback_ = 40; // 40%
+
+	int32_t ringFreq_ = 440; // 440 Hz
+	int32_t ringMix_ = 50; // 50%
+
+	int32_t distOutGainVal_ = 0; // 0.0 dB default (-48.0 dB .. +48.0 dB)
 };
+
+MenuItem* getGainActionMenuItem();
 
 class LevelerActionMenuItem : public MenuItem {
 public:
