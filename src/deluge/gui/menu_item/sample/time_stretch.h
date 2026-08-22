@@ -148,6 +148,12 @@ public:
 				origBpmVal_ = bpm;
 				if (soundEditor.currentSource) {
 					soundEditor.currentSource->originalBPM = bpm;
+					if (bpm > 0 && newBpmVal_ > 0) {
+						int32_t pct = (bpm * 1000) / newBpmVal_;
+						if (pct < 100) pct = 100;
+						if (pct > 5000) pct = 5000;
+						soundEditor.currentSource->timeStretchPercent = pct;
+					}
 				}
 			}
 			else if (selectedParam_ == 1) { // NEW BPM
@@ -156,7 +162,7 @@ public:
 				if (bpm > 3000) bpm = 3000;
 				newBpmVal_ = bpm;
 				if (origBpmVal_ > 0 && soundEditor.currentSource) {
-					int32_t pct = (newBpmVal_ * 1000) / origBpmVal_;
+					int32_t pct = (origBpmVal_ * 1000) / newBpmVal_;
 					if (pct < 100) pct = 100;
 					if (pct > 5000) pct = 5000;
 					soundEditor.currentSource->timeStretchPercent = pct;
@@ -265,7 +271,7 @@ public:
 			soundEditor.currentSource->originalBPM = detectedBpmVal_;
 			if (targetBPM > 0) {
 				int32_t targetBpmVal = (int32_t)(targetBPM * 10.0f);
-				int32_t pct = (targetBpmVal * 1000) / detectedBpmVal_;
+				int32_t pct = (detectedBpmVal_ * 1000) / targetBpmVal;
 				if (pct < 100) pct = 100;
 				if (pct > 5000) pct = 5000;
 				soundEditor.currentSource->timeStretchPercent = pct;
