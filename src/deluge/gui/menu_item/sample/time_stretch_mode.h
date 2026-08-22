@@ -1,0 +1,73 @@
+/*
+ * Copyright (c) 2024 Synthstrom Audible Limited
+ *
+ * This file is part of The Synthstrom Audible Deluge Firmware.
+ *
+ * The Synthstrom Audible Deluge Firmware is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU General Public License as published by the Free Software Foundation,
+ * either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+#pragma once
+#include "definitions_cxx.hpp"
+#include "gui/menu_item/formatted_title.h"
+#include "gui/menu_item/sample/utils.h"
+#include "gui/menu_item/selection.h"
+#include "gui/ui/sound_editor.h"
+#include "model/drum/drum.h"
+#include "model/instrument/kit.h"
+#include "model/song/song.h"
+#include "processing/sound/sound_drum.h"
+
+namespace deluge::gui::menu_item::sample {
+
+class TimeStretchMode final : public Selection, public FormattedTitle {
+public:
+	TimeStretchMode(l10n::String name, l10n::String title_format_str)
+	    : Selection(name), FormattedTitle(title_format_str) {}
+
+	[[nodiscard]] std::string_view getTitle() const override { return FormattedTitle::title(); }
+
+	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) final {
+		return getCurrentAudioClip() || isSampleModeSample(modControllable, whichThing);
+	}
+
+	bool usesAffectEntire() override { return true; }
+
+	void readCurrentValue() override {
+		this->setValue(soundEditor.currentSampleControls->timeStretchMode);
+	}
+
+	void writeCurrentValue() override {
+		auto current_value = this->getValue<::TimeStretchMode>();
+
+		if (currentUIMode == UI_MODE_HOLDING_AFFECT_ENTIRE_IN_SOUND_EDITOR && soundEditor.editingKit()) {
+			Kit* kit = getCurrentKit();
+			for (Drum* thisDrum = kit->firstDrum; thisDrum != nullptr; thisDrum = thisDrum->next) {
+				if (thisDrum->type == DrumType::SOUND) {
+					auto* soundDrum = static_cast<SoundDrum*>(thisDrum);
+					Source* source = &soundDrum->sources[soundEditor.currentSourceIndex];
+					source->sampleControls.timeStretchMode = current_value;
+				}
+			}
+		}
+		else {
+			soundEditor.currentSampleControls->timeStretchMode = current_value;
+		}
+	}
+
+	deluge::vector<std::string_view> getOptions() override {
+		return {
+		    l10n::getView(l10n::String::STRING_FOR_STANDARD),
+		    l10n::getView(l10n::String::STRING_FOR_AKAI),
+		};
+	}
+};
+
+} // namespace deluge::gui::menu_item::sample

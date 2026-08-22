@@ -924,6 +924,23 @@ ActionResult SoundEditor::potentialShortcutPadAction(int32_t x, int32_t y, bool 
 doSetup:
 				if (item) {
 
+					if (item == &samplePitchSpeedMenu || item == &timeStretchModeMenu) {
+						if (getCurrentUI() == &soundEditor) {
+							if (getCurrentMenuItem() == &samplePitchSpeedMenu) {
+								item = &timeStretchModeMenu;
+							}
+							else if (getCurrentMenuItem() == &timeStretchModeMenu) {
+								item = &samplePitchSpeedMenu;
+							}
+						}
+					}
+					else if (item == &timeStretchMenu) {
+						if (getCurrentUI() == &soundEditor && getCurrentMenuItem() == &timeStretchMenu) {
+							timeStretchMenu.togglePage();
+							return ActionResult::DEALT_WITH;
+						}
+					}
+
 					if (item == comingSoonMenu) {
 						display->displayPopup(deluge::l10n::get(deluge::l10n::String::STRING_FOR_UNIMPLEMENTED));
 						return ActionResult::DEALT_WITH;

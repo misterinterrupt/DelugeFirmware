@@ -2239,7 +2239,8 @@ dontUseCache: {}
 			bool stillActive = voiceSample->render(
 			    &guides[s], renderBuffer, numSamples, sample, numChannels, loopingType, phaseIncrement,
 			    timeStretchRatio, sourceAmplitude, amplitudeIncrement, interpolationBufferSize,
-			    sound->sources[s].sampleControls.interpolationMode, getPriorityRating());
+			    sound->sources[s].sampleControls.interpolationMode, getPriorityRating(),
+			    sound->sources[s].sampleControls.timeStretchMode);
 
 			if (stereoUnison) {
 				if (numChannels == 2) {

@@ -8,7 +8,12 @@
 #include "gui/menu_item/patch_cables.h"
 #include "gui/menu_item/patched_param/integer_non_fm.h"
 #include "gui/menu_item/sample/end.h"
+#include "gui/menu_item/sample/original_bpm.h"
+#include "gui/menu_item/sample/pitch_speed.h"
 #include "gui/menu_item/sample/start.h"
+#include "gui/menu_item/sample/time_stretch.h"
+#include "gui/menu_item/sample/time_stretch_mode.h"
+#include "gui/menu_item/sample/time_stretch_percent.h"
 #include "gui/menu_item/sequence/direction.h"
 #include "gui/menu_item/source/patched_param/fm.h"
 #include "gui/menu_item/stem_export/start.h"
@@ -20,6 +25,11 @@ extern deluge::gui::menu_item::osc::source::WaveIndex sourceWaveIndexMenu;
 
 extern deluge::gui::menu_item::sample::Start sampleStartMenu;
 extern deluge::gui::menu_item::sample::End sampleEndMenu;
+extern deluge::gui::menu_item::sample::PitchSpeed samplePitchSpeedMenu;
+extern deluge::gui::menu_item::sample::TimeStretchMode timeStretchModeMenu;
+extern deluge::gui::menu_item::sample::TimeStretch timeStretchMenu;
+extern deluge::gui::menu_item::sample::OriginalBPM originalBPMMenu;
+extern deluge::gui::menu_item::sample::TimeStretchPercent timeStretchPercentMenu;
 extern deluge::gui::menu_item::audio_clip::SampleMarkerEditor audioClipSampleMarkerEditorMenuStart;
 extern deluge::gui::menu_item::audio_clip::SampleMarkerEditor audioClipSampleMarkerEditorMenuEnd;
 extern DrumName drumNameMenu;

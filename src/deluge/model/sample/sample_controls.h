@@ -27,4 +27,5 @@ public:
 	InterpolationMode interpolationMode;
 	bool pitchAndSpeedAreIndependent;
 	bool reversed;
+	TimeStretchMode timeStretchMode;
 };

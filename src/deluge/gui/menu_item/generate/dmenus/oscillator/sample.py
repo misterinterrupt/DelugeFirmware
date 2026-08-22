@@ -105,3 +105,13 @@ interpolation = Menu(
     title="STRING_FOR_SAMP_INTERP_MENU_TITLE",
     available_when="Only when a sample is loaded or monitoring an input",
 )
+
+time_stretch_mode = Menu(
+    "sample::TimeStretchMode",
+    "timeStretchModeMenu",
+    ["{name}", "{title}"],
+    "oscillator/sample/time_stretch_mode.md",
+    name="STRING_FOR_TIME_STRETCH_MODE",
+    title="STRING_FOR_TIME_STRETCH_MODE_MENU_TITLE",
+    available_when=_available_txt,
+)

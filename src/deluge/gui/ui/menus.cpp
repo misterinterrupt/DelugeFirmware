@@ -136,6 +136,7 @@
 #include "gui/menu_item/sample/reverse.h"
 #include "gui/menu_item/sample/start.h"
 #include "gui/menu_item/sample/time_stretch.h"
+#include "gui/menu_item/sample/time_stretch_mode.h"
 #include "gui/menu_item/sample/time_stretch_percent.h"
 #include "gui/menu_item/sample/transpose.h"
 #include "gui/menu_item/sequence/direction.h"

@@ -63,6 +63,7 @@ menus = [
             sample.timestretch,
             sample.original_bpm,
             sample.time_stretch_percent,
+            sample.time_stretch_mode,
             sample.interpolation,
             pulse_width,
             sync,

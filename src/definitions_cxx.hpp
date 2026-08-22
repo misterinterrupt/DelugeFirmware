@@ -714,6 +714,13 @@ enum class InterpolationMode {
 };
 constexpr int32_t kNumInterpolationModes = 2;
 
+enum class TimeStretchMode : uint8_t {
+	DEFAULT,
+	AKAI,
+};
+constexpr int32_t kNumTimeStretchModes = util::to_underlying(TimeStretchMode::AKAI) + 1;
+
+
 constexpr int32_t kCacheByteDepth = 3;
 constexpr int32_t kCacheByteDepthMagnitude = 2; // Invalid / unused for odd numbers of bytes like 3
 

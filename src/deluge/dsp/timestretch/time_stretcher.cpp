@@ -37,8 +37,10 @@
 
 bool TimeStretcher::init(Sample* sample, VoiceSample* voiceSample, SamplePlaybackGuide* guide, int64_t newSamplePosBig,
                          int32_t numChannels, int32_t phaseIncrement, int32_t timeStretchRatio, int32_t playDirection,
-                         int32_t priorityRating, int32_t fudgingNumSamplesTilLoop, LoopType loopingType) {
+                         int32_t priorityRating, int32_t fudgingNumSamplesTilLoop, LoopType loopingType,
+                         TimeStretchMode mode) {
 
+	timeStretchMode = mode;
 	AudioEngine::logAction("TimeStretcher::init");
 
 	// D_PRINTLN("TimeStretcher::init");
@@ -146,8 +148,9 @@ bool TimeStretcher::init(Sample* sample, VoiceSample* voiceSample, SamplePlaybac
 void TimeStretcher::reInit(int64_t newSamplePosBig, SamplePlaybackGuide* guide, VoiceSample* voiceSample,
                            Sample* sample, int32_t numChannels, int32_t timeStretchRatio, int32_t phaseIncrement,
                            uint64_t combinedIncrement, int32_t playDirection, LoopType loopingType,
-                           int32_t priorityRating) {
+                           int32_t priorityRating, TimeStretchMode mode) {
 
+	timeStretchMode = mode;
 	samplePosBig = newSamplePosBig;
 
 	// Not quite sure if these two are necessary...
@@ -161,7 +164,7 @@ void TimeStretcher::reInit(int64_t newSamplePosBig, SamplePlaybackGuide* guide, 
 	// just do an init() or at least force the new play-head to exactly the start-pos-sample or something?
 	if (!playHeadStillActive[PLAY_HEAD_NEWER]) {
 		hopEnd(guide, voiceSample, sample, numChannels, timeStretchRatio, phaseIncrement, combinedIncrement,
-		       playDirection, loopingType, priorityRating);
+		       playDirection, loopingType, priorityRating, mode);
 	}
 }
 
@@ -240,8 +243,10 @@ const int16_t lookaheadFine[] = {
 // Returns false if sound needs to cut due to a load error or similar
 bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample, Sample* sample, int32_t numChannels,
                            int32_t timeStretchRatio, int32_t phaseIncrement, uint64_t combinedIncrement,
-                           int32_t playDirection, LoopType loopingType, int32_t priorityRating) {
+                           int32_t playDirection, LoopType loopingType, int32_t priorityRating,
+                           TimeStretchMode mode) {
 
+	timeStretchMode = mode;
 	AudioEngine::logAction("hopEnd");
 
 #if ALPHA_OR_BETA_VERSION
@@ -313,7 +318,49 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 		samplePos = getSamplePos(playDirection);
 	}
 
-	int32_t speedLog = quickLog(timeStretchRatio);
+	int32_t newHeadBytePos;
+
+	int32_t speedLog = 0;
+	int32_t additionalOscPos = 0;
+	int32_t waveformStartByte = sample->audioDataStartPosBytes;
+	if (playDirection != 1) {
+		waveformStartByte += sample->audioDataLengthBytes - bytesPerSample;
+	}
+
+	if (mode == TimeStretchMode::AKAI) {
+		// Vintage Akai cycle-repeat granular timestretching:
+		int32_t baseGrainLength = 882; // ~20ms at 44.1kHz
+		int32_t grainSamples = ((uint64_t)baseGrainLength * phaseIncrement) >> 24;
+		if (grainSamples < 120) {
+			grainSamples = 120;
+		}
+
+		samplesTilHopEnd = ((uint64_t)grainSamples << 24) / (uint32_t)timeStretchRatio;
+		if (samplesTilHopEnd < 1) {
+			samplesTilHopEnd = 1;
+		}
+
+		uint32_t crossfadeLengthSamples = std::min<int32_t>(grainSamples / 6, 160);
+		if (crossfadeLengthSamples < 16) {
+			crossfadeLengthSamples = 16;
+		}
+
+		crossfadeIncrement = (uint32_t)kMaxSampleValue / (uint32_t)crossfadeLengthSamples;
+		crossfadeProgress = 0;
+
+		int32_t beamBackEdge = samplePos + (int32_t)(((int64_t)grainSamples * (timeStretchRatio - (int64_t)kMaxSampleValue)) >> 24) * playDirection;
+
+		int32_t waveformEndSample = (playDirection == 1) ? sample->lengthInSamples : -1;
+		if ((int32_t)(beamBackEdge - waveformEndSample) * playDirection >= 0) {
+			playHeadStillActive[PLAY_HEAD_NEWER] = false;
+			return true;
+		}
+
+		newHeadBytePos = sample->audioDataStartPosBytes + beamBackEdge * bytesPerSample;
+		goto skipSearch;
+	}
+	else {
+		speedLog = quickLog(timeStretchRatio);
 
 	int32_t minBeamWidth; // Not pixellated
 	int32_t maxBeamWidth; // Not pixellated
@@ -372,12 +419,11 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 	    (multiply_32x32_rshift32(minBeamWidth, multiply_32x32_rshift32(getNoise(), randomElement << 8)) << 2);
 #endif
 
-	int32_t newHeadBytePos;
 	uint32_t crossfadeLengthSamples;
 
-	int32_t additionalOscPos = 0;
+	additionalOscPos = 0;
 
-	int32_t waveformStartByte = sample->audioDataStartPosBytes;
+	waveformStartByte = sample->audioDataStartPosBytes;
 	if (playDirection != 1) {
 		// The actual first sample of the waveform in our given
 		// direction, regardless of our elected start-point
@@ -860,6 +906,7 @@ stopSearch:
 			newHeadBytePos = waveformStartByte;
 		}
 	}
+}
 
 skipSearch:
 

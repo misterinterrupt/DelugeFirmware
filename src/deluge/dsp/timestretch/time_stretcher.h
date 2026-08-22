@@ -39,16 +39,18 @@ public:
 	TimeStretcher() = default;
 	bool init(Sample* sample, VoiceSample* voiceSample, SamplePlaybackGuide* guide, int64_t newSamplePosBig,
 	          int32_t numChannels, int32_t phaseIncrement, int32_t timeStretchRatio, int32_t playDirection,
-	          int32_t priorityRating, int32_t fudgingNumSamplesTilLoop, LoopType loopingType);
+	          int32_t priorityRating, int32_t fudgingNumSamplesTilLoop, LoopType loopingType,
+	          TimeStretchMode mode = TimeStretchMode::DEFAULT);
 	void reInit(int64_t newSamplePosBig, SamplePlaybackGuide* guide, VoiceSample* voiceSample, Sample* sample,
 	            int32_t numChannels, int32_t timeStretchRatio, int32_t phaseIncrement, uint64_t combinedIncrement,
-	            int32_t playDirection, LoopType loopingType, int32_t priorityRating);
+	            int32_t playDirection, LoopType loopingType, int32_t priorityRating,
+	            TimeStretchMode mode = TimeStretchMode::DEFAULT);
 	void beenUnassigned();
 	void unassignAllReasonsForPercLookahead();
 	void unassignAllReasonsForPercCacheClusters();
 	bool hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample, Sample* sample, int32_t numChannels,
 	            int32_t timeStretchRatio, int32_t phaseIncrement, uint64_t combinedIncrement, int32_t playDirection,
-	            LoopType loopingType, int32_t priorityRating);
+	            LoopType loopingType, int32_t priorityRating, TimeStretchMode mode = TimeStretchMode::DEFAULT);
 
 	void rememberPercCacheCluster(Cluster* cluster);
 	void updateClustersForPercLookahead(Sample* sample, uint32_t sourceBytePos, int32_t playDirection);
@@ -68,6 +70,7 @@ public:
 #endif
 	TimeStretcher* nextUnassigned;
 
+	TimeStretchMode timeStretchMode = TimeStretchMode::DEFAULT;
 	int64_t samplePosBig; // In whole samples including both channels. From audioDataStart. <<'d by 24
 
 	uint32_t crossfadeProgress; // Out of kMaxSampleValue

@@ -3302,6 +3302,10 @@ Error Sound::readSourceFromFile(Deserializer& reader, int32_t s, ParamManagerFor
 			source->sampleControls.pitchAndSpeedAreIndependent = reader.readTagOrAttributeValueInt();
 			reader.exitTag("timeStretchEnable");
 		}
+		else if (!strcmp(tagName, "timeStretchMode")) {
+			source->sampleControls.timeStretchMode = static_cast<TimeStretchMode>(reader.readTagOrAttributeValueInt());
+			reader.exitTag("timeStretchMode");
+		}
 		else if (!strcmp(tagName, "timeStretchAmount")) {
 			source->timeStretchAmount = reader.readTagOrAttributeValueInt();
 			reader.exitTag("timeStretchAmount");
@@ -3520,6 +3524,9 @@ void Sound::writeSourceToFile(Serializer& writer, int32_t s, char const* tagName
 		writer.writeAttribute("loopMode", util::to_underlying(source->repeatMode));
 		writer.writeAttribute("reversed", source->sampleControls.reversed);
 		writer.writeAttribute("timeStretchEnable", source->sampleControls.pitchAndSpeedAreIndependent);
+		if (source->sampleControls.timeStretchMode != TimeStretchMode::DEFAULT) {
+			writer.writeAttribute("timeStretchMode", util::to_underlying(source->sampleControls.timeStretchMode));
+		}
 		writer.writeAttribute("timeStretchAmount", source->timeStretchAmount);
 		if (source->originalBPM) {
 			writer.writeAttribute("originalBPM", source->originalBPM);

@@ -312,7 +312,8 @@ bool VoiceSample::fudgeTimeStretchingToAvoidClick(Sample* sample, SamplePlayback
 // Returns false if becoming unassigned now
 bool VoiceSample::weShouldBeTimeStretchingNow(Sample* sample, SamplePlaybackGuide* guide, int32_t numSamples,
                                               int32_t phaseIncrement, int32_t timeStretchRatio, int32_t playDirection,
-                                              int32_t priorityRating, LoopType loopingType) {
+                                              int32_t priorityRating, LoopType loopingType,
+                                              TimeStretchMode mode) {
 
 	// If not set up yet, do it
 	if (!timeStretcher) {
@@ -328,7 +329,7 @@ bool VoiceSample::weShouldBeTimeStretchingNow(Sample* sample, SamplePlaybackGuid
 		int32_t playSample = divide_round_negative(playByte, sample->numChannels * sample->byteDepth);
 
 		timeStretcher->init(sample, this, guide, (int64_t)playSample << 24, sample->numChannels, phaseIncrement,
-		                    timeStretchRatio, playDirection, priorityRating, 0, loopingType);
+		                    timeStretchRatio, playDirection, priorityRating, 0, loopingType, mode);
 		bool success = reassessReassessmentLocation(
 		    guide, sample,
 		    priorityRating); // Got to - because time stretching affects the SampleLowLevelReader's adherence to markers
@@ -422,7 +423,7 @@ bool VoiceSample::render(SamplePlaybackGuide* guide, int32_t* __restrict__ outpu
                          Sample* sample, int32_t sampleSourceNumChannels, LoopType loopingType, int32_t phaseIncrement,
                          int32_t timeStretchRatio, int32_t amplitude, int32_t amplitudeIncrement,
                          int32_t interpolationBufferSize, InterpolationMode desiredInterpolationMode,
-                         int32_t priorityRating) {
+                         int32_t priorityRating, TimeStretchMode mode) {
 
 	int32_t playDirection = guide->playDirection;
 
@@ -448,7 +449,7 @@ bool VoiceSample::render(SamplePlaybackGuide* guide, int32_t* __restrict__ outpu
 			if (needToAvoidClick) {
 
 				success = weShouldBeTimeStretchingNow(sample, guide, numSamples, phaseIncrement, timeStretchRatio,
-				                                      playDirection, priorityRating, loopingType);
+				                                      playDirection, priorityRating, loopingType, mode);
 				if (!success) {
 					return false;
 				}
@@ -498,7 +499,7 @@ bool VoiceSample::render(SamplePlaybackGuide* guide, int32_t* __restrict__ outpu
 					// cohesively until it's ultimately dealt with.
 
 					success = weShouldBeTimeStretchingNow(sample, guide, numSamples, phaseIncrement, timeStretchRatio,
-					                                      playDirection, priorityRating, loopingType);
+					                                      playDirection, priorityRating, loopingType, mode);
 					if (!success) {
 						return false;
 					}
@@ -532,7 +533,7 @@ bool VoiceSample::render(SamplePlaybackGuide* guide, int32_t* __restrict__ outpu
 		// If we should be time stretching now...
 		if (timeStretchRatio != kMaxSampleValue) {
 			bool stillGoing = weShouldBeTimeStretchingNow(sample, guide, numSamples, phaseIncrement, timeStretchRatio,
-			                                              playDirection, priorityRating, loopingType);
+			                                              playDirection, priorityRating, loopingType, mode);
 			if (!stillGoing) {
 				return false;
 			}
@@ -1028,7 +1029,7 @@ assessLoopPointAgainTimestretched:
 
 							timeStretcher->reInit(newSamplePosBigOvershot, guide, this, sample, sampleSourceNumChannels,
 							                      timeStretchRatio, phaseIncrement, combinedIncrement, playDirection,
-							                      loopingType, priorityRating);
+							                      loopingType, priorityRating, mode);
 
 #if ALPHA_OR_BETA_VERSION
 							if (count >= 1024) {
@@ -1180,7 +1181,7 @@ readTimestretched:
 					if (allowedToDoHop) {
 						bool success = timeStretcher->hopEnd(guide, this, sample, sampleSourceNumChannels,
 						                                     timeStretchRatio, phaseIncrement, combinedIncrement,
-						                                     playDirection, loopingType, priorityRating);
+						                                     playDirection, loopingType, priorityRating, mode);
 						if (!success) {
 							return false; // Can fail if tried to jump to a bit in an unloaded Cluster. Shouldn't
 							              // actually happen
