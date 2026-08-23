@@ -66,6 +66,7 @@ public:
 
 	void renderBlock(int32_t* bufferStart, int32_t numSamples, uint32_t phaseIncrement,
 	                 uint32_t pulseWidth, int32_t feedback, int32_t damping, PhysicalModelType modelType,
+	                 int32_t exciterPunch, int32_t exciterNoise, int32_t exciterDecay,
 	                 int32_t amplitude, bool applyAmplitude, int32_t amplitudeIncrement) {
 
 		float baseHz = (float)phaseIncrement * (44100.0f / 4294967296.0f);
@@ -81,6 +82,16 @@ public:
 		// Calculate high-frequency damping factor from damping parameter [-1.0, +1.0] -> [0.05, 3.0]
 		float dampNorm = std::clamp((float)damping / 2147483648.0f, -0.99f, 0.99f);
 		float dampFactor = 0.5f * std::pow(4.0f, dampNorm);
+
+		// Exciter parameter scalings
+		float punchNorm = std::clamp((float)exciterPunch / 2147483648.0f, -0.99f, 0.99f);
+		float punchGain = std::pow(4.0f, punchNorm);
+
+		float noiseNorm = std::clamp((float)exciterNoise / 2147483648.0f, -0.99f, 0.99f);
+		float noiseGain = std::pow(4.0f, noiseNorm);
+
+		float exciterDecayNorm = std::clamp((float)exciterDecay / 2147483648.0f, -0.99f, 0.99f);
+		float exciterDecayFactor = std::pow(3.0f, exciterDecayNorm);
 
 		// Select partial ratios per model
 		float ratios[6];
@@ -161,20 +172,27 @@ public:
 		for (int i = 0; i < numSamples; i++) {
 			ampNow += ampInc;
 
-			// Exciter generator
+			// Exciter generator with Punch, Noise & Decay control
 			float exciter = 0.0f;
 			if (modelType == PhysicalModelType::BOWED_METAL) {
 				bowPhase_ += fundamentalHz / fs;
 				if (bowPhase_ >= 1.0f) bowPhase_ -= 1.0f;
-				exciter = (bowPhase_ < (0.5f + strikeHardness_ * 0.2f)) ? 0.8f : -0.8f;
+				float duty = std::clamp(0.5f + strikeHardness_ * 0.2f, 0.1f, 0.9f);
+				float stickSignal = (bowPhase_ < duty) ? 0.8f : -0.8f;
+				lfsr_ = lfsr_ * 1664525u + 1013904223u;
+				float noise = ((float)(int32_t)lfsr_ / 2147483648.0f);
+				exciter = (stickSignal * punchGain) + (noise * noiseGain * 0.3f);
 			}
 			else {
 				// Impulsive strike + noise burst
 				lfsr_ = lfsr_ * 1664525u + 1013904223u;
 				float noise = ((float)(int32_t)lfsr_ / 2147483648.0f);
 				if (strikeCounter_ > 0) {
-					float strikeImpulse = (strikeCounter_ > 980) ? (3.0f * strikeHardness_) : 0.0f;
-					float noiseBurst = noise * strikeHardness_ * ((float)strikeCounter_ / 1000.0f);
+					int32_t impulseThreshold = 1000 - (int32_t)(30.0f * exciterDecayFactor);
+					float strikeImpulse = (strikeCounter_ > impulseThreshold) ? (3.0f * strikeHardness_ * punchGain) : 0.0f;
+					float maxCounter = 1000.0f * exciterDecayFactor;
+					float env = std::clamp((float)strikeCounter_ / maxCounter, 0.0f, 1.0f);
+					float noiseBurst = noise * strikeHardness_ * noiseGain * env;
 					exciter = strikeImpulse + noiseBurst;
 					strikeCounter_--;
 				}

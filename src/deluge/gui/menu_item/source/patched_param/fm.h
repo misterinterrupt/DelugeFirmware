@@ -27,11 +27,22 @@ public:
 
 	[[nodiscard]] std::string_view getTitle() const override {
 		if (soundEditor.currentSound && (soundEditor.currentSound->sources[0].oscType == OscType::PHYSICAL_MODEL || soundEditor.currentSound->sources[1].oscType == OscType::PHYSICAL_MODEL)) {
-			if (p == deluge::modulation::params::LOCAL_MODULATOR_0_FEEDBACK) {
+			int32_t effectiveParam = p;
+			if (soundEditor.currentSourceIndex == 1 && (p == deluge::modulation::params::LOCAL_MODULATOR_0_VOLUME || p == deluge::modulation::params::LOCAL_MODULATOR_0_FEEDBACK)) {
+				effectiveParam = p + 1;
+			}
+
+			if (effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_0_FEEDBACK) {
 				return "DAMPING";
 			}
-			else if (p == deluge::modulation::params::LOCAL_MODULATOR_0_VOLUME) {
+			else if (effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_0_VOLUME) {
 				return "EXCITER PUNCH";
+			}
+			else if (effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_1_VOLUME) {
+				return "EXCITER NOISE";
+			}
+			else if (effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_1_FEEDBACK) {
+				return "EXCITER DECAY";
 			}
 		}
 		return FormattedTitle::title();
