@@ -149,6 +149,7 @@ public:
 	const char* getName() { return "sound_editor"; }
 
 	bool selectedNoteRow;
+	bool isDisplayBlank;
 
 private:
 	/// Setup shortcut blinking by finding the given menu item in the provided item map

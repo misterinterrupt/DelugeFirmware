@@ -124,6 +124,7 @@ void SoundEditor::setShortcutsVersion(int32_t newVersion) {
 SoundEditor soundEditor;
 
 SoundEditor::SoundEditor() {
+	isDisplayBlank = false;
 	currentParamShorcutX = 255;
 	memset(sourceShortcutBlinkFrequencies, 255, sizeof(sourceShortcutBlinkFrequencies));
 	timeLastAttemptedAutomatedParamEdit = 0;
@@ -276,6 +277,14 @@ ActionResult SoundEditor::buttonAction(deluge::hid::Button b, bool on, bool inCa
 								}
 
 								enterSubmenu(newItem);
+							}
+							else {
+								isDisplayBlank = true;
+								display->setText("");
+								if (display->haveOLED()) {
+									deluge::hid::display::OLED::clearMainImage();
+									renderUIsForOled();
+								}
 							}
 						}
 						else {
@@ -559,6 +568,7 @@ void SoundEditor::setupShortcutsBlinkFromTable(MenuItem const* const currentItem
 
 bool SoundEditor::beginScreen(MenuItem* oldMenuItem) {
 
+	isDisplayBlank = false;
 	MenuItem* currentItem = getCurrentMenuItem();
 
 	currentItem->beginSession(oldMenuItem);
@@ -942,7 +952,12 @@ doSetup:
 					}
 
 					if (item == comingSoonMenu) {
+						isDisplayBlank = true;
 						display->setText("");
+						if (display->haveOLED()) {
+							deluge::hid::display::OLED::clearMainImage();
+							renderUIsForOled();
+						}
 						return ActionResult::DEALT_WITH;
 					}
 
@@ -986,6 +1001,12 @@ doSetup:
 					}
 
 					if (!setupSuccess) {
+						isDisplayBlank = true;
+						display->setText("");
+						if (display->haveOLED()) {
+							deluge::hid::display::OLED::clearMainImage();
+							renderUIsForOled();
+						}
 						return ActionResult::DEALT_WITH;
 					}
 
@@ -998,7 +1019,12 @@ doSetup:
 
 				PatchSource source = modSourceShortcuts[x - 14][y];
 				if (source == PatchSource::SOON) {
+					isDisplayBlank = true;
 					display->setText("");
+					if (display->haveOLED()) {
+						deluge::hid::display::OLED::clearMainImage();
+						renderUIsForOled();
+					}
 				}
 
 				if (source >= kLastPatchSource) {
@@ -1059,6 +1085,14 @@ getOut:
 								// if automation view is open in the background
 								// potentially refresh grid if opening a new patch cable menu
 								getCurrentMenuItem()->buttonAction(hid::button::SELECT_ENC, on, sdRoutineLock);
+							}
+						}
+						else {
+							isDisplayBlank = true;
+							display->setText("");
+							if (display->haveOLED()) {
+								deluge::hid::display::OLED::clearMainImage();
+								renderUIsForOled();
 							}
 						}
 
@@ -1615,6 +1649,11 @@ void SoundEditor::mpeZonesPotentiallyUpdated() {
 }
 
 void SoundEditor::renderOLED(deluge::hid::display::oled_canvas::Canvas& canvas) {
+
+	if (isDisplayBlank) {
+		deluge::hid::display::OLED::clearMainImage();
+		return;
+	}
 
 	// Sorry - extremely ugly hack here.
 	MenuItem* currentMenuItem = getCurrentMenuItem();
