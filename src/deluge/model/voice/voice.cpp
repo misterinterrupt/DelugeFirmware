@@ -302,6 +302,9 @@ activenessDetermined:
 
 			// if (source->repeatMode == SampleRepeatMode::STRETCH) samplesLateHere = 0;
 		}
+		else if (oscType == OscType::PHYSICAL_MODEL) {
+			physicalModelEngines[s].trigger(sound->oscRetriggerPhase[s]);
+		}
 
 		for (int32_t u = 0; u < sound->numUnison; u++) {
 
@@ -1411,7 +1414,7 @@ cantBeDoingOscSyncForFirstOsc:
 						renderFMWithFeedback(spareRenderingBuffer[2], numSamples, NULL,
 						                     &unisonParts[u].modulatorPhase[0], modulatorAmplitudeLastTime[0],
 						                     phaseIncrementModulator[0],
-						                     paramFinalValues[params::LOCAL_MODULATOR_0_FEEDBACK],
+						                     paramFinalValues[params::LOCAL_MODULATOR_0_FEEDBACK] >> 6,
 						                     &unisonParts[u].modulatorFeedback[0], modulatorAmplitudeIncrements[0]);
 					}
 
@@ -1420,7 +1423,7 @@ cantBeDoingOscSyncForFirstOsc:
 						renderSineWaveWithFeedback(
 						    spareRenderingBuffer[2], numSamples, &unisonParts[u].modulatorPhase[0],
 						    modulatorAmplitudeLastTime[0], phaseIncrementModulator[0],
-						    paramFinalValues[params::LOCAL_MODULATOR_0_FEEDBACK], &unisonParts[u].modulatorFeedback[0],
+						    paramFinalValues[params::LOCAL_MODULATOR_0_FEEDBACK] >> 6, &unisonParts[u].modulatorFeedback[0],
 						    true, modulatorAmplitudeIncrements[0]);
 					}
 				}
@@ -1429,7 +1432,7 @@ cantBeDoingOscSyncForFirstOsc:
 						renderSineWaveWithFeedback(
 						    spareRenderingBuffer[2], numSamples, &unisonParts[u].modulatorPhase[0],
 						    modulatorAmplitudeLastTime[0], phaseIncrementModulator[0],
-						    paramFinalValues[params::LOCAL_MODULATOR_0_FEEDBACK], &unisonParts[u].modulatorFeedback[0],
+						    paramFinalValues[params::LOCAL_MODULATOR_0_FEEDBACK] >> 6, &unisonParts[u].modulatorFeedback[0],
 						    false, modulatorAmplitudeIncrements[0]);
 					}
 					else {
@@ -1438,7 +1441,7 @@ noModulatorsActive:
 							if (sourceAmplitudes[s]) {
 								renderSineWaveWithFeedback(
 								    fmOscBuffer, numSamples, &unisonParts[u].sources[s].oscPos, sourceAmplitudesNow[s],
-								    phaseIncrements[s], paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s],
+								    phaseIncrements[s], paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s] >> 6,
 								    &unisonParts[u].sources[s].carrierFeedback, true, sourceAmplitudeIncrements[s]);
 							}
 						}
@@ -1453,7 +1456,7 @@ noModulatorsActive:
 						renderFMWithFeedbackAdd(
 						    fmOscBuffer, numSamples, spareRenderingBuffer[2], &unisonParts[u].sources[s].oscPos,
 						    sourceAmplitudesNow[s], phaseIncrements[s],
-						    paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s],
+						    paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s] >> 6,
 						    &unisonParts[u].sources[s].carrierFeedback, sourceAmplitudeIncrements[s]);
 					}
 				}
@@ -2903,6 +2906,17 @@ doSine:
 		amplitude <<= 3;
 		amplitudeIncrement <<= 3;
 		goto doNeedToApplyAmplitude;
+	}
+
+	else if (type == OscType::PHYSICAL_MODEL) {
+		uint32_t unsignedIndex = (uint32_t)(sourceWaveIndexesLastTime[s] + 1073741824);
+		int32_t modelIdx = std::clamp<int32_t>((int32_t)(unsignedIndex / (2147483648u / 6)), 0, 5);
+		auto modelType = static_cast<dsp::physical_model::PhysicalModelType>(modelIdx);
+		int32_t feedbackVal = paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s];
+		int32_t dampingVal = paramFinalValues[params::LOCAL_CARRIER_1_FEEDBACK];
+		physicalModelEngines[s].renderBlock(bufferStart, numSamples, phaseIncrement, pulseWidth, feedbackVal, dampingVal, modelType,
+		                                    amplitude, applyAmplitude, amplitudeIncrement);
+		return;
 	}
 
 	else if (type == OscType::TRIANGLE) {

@@ -19,6 +19,7 @@
 
 #include "definitions_cxx.hpp"
 #include "dsp/filter/filter_set.h"
+#include "dsp/physical_model/physical_model_engine.h"
 #include "model/voice/voice_sample_playback_guide.h"
 #include "model/voice/voice_unison_part.h"
 #include "modulation/envelope.h"
@@ -41,6 +42,8 @@ public:
 	// Stores overall info on each Source (basically just sample memory bounds), for the play-through associated with
 	// this Voice right now.
 	VoiceSamplePlaybackGuide guides[kNumSources];
+
+	dsp::physical_model::PhysicalModelEngine physicalModelEngines[kNumSources];
 
 	Sound* assignedToSound;
 

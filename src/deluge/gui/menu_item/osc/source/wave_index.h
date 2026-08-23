@@ -17,6 +17,7 @@
 #pragma once
 #include "gui/menu_item/formatted_title.h"
 #include "gui/menu_item/source/patched_param.h"
+#include "hid/display/display.h"
 #include "processing/sound/sound.h"
 
 namespace deluge::gui::menu_item::osc::source {
@@ -25,12 +26,38 @@ public:
 	WaveIndex(l10n::String name, l10n::String title_format_str, int32_t newP)
 	    : PatchedParam(name, newP), FormattedTitle(title_format_str) {}
 
-	[[nodiscard]] std::string_view getTitle() const override { return FormattedTitle::title(); }
+	[[nodiscard]] std::string_view getTitle() const override {
+		if (soundEditor.currentSource && soundEditor.currentSource->oscType == OscType::PHYSICAL_MODEL) {
+			return "MODEL TYPE";
+		}
+		return FormattedTitle::title();
+	}
 
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
 		Sound* sound = static_cast<Sound*>(modControllable);
 		Source* source = &sound->sources[whichThing];
-		return (sound->getSynthMode() != SynthMode::FM && source->oscType == OscType::WAVETABLE);
+		return (sound->getSynthMode() != SynthMode::FM
+		        && (source->oscType == OscType::WAVETABLE || source->oscType == OscType::PHYSICAL_MODEL));
+	}
+
+	void drawValue() override {
+		if (soundEditor.currentSource && soundEditor.currentSource->oscType == OscType::PHYSICAL_MODEL) {
+			uint32_t unsignedIndex = (uint32_t)(this->getValue() + 1073741824);
+			int32_t idx = std::clamp<int32_t>((int32_t)(unsignedIndex / (2147483648u / 6)), 0, 5);
+			static const char* oledNames[6] = {
+			    "MEMBRANE", "WOOD BLOCK", "BOWED METAL", "REAL CYMBAL", "DIGITAL CYMBAL", "STRING"};
+			static const char* segNames[6] = {
+			    "MEMB", "WOOD", "BOWD", "CYMB", "DIGI", "STRG"};
+
+			if (display->haveOLED()) {
+				display->setText(oledNames[idx]);
+			}
+			if (display->have7SEG()) {
+				display->setText(segNames[idx]);
+			}
+			return;
+		}
+		menu_item::source::PatchedParam::drawValue();
 	}
 };
 } // namespace deluge::gui::menu_item::osc::source

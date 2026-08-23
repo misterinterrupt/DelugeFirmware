@@ -134,7 +134,7 @@ int32_t getParamNeutralValue(int32_t p) {
 	case params::LOCAL_MODULATOR_1_FEEDBACK:
 	case params::LOCAL_CARRIER_0_FEEDBACK:
 	case params::LOCAL_CARRIER_1_FEEDBACK:
-		return 5931642;
+		return 536870912;
 
 	case params::GLOBAL_DELAY_RATE:
 	case params::GLOBAL_ARP_RATE:
@@ -707,6 +707,9 @@ char const* oscTypeToString(OscType oscType) {
 	case OscType::WAVETABLE:
 		return "wavetable";
 
+	case OscType::PHYSICAL_MODEL:
+		return "physicalModel";
+
 	case OscType::INPUT_L:
 		return "inLeft";
 
@@ -746,6 +749,9 @@ OscType stringToOscType(char const* string) {
 	}
 	else if (!strcmp(string, "wavetable")) {
 		return OscType::WAVETABLE;
+	}
+	else if (!strcmp(string, "physicalModel")) {
+		return OscType::PHYSICAL_MODEL;
 	}
 	else if (!strcmp(string, "inLeft")) {
 		return OscType::INPUT_L;

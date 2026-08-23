@@ -85,6 +85,7 @@ public:
 		    l10n::getView(STRING_FOR_SAW),           //<
 		    l10n::getView(STRING_FOR_ANALOG_SAW),    //<
 		    l10n::getView(STRING_FOR_WAVETABLE),     //<
+		    "PHYSICAL MODEL",
 		};
 
 		if (soundEditor.currentSound->getSynthMode() == SynthMode::RINGMOD) {

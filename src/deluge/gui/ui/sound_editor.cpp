@@ -942,7 +942,7 @@ doSetup:
 					}
 
 					if (item == comingSoonMenu) {
-						display->displayPopup(deluge::l10n::get(deluge::l10n::String::STRING_FOR_UNIMPLEMENTED));
+						display->setText("");
 						return ActionResult::DEALT_WITH;
 					}
 
@@ -998,7 +998,7 @@ doSetup:
 
 				PatchSource source = modSourceShortcuts[x - 14][y];
 				if (source == PatchSource::SOON) {
-					display->displayPopup("SOON");
+					display->setText("");
 				}
 
 				if (source >= kLastPatchSource) {
@@ -1449,7 +1449,7 @@ doMIDIOrCV:
 	MenuPermission result = newItem->checkPermissionToBeginSession(newModControllable, sourceIndex, &newRange);
 
 	if (result == MenuPermission::NO) {
-		display->displayPopup(deluge::l10n::get(deluge::l10n::String::STRING_FOR_PARAMETER_NOT_APPLICABLE));
+		display->setText("");
 		return false;
 	}
 	else if (result == MenuPermission::MUST_SELECT_RANGE) {

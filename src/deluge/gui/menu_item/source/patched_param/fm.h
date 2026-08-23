@@ -25,11 +25,21 @@ public:
 	FM(l10n::String name, l10n::String title_format_str, int32_t newP)
 	    : source::PatchedParam(name, newP), FormattedTitle(title_format_str) {}
 
-	[[nodiscard]] std::string_view getTitle() const override { return FormattedTitle::title(); }
+	[[nodiscard]] std::string_view getTitle() const override {
+		if (soundEditor.currentSound && (soundEditor.currentSound->sources[0].oscType == OscType::PHYSICAL_MODEL || soundEditor.currentSound->sources[1].oscType == OscType::PHYSICAL_MODEL)) {
+			if (p == deluge::modulation::params::LOCAL_MODULATOR_0_FEEDBACK) {
+				return "DAMPING";
+			}
+			else if (p == deluge::modulation::params::LOCAL_MODULATOR_0_VOLUME) {
+				return "EXCITER PUNCH";
+			}
+		}
+		return FormattedTitle::title();
+	}
 
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
 		Sound* sound = static_cast<Sound*>(modControllable);
-		return (sound->getSynthMode() == SynthMode::FM);
+		return (sound->getSynthMode() == SynthMode::FM || sound->sources[0].oscType == OscType::PHYSICAL_MODEL || sound->sources[1].oscType == OscType::PHYSICAL_MODEL);
 	}
 };
 } // namespace deluge::gui::menu_item::source::patched_param

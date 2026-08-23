@@ -27,7 +27,12 @@ public:
 	PulseWidth(l10n::String name, l10n::String title_format_str, int32_t newP)
 	    : source::PatchedParam(name, newP), FormattedTitle(title_format_str) {}
 
-	[[nodiscard]] std::string_view getTitle() const override { return FormattedTitle::title(); }
+	[[nodiscard]] std::string_view getTitle() const override {
+		if (soundEditor.currentSource && soundEditor.currentSource->oscType == OscType::PHYSICAL_MODEL) {
+			return "STRUCTURE / INHARM";
+		}
+		return FormattedTitle::title();
+	}
 
 	int32_t getFinalValue() override { return computeFinalValueForHalfPrecisionMenuItem(this->getValue()); }
 

@@ -25,11 +25,20 @@ public:
 	Feedback(l10n::String name, l10n::String title_format_str, int32_t newP)
 	    : PatchedParam(name, newP), FormattedTitle(title_format_str) {}
 
-	[[nodiscard]] std::string_view getTitle() const override { return FormattedTitle::title(); }
+	[[nodiscard]] std::string_view getTitle() const override {
+		if (soundEditor.currentSource && soundEditor.currentSource->oscType == OscType::PHYSICAL_MODEL) {
+			if (p == deluge::modulation::params::LOCAL_CARRIER_0_FEEDBACK) {
+				return "DECAY";
+			}
+			return "DAMPING";
+		}
+		return FormattedTitle::title();
+	}
 
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
 		Sound* sound = static_cast<Sound*>(modControllable);
-		return (sound->getSynthMode() == SynthMode::FM || sound->sources[whichThing].oscType == OscType::DX7);
+		return (sound->getSynthMode() == SynthMode::FM || sound->sources[whichThing].oscType == OscType::DX7
+		        || sound->sources[whichThing].oscType == OscType::PHYSICAL_MODEL);
 	}
 };
 
