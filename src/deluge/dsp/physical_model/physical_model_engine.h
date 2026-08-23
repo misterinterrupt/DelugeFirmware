@@ -49,6 +49,7 @@ public:
 		tensionEnv_ = 0.0f;
 		dcBlockX_ = 0.0f;
 		dcBlockY_ = 0.0f;
+		exciterLPF_ = 0.0f;
 	}
 
 	void trigger(uint32_t retriggerPhase = 0xFFFFFFFF) {
@@ -84,9 +85,19 @@ public:
 		float uPitch = ((float)(int32_t)exciterPitch + 2147483648.0f) / 4294967295.0f;
 		float uDamp  = ((float)(int32_t)damping      + 2147483648.0f) / 4294967295.0f;
 
-		float punchGain = 0.6f + uPunch * 3.4f;
-		float dampFactor = 0.05f + uDamp * 3.0f;
+		// Mallet Punch Gain & Nonlinear Drive
+		float punchGain = 0.5f + uPunch * 4.5f;
+
+		// Damping factor for modal partials
+		float dampFactor = 0.02f + uDamp * 3.5f;
+
+		// Exciter noise cutoff (Exciter Color)
+		float noiseCutoff = std::clamp(0.02f + uPitch * 0.95f, 0.01f, 0.99f);
+
+		// Pitch shift multiplier including strike tension drop
 		float pitchShiftMult = std::pow(2.0f, (uPitch - 0.5f) * 2.0f);
+		float pitchMultiplier = pitchShiftMult * (1.0f + (tensionEnv_ * 0.20f * uPunch * strikeHardness_));
+		float fundamentalHz = baseHz * pitchMultiplier;
 
 		// Select partial ratios per model
 		float ratios[6];
@@ -136,9 +147,6 @@ public:
 		float fs = 44100.0f;
 		float b0[6], a1[6], a2[6];
 
-		float pitchMultiplier = pitchShiftMult * (1.0f + (tensionEnv_ * 0.15f * strikeHardness_));
-		float fundamentalHz = baseHz * pitchMultiplier;
-
 		for (int p = 0; p < numPartials; p++) {
 			float freq = std::clamp(fundamentalHz * ratios[p], 20.0f, fs * 0.45f);
 			float w0 = 2.0f * 3.14159265358979323846f * freq / fs;
@@ -167,7 +175,7 @@ public:
 		for (int i = 0; i < numSamples; i++) {
 			ampNow += ampInc;
 
-			// Exciter generator with Punch & Noise control
+			// Exciter generator with Mallet Hardness, Exciter Color & Nonlinear Impact Drive
 			float exciter = 0.0f;
 			if (modelType == PhysicalModelType::BOWED_METAL) {
 				bowPhase_ += fundamentalHz / fs;
@@ -175,18 +183,27 @@ public:
 				float duty = std::clamp(0.5f + strikeHardness_ * 0.2f, 0.1f, 0.9f);
 				float stickSignal = (bowPhase_ < duty) ? 0.8f : -0.8f;
 				lfsr_ = lfsr_ * 1664525u + 1013904223u;
-				float noise = ((float)(int32_t)lfsr_ / 2147483648.0f);
-				exciter = (stickSignal * punchGain) + (noise * punchGain * 0.3f);
+				float noiseRaw = ((float)(int32_t)lfsr_ / 2147483648.0f);
+				exciterLPF_ += (noiseRaw - exciterLPF_) * noiseCutoff;
+				exciter = (stickSignal * punchGain) + (exciterLPF_ * punchGain * 0.4f);
 			}
 			else {
-				// Impulsive strike + noise burst
+				// Impulsive strike + color filtered noise burst
 				lfsr_ = lfsr_ * 1664525u + 1013904223u;
-				float noise = ((float)(int32_t)lfsr_ / 2147483648.0f);
+				float noiseRaw = ((float)(int32_t)lfsr_ / 2147483648.0f);
+				exciterLPF_ += (noiseRaw - exciterLPF_) * noiseCutoff;
+
 				if (strikeCounter_ > 0) {
-					int32_t impulseThreshold = 1000 - (int32_t)(40.0f * punchGain);
-					float strikeImpulse = (strikeCounter_ > impulseThreshold) ? (3.0f * strikeHardness_ * punchGain) : 0.0f;
-					float env = std::clamp((float)strikeCounter_ / 1000.0f, 0.0f, 1.0f);
-					float noiseBurst = noise * strikeHardness_ * (0.3f + punchGain * 0.7f) * env;
+					// Smooth half-sine mallet contact impulse curve
+					float envPhase = (float)(1000 - strikeCounter_) / (100.0f + uPunch * 100.0f);
+					float strikeImpulse = 0.0f;
+					if (envPhase < 3.14159f) {
+						float sinePulse = std::sin(envPhase);
+						// Nonlinear mallet compression curve
+						strikeImpulse = (3.5f * sinePulse * punchGain * strikeHardness_) / (1.0f + 0.3f * punchGain * sinePulse);
+					}
+					float decayEnv = std::clamp((float)strikeCounter_ / 1000.0f, 0.0f, 1.0f);
+					float noiseBurst = exciterLPF_ * strikeHardness_ * (0.2f + punchGain * 0.8f) * decayEnv;
 					exciter = strikeImpulse + noiseBurst;
 					strikeCounter_--;
 				}
@@ -233,6 +250,7 @@ private:
 	float tensionEnv_ = 0.0f;
 	float dcBlockX_ = 0.0f;
 	float dcBlockY_ = 0.0f;
+	float exciterLPF_ = 0.0f;
 };
 
 } // namespace deluge::dsp::physical_model
