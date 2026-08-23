@@ -66,7 +66,7 @@ public:
 
 	void renderBlock(int32_t* bufferStart, int32_t numSamples, uint32_t phaseIncrement,
 	                 uint32_t pulseWidth, int32_t feedback, int32_t damping, PhysicalModelType modelType,
-	                 int32_t exciterPunch, int32_t exciterNoise, int32_t exciterDecay,
+	                 int32_t exciterPunch, int32_t exciterPitch,
 	                 int32_t amplitude, bool applyAmplitude, int32_t amplitudeIncrement) {
 
 		float baseHz = (float)phaseIncrement * (44100.0f / 4294967296.0f);
@@ -79,19 +79,14 @@ public:
 		float fbNorm = std::clamp((float)feedback / 2147483648.0f, -0.99f, 0.99f);
 		float baseQ = 60.0f * std::pow(30.0f, fbNorm);
 
-		// Calculate high-frequency damping factor from damping parameter [-1.0, +1.0] -> [0.05, 3.0]
-		float dampNorm = std::clamp((float)damping / 2147483648.0f, -0.99f, 0.99f);
-		float dampFactor = 0.5f * std::pow(4.0f, dampNorm);
+		// Unipolar parameter scalings from [-2147483648, +2147483647] -> [0.0, 1.0]
+		float uPunch = ((float)(int32_t)exciterPunch + 2147483648.0f) / 4294967295.0f;
+		float uPitch = ((float)(int32_t)exciterPitch + 2147483648.0f) / 4294967295.0f;
+		float uDamp  = ((float)(int32_t)damping      + 2147483648.0f) / 4294967295.0f;
 
-		// Exciter parameter scalings
-		float punchNorm = std::clamp((float)exciterPunch / 2147483648.0f, -0.99f, 0.99f);
-		float punchGain = std::pow(4.0f, punchNorm);
-
-		float noiseNorm = std::clamp((float)exciterNoise / 2147483648.0f, -0.99f, 0.99f);
-		float noiseGain = std::pow(4.0f, noiseNorm);
-
-		float exciterDecayNorm = std::clamp((float)exciterDecay / 2147483648.0f, -0.99f, 0.99f);
-		float exciterDecayFactor = std::pow(3.0f, exciterDecayNorm);
+		float punchGain = 0.6f + uPunch * 3.4f;
+		float dampFactor = 0.05f + uDamp * 3.0f;
+		float pitchShiftMult = std::pow(2.0f, (uPitch - 0.5f) * 2.0f);
 
 		// Select partial ratios per model
 		float ratios[6];
@@ -141,7 +136,7 @@ public:
 		float fs = 44100.0f;
 		float b0[6], a1[6], a2[6];
 
-		float pitchMultiplier = 1.0f + (tensionEnv_ * 0.15f * strikeHardness_);
+		float pitchMultiplier = pitchShiftMult * (1.0f + (tensionEnv_ * 0.15f * strikeHardness_));
 		float fundamentalHz = baseHz * pitchMultiplier;
 
 		for (int p = 0; p < numPartials; p++) {
@@ -172,7 +167,7 @@ public:
 		for (int i = 0; i < numSamples; i++) {
 			ampNow += ampInc;
 
-			// Exciter generator with Punch, Noise & Decay control
+			// Exciter generator with Punch & Noise control
 			float exciter = 0.0f;
 			if (modelType == PhysicalModelType::BOWED_METAL) {
 				bowPhase_ += fundamentalHz / fs;
@@ -181,18 +176,17 @@ public:
 				float stickSignal = (bowPhase_ < duty) ? 0.8f : -0.8f;
 				lfsr_ = lfsr_ * 1664525u + 1013904223u;
 				float noise = ((float)(int32_t)lfsr_ / 2147483648.0f);
-				exciter = (stickSignal * punchGain) + (noise * noiseGain * 0.3f);
+				exciter = (stickSignal * punchGain) + (noise * punchGain * 0.3f);
 			}
 			else {
 				// Impulsive strike + noise burst
 				lfsr_ = lfsr_ * 1664525u + 1013904223u;
 				float noise = ((float)(int32_t)lfsr_ / 2147483648.0f);
 				if (strikeCounter_ > 0) {
-					int32_t impulseThreshold = 1000 - (int32_t)(30.0f * exciterDecayFactor);
+					int32_t impulseThreshold = 1000 - (int32_t)(40.0f * punchGain);
 					float strikeImpulse = (strikeCounter_ > impulseThreshold) ? (3.0f * strikeHardness_ * punchGain) : 0.0f;
-					float maxCounter = 1000.0f * exciterDecayFactor;
-					float env = std::clamp((float)strikeCounter_ / maxCounter, 0.0f, 1.0f);
-					float noiseBurst = noise * strikeHardness_ * noiseGain * env;
+					float env = std::clamp((float)strikeCounter_ / 1000.0f, 0.0f, 1.0f);
+					float noiseBurst = noise * strikeHardness_ * (0.3f + punchGain * 0.7f) * env;
 					exciter = strikeImpulse + noiseBurst;
 					strikeCounter_--;
 				}

@@ -26,7 +26,12 @@ public:
 	Transpose(l10n::String name, l10n::String title_format_str, int32_t newP)
 	    : source::Transpose(name, newP), FormattedTitle(title_format_str) {}
 
-	[[nodiscard]] std::string_view getTitle() const override { return FormattedTitle::title(); }
+	[[nodiscard]] std::string_view getTitle() const override {
+		if (soundEditor.currentSound && (soundEditor.currentSound->sources[0].oscType == OscType::PHYSICAL_MODEL || soundEditor.currentSound->sources[1].oscType == OscType::PHYSICAL_MODEL)) {
+			return "EXCITER PITCH";
+		}
+		return FormattedTitle::title();
+	}
 
 	void readCurrentValue() override {
 		this->setValue(computeCurrentValueForTranspose(

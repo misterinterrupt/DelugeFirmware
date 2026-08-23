@@ -32,17 +32,11 @@ public:
 				effectiveParam = p + 1;
 			}
 
-			if (effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_0_FEEDBACK) {
+			if (effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_0_FEEDBACK || effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_1_FEEDBACK) {
 				return "DAMPING";
 			}
-			else if (effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_0_VOLUME) {
+			else if (effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_0_VOLUME || effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_1_VOLUME) {
 				return "EXCITER PUNCH";
-			}
-			else if (effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_1_VOLUME) {
-				return "EXCITER NOISE";
-			}
-			else if (effectiveParam == deluge::modulation::params::LOCAL_MODULATOR_1_FEEDBACK) {
-				return "EXCITER DECAY";
 			}
 		}
 		return FormattedTitle::title();

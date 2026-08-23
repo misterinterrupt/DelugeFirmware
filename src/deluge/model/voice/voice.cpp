@@ -2913,12 +2913,11 @@ doSine:
 		int32_t modelIdx = std::clamp<int32_t>((int32_t)(unsignedIndex / (2147483648u / 6)), 0, 5);
 		auto modelType = static_cast<dsp::physical_model::PhysicalModelType>(modelIdx);
 		int32_t feedbackVal = paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s];
-		int32_t dampingVal = paramFinalValues[params::LOCAL_CARRIER_1_FEEDBACK] + paramFinalValues[params::LOCAL_MODULATOR_0_FEEDBACK + s];
+		int32_t dampingVal = paramFinalValues[params::LOCAL_MODULATOR_0_FEEDBACK + s];
 		int32_t exciterPunch = paramFinalValues[params::LOCAL_MODULATOR_0_VOLUME + s];
-		int32_t exciterNoise = paramFinalValues[params::LOCAL_MODULATOR_1_VOLUME];
-		int32_t exciterDecay = paramFinalValues[params::LOCAL_MODULATOR_1_FEEDBACK];
+		int32_t exciterPitch = paramFinalValues[params::LOCAL_MODULATOR_0_PITCH_ADJUST + s];
 		physicalModelEngines[s].renderBlock(bufferStart, numSamples, phaseIncrement, pulseWidth, feedbackVal, dampingVal, modelType,
-		                                    exciterPunch, exciterNoise, exciterDecay,
+		                                    exciterPunch, exciterPitch,
 		                                    amplitude, applyAmplitude, amplitudeIncrement);
 		return;
 	}
