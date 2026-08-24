@@ -3498,7 +3498,7 @@ void Sound::writeSourceToFile(Serializer& writer, int32_t s, char const* tagName
 
 	writer.writeOpeningTagBeginning(tagName);
 
-	if (synthMode != SynthMode::FM) {
+	if (synthMode != SynthMode::FM || source->oscType == OscType::PHYSICAL_MODEL) {
 		writer.writeAttribute("type", oscTypeToString(source->oscType));
 	}
 

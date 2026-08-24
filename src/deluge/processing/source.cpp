@@ -199,7 +199,7 @@ void Source::doneReadingFromFile(Sound* sound) {
 
 	SynthMode synthMode = sound->getSynthMode();
 
-	if (synthMode == SynthMode::FM) {
+	if (synthMode == SynthMode::FM && oscType != OscType::PHYSICAL_MODEL) {
 		oscType = OscType::SINE;
 	}
 	else if (synthMode == SynthMode::RINGMOD) {
