@@ -9,8 +9,8 @@
 // also SyncLevel)
 enum SyncType : uint8_t {
 	SYNC_TYPE_EVEN = 0,
-	SYNC_TYPE_TRIPLET = 10,
-	SYNC_TYPE_DOTTED = 19,
+	SYNC_TYPE_TRIPLET = 12,
+	SYNC_TYPE_DOTTED = 23,
 };
 
 // Triplet swing not supported yet.
@@ -30,14 +30,21 @@ enum SyncLevel : uint8_t {
 	SYNC_LEVEL_64TH = 7,
 	SYNC_LEVEL_128TH = 8,
 	SYNC_LEVEL_256TH = 9,
+	SYNC_LEVEL_512TH = 10,
+	SYNC_LEVEL_1024TH = 11,
 };
 
-#define MAX_SYNC_LEVEL 9
-#define NUM_SYNC_VALUES 28
+#define MAX_SYNC_LEVEL 11
+#define NUM_SYNC_VALUES 34
 
 enum SyncLevel syncValueToSyncLevel(int32_t option);
 
 enum SyncType syncValueToSyncType(int32_t value);
+
+int32_t syncTypeAndLevelToMenuOption(enum SyncType type, enum SyncLevel level);
+
+void getSyncTypeAndLevelFromChronologicalOption(int32_t index, SyncType& outType, SyncLevel& outLevel);
+int32_t getChronologicalSyncOption(SyncType type, SyncLevel level);
 
 void syncValueToString(uint32_t value, StringBuf& buffer, int32_t tickMagnitude);
 

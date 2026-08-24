@@ -50,6 +50,6 @@ void SyncLevel::drawPixelsForOled() {
 }
 
 int32_t SyncLevel::syncTypeAndLevelToMenuOption(::SyncType type, ::SyncLevel level) {
-	return static_cast<int32_t>(type) + (static_cast<int32_t>(level) - (type != SYNC_TYPE_EVEN ? 1 : 0));
+	return ::syncTypeAndLevelToMenuOption(type, level);
 }
 } // namespace deluge::gui::menu_item

@@ -27,10 +27,7 @@ public:
 
 	[[nodiscard]] std::string_view getTitle() const override {
 		if (soundEditor.currentSource && soundEditor.currentSource->oscType == OscType::PHYSICAL_MODEL) {
-			if (p == deluge::modulation::params::LOCAL_CARRIER_0_FEEDBACK) {
-				return "DECAY";
-			}
-			return "DAMPING";
+			return "BODY FEEDBACK";
 		}
 		return FormattedTitle::title();
 	}

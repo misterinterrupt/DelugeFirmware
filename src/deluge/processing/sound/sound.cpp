@@ -1393,10 +1393,7 @@ PatchCableAcceptance Sound::maySourcePatchToParam(PatchSource s, uint8_t p, Para
 		if (synthMode != SynthMode::FM && sources[0].oscType != OscType::PHYSICAL_MODEL && sources[1].oscType != OscType::PHYSICAL_MODEL) {
 			return PatchCableAcceptance::DISALLOWED;
 		}
-		return (isSourceActiveEver(0, paramManager)
-		        && patchedParams->params[params::LOCAL_CARRIER_0_FEEDBACK].containsSomething(-2147483648))
-		           ? PatchCableAcceptance::ALLOWED
-		           : PatchCableAcceptance::EDITABLE;
+		return PatchCableAcceptance::ALLOWED;
 
 	case params::LOCAL_OSC_B_PHASE_WIDTH:
 		if (getSynthMode() == SynthMode::FM) {
@@ -1417,10 +1414,7 @@ PatchCableAcceptance Sound::maySourcePatchToParam(PatchSource s, uint8_t p, Para
 		if (synthMode != SynthMode::FM && sources[0].oscType != OscType::PHYSICAL_MODEL && sources[1].oscType != OscType::PHYSICAL_MODEL) {
 			return PatchCableAcceptance::DISALLOWED;
 		}
-		return (isSourceActiveEver(1, paramManager)
-		        && patchedParams->params[params::LOCAL_CARRIER_1_FEEDBACK].containsSomething(-2147483648))
-		           ? PatchCableAcceptance::ALLOWED
-		           : PatchCableAcceptance::EDITABLE;
+		return PatchCableAcceptance::ALLOWED;
 
 	case params::LOCAL_NOISE_VOLUME:
 		if (synthMode == SynthMode::FM) {
@@ -1455,34 +1449,26 @@ PatchCableAcceptance Sound::maySourcePatchToParam(PatchSource s, uint8_t p, Para
 		if (synthMode != SynthMode::FM && sources[0].oscType != OscType::PHYSICAL_MODEL && sources[1].oscType != OscType::PHYSICAL_MODEL) {
 			return PatchCableAcceptance::DISALLOWED;
 		}
-		return (patchedParams->params[params::LOCAL_MODULATOR_0_VOLUME].containsSomething(-2147483648))
-		           ? PatchCableAcceptance::ALLOWED
-		           : PatchCableAcceptance::EDITABLE;
+		return PatchCableAcceptance::ALLOWED;
 
 	case params::LOCAL_MODULATOR_0_FEEDBACK:
 		if (synthMode != SynthMode::FM && sources[0].oscType != OscType::PHYSICAL_MODEL && sources[1].oscType != OscType::PHYSICAL_MODEL) {
 			return PatchCableAcceptance::DISALLOWED;
 		}
-		return (patchedParams->params[params::LOCAL_MODULATOR_0_FEEDBACK].containsSomething(-2147483648))
-		           ? PatchCableAcceptance::ALLOWED
-		           : PatchCableAcceptance::EDITABLE;
+		return PatchCableAcceptance::ALLOWED;
 
 	case params::LOCAL_MODULATOR_1_VOLUME:
 	case params::LOCAL_MODULATOR_1_PITCH_ADJUST:
 		if (synthMode != SynthMode::FM && sources[0].oscType != OscType::PHYSICAL_MODEL && sources[1].oscType != OscType::PHYSICAL_MODEL) {
 			return PatchCableAcceptance::DISALLOWED;
 		}
-		return (patchedParams->params[params::LOCAL_MODULATOR_1_VOLUME].containsSomething(-2147483648))
-		           ? PatchCableAcceptance::ALLOWED
-		           : PatchCableAcceptance::EDITABLE;
+		return PatchCableAcceptance::ALLOWED;
 
 	case params::LOCAL_MODULATOR_1_FEEDBACK:
 		if (synthMode != SynthMode::FM && sources[0].oscType != OscType::PHYSICAL_MODEL && sources[1].oscType != OscType::PHYSICAL_MODEL) {
 			return PatchCableAcceptance::DISALLOWED;
 		}
-		return (patchedParams->params[params::LOCAL_MODULATOR_1_FEEDBACK].containsSomething(-2147483648))
-		           ? PatchCableAcceptance::ALLOWED
-		           : PatchCableAcceptance::EDITABLE;
+		return PatchCableAcceptance::ALLOWED;
 
 	case params::GLOBAL_LFO_FREQ:
 		return (lfoConfig[LFO1_ID].syncLevel == SYNC_LEVEL_NONE) ? PatchCableAcceptance::ALLOWED

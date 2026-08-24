@@ -50,6 +50,7 @@ public:
 		dcBlockX_ = 0.0f;
 		dcBlockY_ = 0.0f;
 		exciterLPF_ = 0.0f;
+		lastBodyOut_ = 0.0f;
 	}
 
 	void trigger(uint32_t retriggerPhase = 0xFFFFFFFF) {
@@ -80,6 +81,9 @@ public:
 		float fbNorm = std::clamp((float)feedback / 2147483648.0f, -0.99f, 0.99f);
 		float baseQ = 60.0f * std::pow(30.0f, fbNorm);
 
+		// Acoustic body recirculation feedback gain [0.0, 0.45]
+		float recirculationGain = (fbNorm > 0.0f) ? (fbNorm * 0.45f) : 0.0f;
+
 		// Unipolar parameter scalings from [-2147483648, +2147483647] -> [0.0, 1.0]
 		float uPunch = ((float)(int32_t)exciterPunch + 2147483648.0f) / 4294967295.0f;
 		float uPitch = ((float)(int32_t)exciterPitch + 2147483648.0f) / 4294967295.0f;
@@ -98,6 +102,11 @@ public:
 		float pitchShiftMult = std::pow(2.0f, (uPitch - 0.5f) * 2.0f);
 		float pitchMultiplier = pitchShiftMult * (1.0f + (tensionEnv_ * 0.20f * uPunch * strikeHardness_));
 		float fundamentalHz = baseHz * pitchMultiplier;
+
+		// Frequency-dependent Q compensation relative to 220Hz
+		float pitchQFactor = std::pow(std::clamp(fundamentalHz / 220.0f, 0.1f, 20.0f), 0.35f);
+		pitchQFactor = std::clamp(pitchQFactor, 0.5f, 2.5f);
+		float effectiveBaseQ = baseQ * pitchQFactor;
 
 		// Select partial ratios per model
 		float ratios[6];
@@ -152,7 +161,7 @@ public:
 			float w0 = 2.0f * 3.14159265358979323846f * freq / fs;
 			float cosW = std::cos(w0);
 			float sinW = std::sin(w0);
-			float Q = baseQ / (1.0f + dampFactor * p * 0.4f);
+			float Q = effectiveBaseQ / (1.0f + dampFactor * p * 0.4f);
 			Q = std::clamp(Q, 0.8f, 2500.0f);
 			float alpha = sinW / (2.0f * Q);
 
@@ -209,6 +218,13 @@ public:
 				}
 			}
 
+			// Mix acoustic body recirculation feedback signal into exciter
+			if (recirculationGain > 0.001f) {
+				float fbSig = lastBodyOut_ * recirculationGain;
+				fbSig = fbSig / (1.0f + std::abs(fbSig)); // Soft-clamped feedback
+				exciter += fbSig;
+			}
+
 			// Fast Parallel Biquad Resonator Filter Bank
 			float sampleSum = 0.0f;
 			for (int p = 0; p < numPartials; p++) {
@@ -227,6 +243,8 @@ public:
 			float x = dcBlockOut * 2.5f;
 			float sat = x * (27.0f + x * x) / (27.0f + 9.0f * x * x);
 			sat = std::clamp(sat, -1.0f, 1.0f);
+
+			lastBodyOut_ = sat;
 
 			int32_t outSample = (int32_t)(sat * 1073741824.0f);
 
@@ -251,6 +269,7 @@ private:
 	float dcBlockX_ = 0.0f;
 	float dcBlockY_ = 0.0f;
 	float exciterLPF_ = 0.0f;
+	float lastBodyOut_ = 0.0f;
 };
 
 } // namespace deluge::dsp::physical_model

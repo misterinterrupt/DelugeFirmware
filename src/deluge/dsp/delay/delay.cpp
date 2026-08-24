@@ -101,20 +101,23 @@ void Delay::setupWorkingState(Delay::State& workingState, uint32_t timePerIntern
 
 		if (syncLevel != 0) {
 
-			workingState.userDelayRate =
-			    multiply_32x32_rshift32_rounded(workingState.userDelayRate, timePerInternalTickInverse);
+			uint64_t rate = multiply_32x32_rshift32_rounded(workingState.userDelayRate, timePerInternalTickInverse);
 
-			// Limit to the biggest number we can store...
-			int32_t limit = 2147483647 >> (syncLevel + 5);
-			workingState.userDelayRate = std::min(workingState.userDelayRate, limit);
 			if (syncType == SYNC_TYPE_EVEN) {} // Do nothing
 			else if (syncType == SYNC_TYPE_TRIPLET) {
-				workingState.userDelayRate = workingState.userDelayRate * 3 / 2;
+				rate = rate * 3 / 2;
 			}
 			else if (syncType == SYNC_TYPE_DOTTED) {
-				workingState.userDelayRate = workingState.userDelayRate * 2 / 3;
+				rate = rate * 2 / 3;
 			}
-			workingState.userDelayRate <<= (syncLevel + 5);
+			rate <<= (syncLevel + 5);
+
+			if (rate > 2147483647ULL) {
+				workingState.userDelayRate = 2147483647;
+			}
+			else {
+				workingState.userDelayRate = static_cast<int32_t>(rate);
+			}
 		}
 	}
 
