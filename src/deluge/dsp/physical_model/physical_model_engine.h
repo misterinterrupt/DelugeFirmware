@@ -241,6 +241,7 @@ public:
 				float noiseRaw = ((float)(int32_t)lfsr_ * invFixed32);
 				exciterLPF_ += (noiseRaw - exciterLPF_) * noiseCutoff;
 				exciter = (stickSignal * punchGain) + (exciterLPF_ * punchGain * 0.4f);
+				if (strikeCounter_ > 0) strikeCounter_--;
 			}
 			else {
 				// Impulsive strike + color filtered noise burst
@@ -267,6 +268,11 @@ public:
 				float fmSig = ((float)fmInputBuffer[i] * invFixed32);
 				fmSig = std::clamp(fmSig, -2.0f, 2.0f);
 				exciter += fmSig * 1.2f;
+			}
+
+			if (strikeCounter_ > 968) {
+				float strikeRamp = (float)(1000 - strikeCounter_) * (1.0f / 32.0f);
+				exciter *= strikeRamp;
 			}
 
 			// Mix acoustic body recirculation feedback signal into exciter
