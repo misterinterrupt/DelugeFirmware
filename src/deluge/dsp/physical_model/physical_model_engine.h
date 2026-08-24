@@ -61,6 +61,19 @@ public:
 		strikeCounter_ = 1000; // Excitation duration (~22ms)
 		tensionEnv_ = 1.0f;    // Tension pitch-bend drop on strike
 
+		for (int i = 0; i < 6; i++) {
+			y1_[i] = 0.0f;
+			y2_[i] = 0.0f;
+			current_b0_[i] = 0.0f;
+			current_a1_[i] = 0.0f;
+			current_a2_[i] = 0.0f;
+		}
+		initializedCoeffs_ = false;
+		dcBlockX_ = 0.0f;
+		dcBlockY_ = 0.0f;
+		exciterLPF_ = 0.0f;
+		lastBodyOut_ = 0.0f;
+
 		if (retriggerPhase == 0xFFFFFFFF) {
 			strikeHardness_ = 0.5f; // Default natural wooden stick
 		}

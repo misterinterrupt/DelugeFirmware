@@ -285,9 +285,9 @@ activenessDetermined:
 
 		Source* source = &sound->sources[s];
 
-		// FM overrides osc type to always be sines
+		// FM overrides osc type to always be sines except for PHYSICAL_MODEL
 		OscType oscType;
-		if (sound->getSynthMode() == SynthMode::FM) {
+		if (sound->getSynthMode() == SynthMode::FM && source->oscType != OscType::PHYSICAL_MODEL) {
 			oscType = OscType::SINE;
 		}
 		else {
