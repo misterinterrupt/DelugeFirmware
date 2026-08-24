@@ -103,6 +103,7 @@ void Voice::setAsUnassigned(ModelStackWithVoice* modelStack, bool deletingSong) 
 
 void Voice::unassignStuff(bool deletingSong) {
 	for (int32_t s = 0; s < kNumSources; s++) {
+		physicalModelEngines[s].reset();
 		for (int32_t u = 0; u < assignedToSound->numUnison; u++) {
 			unisonParts[u].sources[s].unassign(deletingSong);
 		}
