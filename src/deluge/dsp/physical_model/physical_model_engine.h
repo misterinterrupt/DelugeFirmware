@@ -55,6 +55,7 @@ public:
 		dcBlockY_ = 0.0f;
 		exciterLPF_ = 0.0f;
 		lastBodyOut_ = 0.0f;
+		attackFade_ = 1.0f;
 	}
 
 	void trigger(uint32_t retriggerPhase = 0xFFFFFFFF) {
@@ -73,6 +74,7 @@ public:
 		dcBlockY_ = 0.0f;
 		exciterLPF_ = 0.0f;
 		lastBodyOut_ = 0.0f;
+		attackFade_ = 0.0f;
 
 		if (retriggerPhase == 0xFFFFFFFF) {
 			strikeHardness_ = 0.5f; // Default natural wooden stick
@@ -296,6 +298,12 @@ public:
 			float sat = x * (27.0f + x * x) / (27.0f + 9.0f * x * x);
 			sat = std::clamp(sat, -1.0f, 1.0f);
 
+			if (attackFade_ < 1.0f) {
+				sat *= attackFade_;
+				attackFade_ += (1.0f / 96.0f);
+				if (attackFade_ > 1.0f) attackFade_ = 1.0f;
+			}
+
 			lastBodyOut_ = sat;
 
 			int32_t outSample = (int32_t)(sat * 1073741824.0f);
@@ -326,6 +334,7 @@ private:
 	float dcBlockY_ = 0.0f;
 	float exciterLPF_ = 0.0f;
 	float lastBodyOut_ = 0.0f;
+	float attackFade_ = 1.0f;
 };
 
 } // namespace deluge::dsp::physical_model
