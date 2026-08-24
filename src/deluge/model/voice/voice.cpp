@@ -1439,10 +1439,25 @@ cantBeDoingOscSyncForFirstOsc:
 noModulatorsActive:
 						for (int32_t s = 0; s < kNumSources; s++) {
 							if (sourceAmplitudes[s]) {
-								renderSineWaveWithFeedback(
-								    fmOscBuffer, numSamples, &unisonParts[u].sources[s].oscPos, sourceAmplitudesNow[s],
-								    phaseIncrements[s], paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s] >> 6,
-								    &unisonParts[u].sources[s].carrierFeedback, true, sourceAmplitudeIncrements[s]);
+								if (sound->sources[s].oscType == OscType::PHYSICAL_MODEL) {
+									uint32_t unsignedIndex = (uint32_t)(sourceWaveIndexesLastTime[s] + 1073741824);
+									int32_t modelIdx = std::clamp<int32_t>((int32_t)(unsignedIndex / (2147483648u / 6)), 0, 5);
+									auto modelType = static_cast<dsp::physical_model::PhysicalModelType>(modelIdx);
+									int32_t feedbackVal = paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s];
+									int32_t dampingVal = paramFinalValues[params::LOCAL_MODULATOR_0_FEEDBACK + s];
+									int32_t exciterPunch = paramFinalValues[params::LOCAL_MODULATOR_0_VOLUME + s];
+									int32_t exciterPitch = paramFinalValues[params::LOCAL_MODULATOR_0_PITCH_ADJUST + s];
+									uint32_t pw = paramFinalValues[(s == 0) ? params::LOCAL_OSC_A_PHASE_WIDTH : params::LOCAL_OSC_B_PHASE_WIDTH];
+									physicalModelEngines[s].renderBlock(fmOscBuffer, numSamples, phaseIncrements[s], pw, feedbackVal, dampingVal, modelType,
+									                                    exciterPunch, exciterPitch,
+									                                    sourceAmplitudesNow[s], true, sourceAmplitudeIncrements[s], nullptr);
+								}
+								else {
+									renderSineWaveWithFeedback(
+									    fmOscBuffer, numSamples, &unisonParts[u].sources[s].oscPos, sourceAmplitudesNow[s],
+									    phaseIncrements[s], paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s] >> 6,
+									    &unisonParts[u].sources[s].carrierFeedback, true, sourceAmplitudeIncrements[s]);
+								}
 							}
 						}
 
@@ -1453,11 +1468,26 @@ noModulatorsActive:
 				// Carriers
 				for (int32_t s = 0; s < kNumSources; s++) {
 					if (sourceAmplitudes[s]) {
-						renderFMWithFeedbackAdd(
-						    fmOscBuffer, numSamples, spareRenderingBuffer[2], &unisonParts[u].sources[s].oscPos,
-						    sourceAmplitudesNow[s], phaseIncrements[s],
-						    paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s] >> 6,
-						    &unisonParts[u].sources[s].carrierFeedback, sourceAmplitudeIncrements[s]);
+						if (sound->sources[s].oscType == OscType::PHYSICAL_MODEL) {
+							uint32_t unsignedIndex = (uint32_t)(sourceWaveIndexesLastTime[s] + 1073741824);
+							int32_t modelIdx = std::clamp<int32_t>((int32_t)(unsignedIndex / (2147483648u / 6)), 0, 5);
+							auto modelType = static_cast<dsp::physical_model::PhysicalModelType>(modelIdx);
+							int32_t feedbackVal = paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s];
+							int32_t dampingVal = paramFinalValues[params::LOCAL_MODULATOR_0_FEEDBACK + s];
+							int32_t exciterPunch = paramFinalValues[params::LOCAL_MODULATOR_0_VOLUME + s];
+							int32_t exciterPitch = paramFinalValues[params::LOCAL_MODULATOR_0_PITCH_ADJUST + s];
+							uint32_t pw = paramFinalValues[(s == 0) ? params::LOCAL_OSC_A_PHASE_WIDTH : params::LOCAL_OSC_B_PHASE_WIDTH];
+							physicalModelEngines[s].renderBlock(fmOscBuffer, numSamples, phaseIncrements[s], pw, feedbackVal, dampingVal, modelType,
+							                                    exciterPunch, exciterPitch,
+							                                    sourceAmplitudesNow[s], true, sourceAmplitudeIncrements[s], spareRenderingBuffer[2]);
+						}
+						else {
+							renderFMWithFeedbackAdd(
+							    fmOscBuffer, numSamples, spareRenderingBuffer[2], &unisonParts[u].sources[s].oscPos,
+							    sourceAmplitudesNow[s], phaseIncrements[s],
+							    paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s] >> 6,
+							    &unisonParts[u].sources[s].carrierFeedback, sourceAmplitudeIncrements[s]);
+						}
 					}
 				}
 

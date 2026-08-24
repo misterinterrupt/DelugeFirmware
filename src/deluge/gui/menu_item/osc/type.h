@@ -37,6 +37,11 @@ public:
 	bool mayUseDx() { return !soundEditor.editingKit() && soundEditor.currentSourceIndex == 0; }
 
 	void readCurrentValue() override {
+		if (soundEditor.currentSound && soundEditor.currentSound->getSynthMode() == SynthMode::FM) {
+			int32_t rawVal = (int32_t)soundEditor.currentSource->oscType;
+			this->setValue(rawVal == (int32_t)OscType::PHYSICAL_MODEL ? 1 : 0);
+			return;
+		}
 		int32_t rawVal = (int32_t)soundEditor.currentSource->oscType;
 		if (!mayUseDx() && rawVal > (int32_t)OscType::DX7) {
 			rawVal -= 1;
@@ -44,6 +49,12 @@ public:
 		this->setValue(rawVal);
 	}
 	void writeCurrentValue() override {
+		if (soundEditor.currentSound && soundEditor.currentSound->getSynthMode() == SynthMode::FM) {
+			OscType newValue = (this->getValue() == 1) ? OscType::PHYSICAL_MODEL : OscType::SINE;
+			soundEditor.currentSound->unassignAllVoices();
+			soundEditor.currentSource->setOscType(newValue);
+			return;
+		}
 
 		OscType oldValue = soundEditor.currentSource->oscType;
 		auto newValue = this->getValue<OscType>();
@@ -77,6 +88,12 @@ public:
 
 	deluge::vector<std::string_view> getOptions() override {
 		using enum l10n::String;
+		if (soundEditor.currentSound && soundEditor.currentSound->getSynthMode() == SynthMode::FM) {
+			return {
+			    l10n::getView(STRING_FOR_SINE),
+			    "PHYSICAL MODEL",
+			};
+		}
 		deluge::vector<std::string_view> options = {
 		    l10n::getView(STRING_FOR_SINE),          //<
 		    l10n::getView(STRING_FOR_TRIANGLE),      //<
@@ -111,8 +128,7 @@ public:
 	}
 
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
-		Sound* sound = static_cast<Sound*>(modControllable);
-		return (sound->getSynthMode() != SynthMode::FM);
+		return true;
 	}
 
 	MenuItem* selectButtonPress() final {

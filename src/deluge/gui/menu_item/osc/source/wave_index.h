@@ -36,8 +36,7 @@ public:
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
 		Sound* sound = static_cast<Sound*>(modControllable);
 		Source* source = &sound->sources[whichThing];
-		return (sound->getSynthMode() != SynthMode::FM
-		        && (source->oscType == OscType::WAVETABLE || source->oscType == OscType::PHYSICAL_MODEL));
+		return (source->oscType == OscType::WAVETABLE || source->oscType == OscType::PHYSICAL_MODEL);
 	}
 
 	void drawValue() override {

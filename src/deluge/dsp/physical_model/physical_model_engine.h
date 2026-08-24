@@ -41,7 +41,11 @@ public:
 		for (int i = 0; i < 6; i++) {
 			y1_[i] = 0.0f;
 			y2_[i] = 0.0f;
+			current_b0_[i] = 0.0f;
+			current_a1_[i] = 0.0f;
+			current_a2_[i] = 0.0f;
 		}
+		initializedCoeffs_ = false;
 		lfsr_ = 0x12345678;
 		bowPhase_ = 0.0f;
 		strikeCounter_ = 0;
@@ -69,7 +73,8 @@ public:
 	void renderBlock(int32_t* bufferStart, int32_t numSamples, uint32_t phaseIncrement,
 	                 uint32_t pulseWidth, int32_t feedback, int32_t damping, PhysicalModelType modelType,
 	                 int32_t exciterPunch, int32_t exciterPitch,
-	                 int32_t amplitude, bool applyAmplitude, int32_t amplitudeIncrement) {
+	                 int32_t amplitude, bool applyAmplitude, int32_t amplitudeIncrement,
+	                 const int32_t* fmInputBuffer = nullptr) {
 
 		float baseHz = (float)phaseIncrement * (44100.0f / 4294967296.0f);
 		baseHz = std::clamp(baseHz, 20.0f, 10000.0f);
@@ -154,7 +159,7 @@ public:
 
 		// BLOCK-RATE COEFFICIENT PRE-COMPUTATION
 		float fs = 44100.0f;
-		float b0[6], a1[6], a2[6];
+		float target_b0[6] = {0}, target_a1[6] = {0}, target_a2[6] = {0};
 
 		for (int p = 0; p < numPartials; p++) {
 			float freq = std::clamp(fundamentalHz * ratios[p], 20.0f, fs * 0.45f);
@@ -165,9 +170,26 @@ public:
 			Q = std::clamp(Q, 0.8f, 2500.0f);
 			float alpha = sinW / (2.0f * Q);
 
-			b0[p] = alpha * modalWeights[p];
-			a1[p] = -2.0f * cosW;
-			a2[p] = 1.0f - alpha;
+			target_b0[p] = alpha * modalWeights[p];
+			target_a1[p] = -2.0f * cosW;
+			target_a2[p] = 1.0f - alpha;
+		}
+
+		if (!initializedCoeffs_) {
+			for (int p = 0; p < 6; p++) {
+				current_b0_[p] = target_b0[p];
+				current_a1_[p] = target_a1[p];
+				current_a2_[p] = target_a2[p];
+			}
+			initializedCoeffs_ = true;
+		}
+
+		float step_b0[6] = {0}, step_a1[6] = {0}, step_a2[6] = {0};
+		float invNumSamples = 1.0f / (float)numSamples;
+		for (int p = 0; p < numPartials; p++) {
+			step_b0[p] = (target_b0[p] - current_b0_[p]) * invNumSamples;
+			step_a1[p] = (target_a1[p] - current_a1_[p]) * invNumSamples;
+			step_a2[p] = (target_a2[p] - current_a2_[p]) * invNumSamples;
 		}
 
 		// Decay tension envelope once per block
@@ -218,6 +240,13 @@ public:
 				}
 			}
 
+			if (fmInputBuffer) {
+				float fmSig = ((float)fmInputBuffer[i] / 2147483648.0f);
+				// Soft-saturate FM exciter input to prevent sharp impulse click spikes
+				fmSig = fmSig / (1.0f + 0.33f * std::abs(fmSig));
+				exciter += fmSig * 1.2f;
+			}
+
 			// Mix acoustic body recirculation feedback signal into exciter
 			if (recirculationGain > 0.001f) {
 				float fbSig = lastBodyOut_ * recirculationGain;
@@ -225,10 +254,17 @@ public:
 				exciter += fbSig;
 			}
 
-			// Fast Parallel Biquad Resonator Filter Bank
+			// Fast Parallel Biquad Resonator Filter Bank with per-sample coefficient interpolation
 			float sampleSum = 0.0f;
 			for (int p = 0; p < numPartials; p++) {
-				float y = b0[p] * exciter - a1[p] * y1_[p] - a2[p] * y2_[p];
+				current_b0_[p] += step_b0[p];
+				current_a1_[p] += step_a1[p];
+				current_a2_[p] += step_a2[p];
+
+				float y = current_b0_[p] * exciter - current_a1_[p] * y1_[p] - current_a2_[p] * y2_[p];
+				if (std::abs(y) > 15.0f || std::isnan(y)) {
+					y = std::clamp(y, -15.0f, 15.0f);
+				}
 				y2_[p] = y1_[p];
 				y1_[p] = y;
 				sampleSum += y;
@@ -236,6 +272,9 @@ public:
 
 			// DC Blocker (eliminates envelope attack step click transients)
 			float dcBlockOut = sampleSum - dcBlockX_ + 0.995f * dcBlockY_;
+			if (std::isnan(dcBlockOut) || std::abs(dcBlockOut) > 50.0f) {
+				dcBlockOut = std::clamp(dcBlockOut, -50.0f, 50.0f);
+			}
 			dcBlockX_ = sampleSum;
 			dcBlockY_ = dcBlockOut;
 
@@ -261,6 +300,10 @@ public:
 private:
 	float y1_[6] = {0};
 	float y2_[6] = {0};
+	float current_b0_[6] = {0};
+	float current_a1_[6] = {0};
+	float current_a2_[6] = {0};
+	bool initializedCoeffs_ = false;
 	uint32_t lfsr_ = 0x12345678;
 	float bowPhase_ = 0.0f;
 	int32_t strikeCounter_ = 0;
