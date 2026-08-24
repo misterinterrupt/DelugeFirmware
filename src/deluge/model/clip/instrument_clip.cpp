@@ -810,7 +810,8 @@ void InstrumentClip::processCurrentPos(ModelStackWithTimelineCounter* modelStack
 
 skipDoingSumTo100:
 
-		// Go through each pending note-on
+		// Go through each pending note-on with sub-millisecond micro-staggering
+		uint32_t microStaggerSamples = 0;
 		for (int32_t i = 0; i < pendingNoteOnList.count; i++) {
 
 			bool conditionPassed;
@@ -900,7 +901,10 @@ doNewProbability:
 			}
 
 			if (conditionPassed) [[likely]] {
-				sendPendingNoteOn(modelStack, &pendingNoteOnList.pendingNoteOns[i]);
+				sendPendingNoteOn(modelStack, &pendingNoteOnList.pendingNoteOns[i], microStaggerSamples);
+				if (pendingNoteOnList.count > 1) {
+					microStaggerSamples += 4; // 4 samples offset (~90µs) per simultaneous note
+				}
 			}
 			else {
 				pendingNoteOnList.pendingNoteOns[i].noteRow->soundingStatus = STATUS_OFF;
@@ -913,7 +917,8 @@ doNewProbability:
 	}
 }
 
-void InstrumentClip::sendPendingNoteOn(ModelStackWithTimelineCounter* modelStack, PendingNoteOn* pendingNoteOn) {
+void InstrumentClip::sendPendingNoteOn(ModelStackWithTimelineCounter* modelStack, PendingNoteOn* pendingNoteOn,
+                                       uint32_t samplesLate) {
 
 	ModelStackWithNoteRow* modelStackWithNoteRow =
 	    modelStack->addNoteRow(pendingNoteOn->noteRowId, pendingNoteOn->noteRow);
@@ -927,7 +932,7 @@ void InstrumentClip::sendPendingNoteOn(ModelStackWithTimelineCounter* modelStack
 
 		pendingNoteOn->noteRow->drum->noteOn(modelStackWithThreeMainThings, pendingNoteOn->velocity, (Kit*)output,
 		                                     mpeValues, MIDI_CHANNEL_NONE, pendingNoteOn->sampleSyncLength,
-		                                     pendingNoteOn->ticksLate);
+		                                     pendingNoteOn->ticksLate, samplesLate);
 	}
 	else {
 		ModelStackWithThreeMainThings* modelStackWithThreeMainThings =
@@ -935,7 +940,7 @@ void InstrumentClip::sendPendingNoteOn(ModelStackWithTimelineCounter* modelStack
 		((MelodicInstrument*)output)
 		    ->sendNote(modelStackWithThreeMainThings, true, pendingNoteOn->noteRow->getNoteCode(), mpeValues,
 		               MIDI_CHANNEL_NONE, pendingNoteOn->velocity, pendingNoteOn->sampleSyncLength,
-		               pendingNoteOn->ticksLate);
+		               pendingNoteOn->ticksLate, samplesLate);
 	}
 }
 
