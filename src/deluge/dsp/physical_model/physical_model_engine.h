@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include "processing/engines/audio_engine.h"
 #include "util/functions.h"
 
 namespace deluge::dsp::physical_model {
@@ -172,6 +173,11 @@ public:
 			break;
 		}
 
+		// Dynamically scale max partials if CPU is under load to prevent underruns
+		if (AudioEngine::cpuDireness >= 4) {
+			numPartials = std::min(numPartials, 3);
+		}
+
 		// BLOCK-RATE COEFFICIENT PRE-COMPUTATION
 		float fs = 44100.0f;
 		float target_b0[6] = {0}, target_a1[6] = {0}, target_a2[6] = {0};
@@ -217,11 +223,14 @@ public:
 		int32_t ampNow = amplitude << 3;
 		int32_t ampInc = amplitudeIncrement << 3;
 
-		// Inner per-sample DSP loop
+		const float invFixed32 = 1.0f / 2147483648.0f;
+		const float invDuration = 1.0f / (100.0f + uPunch * 100.0f);
+
+		// Optimized inner per-sample DSP loop (no divisions, no branches, no isnan)
 		for (int i = 0; i < numSamples; i++) {
 			ampNow += ampInc;
 
-			// Exciter generator with Mallet Hardness, Exciter Color & Nonlinear Impact Drive
+			// Exciter generator
 			float exciter = 0.0f;
 			if (modelType == PhysicalModelType::BOWED_METAL) {
 				bowPhase_ += fundamentalHz / fs;
@@ -229,26 +238,25 @@ public:
 				float duty = std::clamp(0.5f + strikeHardness_ * 0.2f, 0.1f, 0.9f);
 				float stickSignal = (bowPhase_ < duty) ? 0.8f : -0.8f;
 				lfsr_ = lfsr_ * 1664525u + 1013904223u;
-				float noiseRaw = ((float)(int32_t)lfsr_ / 2147483648.0f);
+				float noiseRaw = ((float)(int32_t)lfsr_ * invFixed32);
 				exciterLPF_ += (noiseRaw - exciterLPF_) * noiseCutoff;
 				exciter = (stickSignal * punchGain) + (exciterLPF_ * punchGain * 0.4f);
 			}
 			else {
 				// Impulsive strike + color filtered noise burst
 				lfsr_ = lfsr_ * 1664525u + 1013904223u;
-				float noiseRaw = ((float)(int32_t)lfsr_ / 2147483648.0f);
+				float noiseRaw = ((float)(int32_t)lfsr_ * invFixed32);
 				exciterLPF_ += (noiseRaw - exciterLPF_) * noiseCutoff;
 
 				if (strikeCounter_ > 0) {
-					// Smooth half-sine mallet contact impulse curve
-					float envPhase = (float)(1000 - strikeCounter_) / (100.0f + uPunch * 100.0f);
+					float envPhase = (float)(1000 - strikeCounter_) * invDuration;
 					float strikeImpulse = 0.0f;
 					if (envPhase < 3.14159f) {
-						float sinePulse = std::sin(envPhase);
-						// Nonlinear mallet compression curve
-						strikeImpulse = (3.5f * sinePulse * punchGain * strikeHardness_) / (1.0f + 0.3f * punchGain * sinePulse);
+						// Parabolic sine approximation for half-sine pulse: 4*x*(pi-x)/(pi^2)
+						float sinePulse = envPhase * (3.14159f - envPhase) * 0.40528473f;
+						strikeImpulse = sinePulse * punchGain * strikeHardness_ * 2.5f;
 					}
-					float decayEnv = std::clamp((float)strikeCounter_ / 1000.0f, 0.0f, 1.0f);
+					float decayEnv = (float)strikeCounter_ * 0.001f;
 					float noiseBurst = exciterLPF_ * strikeHardness_ * (0.2f + punchGain * 0.8f) * decayEnv;
 					exciter = strikeImpulse + noiseBurst;
 					strikeCounter_--;
@@ -256,16 +264,14 @@ public:
 			}
 
 			if (fmInputBuffer) {
-				float fmSig = ((float)fmInputBuffer[i] / 2147483648.0f);
-				// Soft-saturate FM exciter input to prevent sharp impulse click spikes
-				fmSig = fmSig / (1.0f + 0.33f * std::abs(fmSig));
+				float fmSig = ((float)fmInputBuffer[i] * invFixed32);
+				fmSig = std::clamp(fmSig, -2.0f, 2.0f);
 				exciter += fmSig * 1.2f;
 			}
 
 			// Mix acoustic body recirculation feedback signal into exciter
 			if (recirculationGain > 0.001f) {
-				float fbSig = lastBodyOut_ * recirculationGain;
-				fbSig = fbSig / (1.0f + std::abs(fbSig)); // Soft-clamped feedback
+				float fbSig = std::clamp(lastBodyOut_ * recirculationGain, -0.9f, 0.9f);
 				exciter += fbSig;
 			}
 
@@ -277,26 +283,24 @@ public:
 				current_a2_[p] += step_a2[p];
 
 				float y = current_b0_[p] * exciter - current_a1_[p] * y1_[p] - current_a2_[p] * y2_[p];
-				if (std::abs(y) > 15.0f || std::isnan(y)) {
-					y = std::clamp(y, -15.0f, 15.0f);
-				}
+				y = std::clamp(y, -10.0f, 10.0f);
 				y2_[p] = y1_[p];
 				y1_[p] = y;
 				sampleSum += y;
 			}
 
-			// DC Blocker (eliminates envelope attack step click transients)
+			// DC Blocker
 			float dcBlockOut = sampleSum - dcBlockX_ + 0.995f * dcBlockY_;
-			if (std::isnan(dcBlockOut) || std::abs(dcBlockOut) > 50.0f) {
-				dcBlockOut = std::clamp(dcBlockOut, -50.0f, 50.0f);
-			}
+			dcBlockOut = std::clamp(dcBlockOut, -20.0f, 20.0f);
 			dcBlockX_ = sampleSum;
 			dcBlockY_ = dcBlockOut;
 
-			// Fast soft-clipping saturation
-			float x = dcBlockOut * 2.5f;
-			float sat = x * (27.0f + x * x) / (27.0f + 9.0f * x * x);
-			sat = std::clamp(sat, -1.0f, 1.0f);
+			// Fast cubic soft-clipping saturation
+			float x = std::clamp(dcBlockOut * 1.2f, -1.5f, 1.5f);
+			float sat;
+			if (x > 1.0f) sat = 1.0f;
+			else if (x < -1.0f) sat = -1.0f;
+			else sat = x * (1.5f - 0.5f * x * x);
 
 			if (attackFade_ < 1.0f) {
 				sat *= attackFade_;
