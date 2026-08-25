@@ -41,22 +41,56 @@ public:
 
 	void drawValue() override {
 		if (soundEditor.currentSource && soundEditor.currentSource->oscType == OscType::PHYSICAL_MODEL) {
-			uint32_t unsignedIndex = (uint32_t)(this->getValue() + 1073741824);
-			int32_t idx = std::clamp<int32_t>((int32_t)(unsignedIndex / (2147483648u / 6)), 0, 5);
-			static const char* oledNames[6] = {
-			    "MEMBRANE", "WOOD BLOCK", "BOWED METAL", "REAL CYMBAL", "DIGITAL CYMBAL", "STRING"};
+			int32_t rawVal = soundEditor.currentParamManager->getPatchedParamSet()->getValue(getP());
+			uint32_t unsignedIndex = (uint32_t)rawVal + 2147483648u;
+			int32_t idx = std::clamp<int32_t>((int32_t)(unsignedIndex / (4294967295u / 6)), 0, 5);
 			static const char* segNames[6] = {
 			    "MEMB", "WOOD", "BOWD", "CYMB", "DIGI", "STRG"};
 
-			if (display->haveOLED()) {
-				display->setText(oledNames[idx]);
-			}
 			if (display->have7SEG()) {
 				display->setText(segNames[idx]);
 			}
 			return;
 		}
 		menu_item::source::PatchedParam::drawValue();
+	}
+
+	void drawPixelsForOled() override {
+		if (soundEditor.currentSource && soundEditor.currentSource->oscType == OscType::PHYSICAL_MODEL) {
+			int32_t rawVal = soundEditor.currentParamManager->getPatchedParamSet()->getValue(getP());
+			uint32_t unsignedIndex = (uint32_t)rawVal + 2147483648u;
+			int32_t idx = std::clamp<int32_t>((int32_t)(unsignedIndex / (4294967295u / 6)), 0, 5);
+			
+			static const char* oledNames[6] = {
+			    "MEMBRANE", "WOOD BLOCK", "BOWED METAL", "REAL CYMBAL", "DIGITAL CYMBAL", "STRING"};
+			
+			deluge::hid::display::OLED::main.drawStringCentred(oledNames[idx], 18 + OLED_MAIN_TOPMOST_PIXEL, kTextBigSpacingX, kTextBigSizeY);
+			return;
+		}
+		menu_item::source::PatchedParam::drawPixelsForOled();
+	}
+
+	void selectEncoderAction(int32_t offset) override {
+		if (soundEditor.currentSource && soundEditor.currentSource->oscType == OscType::PHYSICAL_MODEL) {
+			int32_t rawVal = soundEditor.currentParamManager->getPatchedParamSet()->getValue(getP());
+			uint32_t unsignedIndex = (uint32_t)rawVal + 2147483648u;
+			int32_t idx = std::clamp<int32_t>((int32_t)(unsignedIndex / (4294967295u / 6)), 0, 5);
+			
+			idx += offset;
+			idx = std::clamp<int32_t>(idx, 0, 5);
+			
+			// Map to center of segment
+			uint32_t newUnsigned = (idx * (4294967295u / 6)) + ((4294967295u / 6) / 2);
+			int32_t newRaw = (int32_t)(newUnsigned - 2147483648u);
+			
+			char modelStackMemory[MODEL_STACK_MAX_SIZE];
+			ModelStackWithAutoParam* modelStack = getModelStack(modelStackMemory);
+			modelStack->autoParam->setCurrentValueInResponseToUserInput(newRaw, modelStack);
+			
+			readCurrentValue();
+			return;
+		}
+		menu_item::source::PatchedParam::selectEncoderAction(offset);
 	}
 };
 } // namespace deluge::gui::menu_item::osc::source

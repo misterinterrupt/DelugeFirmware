@@ -1085,15 +1085,20 @@ skipAutoRelease: {}
 	uint32_t oscSyncPos[kMaxNumVoicesUnison];
 	bool doingOscSync = sound->renderingOscillatorSyncCurrently(paramManager);
 
+	int32_t numUnisonToRender = sound->numUnison;
+	if (sound->sources[0].oscType == OscType::PHYSICAL_MODEL || sound->sources[1].oscType == OscType::PHYSICAL_MODEL) {
+		numUnisonToRender = 1;
+	}
+
 	// Oscillator sync
 	if (doingOscSync) {
-		for (int32_t u = 0; u < sound->numUnison; u++) {
+		for (int32_t u = 0; u < numUnisonToRender; u++) {
 			oscSyncPos[u] = unisonParts[u].sources[0].oscPos;
 		}
 	}
 
 	// whether stereo unison actually is active. if stereo is being vetoed from higher up, don't do it.
-	bool stereoUnison = sound->unisonStereoSpread && sound->numUnison > 1 && soundRenderingInStereo;
+	bool stereoUnison = sound->unisonStereoSpread && numUnisonToRender > 1 && soundRenderingInStereo;
 
 	int32_t* oscBuffer;
 	bool anythingInOscBuffer = false;
@@ -1250,7 +1255,7 @@ skipAutoRelease: {}
 		}
 
 		// For each unison part
-		for (int32_t u = 0; u < sound->numUnison; u++) {
+		for (int32_t u = 0; u < numUnisonToRender; u++) {
 
 			int32_t unisonAmplitudeL, unisonAmplitudeR;
 			shouldDoPanning((stereoUnison ? sound->unisonPan[u] : 0), &unisonAmplitudeL, &unisonAmplitudeR);
@@ -2940,8 +2945,8 @@ doSine:
 	}
 
 	else if (type == OscType::PHYSICAL_MODEL) {
-		uint32_t unsignedIndex = (uint32_t)(sourceWaveIndexesLastTime[s] + 1073741824);
-		int32_t modelIdx = std::clamp<int32_t>((int32_t)(unsignedIndex / (2147483648u / 6)), 0, 5);
+		uint32_t unsignedIndex = (uint32_t)sourceWaveIndexesLastTime[s] + 2147483648u;
+		int32_t modelIdx = std::clamp<int32_t>((int32_t)(unsignedIndex / (4294967295u / 6)), 0, 5);
 		auto modelType = static_cast<dsp::physical_model::PhysicalModelType>(modelIdx);
 		int32_t feedbackVal = paramFinalValues[params::LOCAL_CARRIER_0_FEEDBACK + s];
 		int32_t dampingVal = paramFinalValues[params::LOCAL_MODULATOR_0_FEEDBACK + s];
