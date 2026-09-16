@@ -2040,18 +2040,20 @@ void View::drawOutputNameFromDetails(OutputType outputType, int32_t channel, int
 				canvas.drawStringAlignRight(drumNameText, topY, kTextSpacingX, kTextSpacingY, OLED_MAIN_WIDTH_PIXELS - 2);
 			}
 
-			// 2. Lower Screen Region: Waveform Summary (Y = 18 to 60)
+			// 2. Lower Screen Region: Waveform Summary
+#if OLED_MAIN_HEIGHT_PIXELS == 64
 			int32_t yMin = OLED_MAIN_TOPMOST_PIXEL + 18;
 			int32_t yMax = OLED_MAIN_TOPMOST_PIXEL + 60;
+#else
+			int32_t yMin = OLED_MAIN_TOPMOST_PIXEL + 12;
+			int32_t yMax = OLED_MAIN_HEIGHT_PIXELS - 2;
+#endif
 			int32_t yCenter = (yMin + yMax) / 2;
 			int32_t halfHeight = (yMax - yMin) / 2;
 
 			int32_t waveXMin = 4;
 			int32_t waveXMax = OLED_MAIN_WIDTH_PIXELS - 5;
 			int32_t waveWidth = waveXMax - waveXMin + 1;
-
-			// Draw subtle baseline
-			canvas.drawHorizontalLine(yCenter, waveXMin, waveXMax);
 
 			if (drumSample && drumSample->clusters.getNumElements() > 0 && drumSample->lengthInSamples > 0) {
 				uint64_t totalSamples = drumSample->lengthInSamples;
@@ -2100,11 +2102,10 @@ void View::drawOutputNameFromDetails(OutputType outputType, int32_t channel, int
 							cEndByte = audioFileManager.clusterSize;
 						}
 
-						int32_t alignOffset = drumSample->byteDepth - 4;
-						int32_t bytePos = cStartByte + alignOffset;
-						int32_t byteEndPos = cEndByte + alignOffset;
+						int32_t bytePos = cStartByte;
+						int32_t byteEndPos = cEndByte - drumSample->byteDepth;
 
-						int32_t maxByteLimit = audioFileManager.clusterSize + alignOffset;
+						int32_t maxByteLimit = audioFileManager.clusterSize - drumSample->byteDepth;
 						if (byteEndPos > maxByteLimit) byteEndPos = maxByteLimit;
 
 						int32_t numSamplesInSpan = (cEndByte - cStartByte) / drumSample->byteDepth;
@@ -2116,10 +2117,23 @@ void View::drawOutputNameFromDetails(OutputType outputType, int32_t channel, int
 							byteInc *= step;
 						}
 
-						while (bytePos < byteEndPos) {
-							if (bytePos >= 0 && (bytePos + 4) <= maxByteLimit) {
-								int32_t sample32 = *(int32_t*)&cl->data[bytePos];
-								int32_t sample8 = sample32 >> 24;
+						while (bytePos <= byteEndPos) {
+							if (bytePos >= 0) {
+								int32_t sample8 = 0;
+								if (drumSample->byteDepth == 2) {
+									int16_t val16 = *(int16_t const*)&cl->data[bytePos];
+									sample8 = val16 >> 8;
+								}
+								else if (drumSample->byteDepth == 4) {
+									int32_t val32 = *(int32_t const*)&cl->data[bytePos];
+									sample8 = val32 >> 24;
+								}
+								else if (drumSample->byteDepth == 3) {
+									int32_t val32 = (int32_t)((uint8_t)cl->data[bytePos] | ((uint8_t)cl->data[bytePos + 1] << 8)
+									                          | ((int8_t)cl->data[bytePos + 2] << 16));
+									sample8 = val32 >> 16;
+								}
+
 								if (sample8 < minVal8) minVal8 = sample8;
 								if (sample8 > maxVal8) maxVal8 = sample8;
 							}
@@ -2128,8 +2142,13 @@ void View::drawOutputNameFromDetails(OutputType outputType, int32_t channel, int
 					}
 
 					if (minVal8 > maxVal8) {
-						minVal8 = -4;
-						maxVal8 = 4;
+						continue;
+					}
+
+					// Skip drawing for signals below noise floor (~-28 dBFS / 5 units out of 128)
+					constexpr int32_t kNoiseCutoff = 5;
+					if (std::abs(maxVal8) < kNoiseCutoff && std::abs(minVal8) < kNoiseCutoff) {
+						continue;
 					}
 
 					int32_t lineTopY = yCenter - (maxVal8 * halfHeight / 128);
@@ -2138,11 +2157,6 @@ void View::drawOutputNameFromDetails(OutputType outputType, int32_t channel, int
 					lineTopY = std::clamp(lineTopY, yMin, yMax);
 					lineBottomY = std::clamp(lineBottomY, yMin, yMax);
 					if (lineTopY > lineBottomY) std::swap(lineTopY, lineBottomY);
-
-					if (lineTopY == lineBottomY) {
-						if (lineTopY > yMin) lineTopY--;
-						else if (lineBottomY < yMax) lineBottomY++;
-					}
 
 					canvas.drawVerticalLine(waveXMin + col, lineTopY, lineBottomY);
 				}
