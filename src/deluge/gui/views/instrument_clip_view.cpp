@@ -3526,6 +3526,9 @@ void InstrumentClipView::setSelectedDrum(Drum* drum, bool shouldRedrawStuff, Kit
 
 			kit->selectedDrum = drum;
 			drumSelectionChanged = true;
+			if (display->haveOLED()) {
+				view.displayOutputName(kit, false, clip);
+			}
 		}
 	}
 
@@ -4152,7 +4155,7 @@ void InstrumentClipView::drawDrumName(Drum* drum, bool justPopUp) {
 	getDrumName(drum, drumName);
 
 	if (display->haveOLED()) {
-		display->popupText(drumName.c_str());
+		// Popup text overlay disabled for OLED as drum name is displayed in the header line
 	}
 	else {
 		bool andAHalf;

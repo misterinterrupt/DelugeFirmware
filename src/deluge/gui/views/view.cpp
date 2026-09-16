@@ -60,14 +60,21 @@
 #include "model/clip/instrument_clip_minder.h"
 #include "model/consequence/consequence.h"
 #include "model/drum/drum.h"
+#include "model/drum/gate_drum.h"
+#include "model/drum/midi_drum.h"
 #include "model/instrument/instrument.h"
 #include "model/instrument/kit.h"
 #include "model/instrument/melodic_instrument.h"
 #include "model/instrument/midi_instrument.h"
 #include "model/model_stack.h"
 #include "model/note/note_row.h"
+#include "model/sample/sample.h"
+#include "model/sample/sample_cluster.h"
 #include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
+#include "storage/audio/audio_file_manager.h"
+#include "storage/cluster/cluster.h"
+#include "storage/multi_range/multisample_range.h"
 #include "model/timeline_counter.h"
 #include "modulation/automation/auto_param.h"
 #include "modulation/params/param.h"
@@ -1974,6 +1981,174 @@ void View::drawOutputNameFromDetails(OutputType outputType, int32_t channel, int
 	if (display->haveOLED()) {
 		deluge::hid::display::oled_canvas::Canvas& canvas = hid::display::OLED::main;
 		hid::display::OLED::clearMainImage();
+
+		if (outputType == OutputType::KIT) {
+			Kit* kit = nullptr;
+			if (clip && clip->output && clip->output->type == OutputType::KIT) {
+				kit = static_cast<Kit*>(clip->output);
+			}
+			else if (currentSong && currentSong->getCurrentClip() && currentSong->getCurrentClip()->output
+			         && currentSong->getCurrentClip()->output->type == OutputType::KIT) {
+				kit = static_cast<Kit*>(currentSong->getCurrentClip()->output);
+			}
+
+			char const* kitNameText = (!isNameEmpty && name) ? name : "";
+
+			DEF_STACK_STRING_BUF(drumNameBuf, 50);
+			char const* drumNameText = "";
+			Sample* drumSample = nullptr;
+
+			if (kit && kit->selectedDrum) {
+				Drum* drum = kit->selectedDrum;
+				if (drum->type == DrumType::SOUND) {
+					SoundDrum* sd = static_cast<SoundDrum*>(drum);
+					if (!sd->name.isEmpty()) {
+						drumNameText = sd->name.get();
+					}
+					for (int32_t s = 0; s < kNumSources; s++) {
+						if (sd->sources[s].ranges.getNumElements() > 0) {
+							MultisampleRange* range = static_cast<MultisampleRange*>(sd->sources[s].ranges.getElement(0));
+							if (range && range->getAudioFileHolder() && range->getAudioFileHolder()->audioFile) {
+								drumSample = static_cast<Sample*>(range->getAudioFileHolder()->audioFile);
+								break;
+							}
+						}
+					}
+				}
+				else if (drum->type == DrumType::GATE) {
+					drumNameBuf.append("GATE ");
+					drumNameBuf.appendInt(((GateDrum*)drum)->channel + 1);
+					drumNameText = drumNameBuf.c_str();
+				}
+				else if (drum->type == DrumType::MIDI) {
+					drumNameBuf.append("MIDI CH");
+					drumNameBuf.appendInt(((MIDIDrum*)drum)->channel + 1);
+					drumNameText = drumNameBuf.c_str();
+				}
+			}
+
+			// 1. Top Header Line: Left-justified Kit name, Right-justified Drum name
+			int32_t topY = OLED_MAIN_TOPMOST_PIXEL + 3;
+
+			// Draw Kit name left-justified at X = 2
+			if (kitNameText[0] != '\0') {
+				canvas.drawString(kitNameText, 2, topY, kTextSpacingX, kTextSpacingY);
+			}
+
+			// Draw Drum name right-justified at X = OLED_MAIN_WIDTH_PIXELS - 2
+			if (drumNameText[0] != '\0') {
+				canvas.drawStringAlignRight(drumNameText, topY, kTextSpacingX, kTextSpacingY, OLED_MAIN_WIDTH_PIXELS - 2);
+			}
+
+			// 2. Lower Screen Region: Waveform Summary (Y = 18 to 60)
+			int32_t yMin = OLED_MAIN_TOPMOST_PIXEL + 18;
+			int32_t yMax = OLED_MAIN_TOPMOST_PIXEL + 60;
+			int32_t yCenter = (yMin + yMax) / 2;
+			int32_t halfHeight = (yMax - yMin) / 2;
+
+			int32_t waveXMin = 4;
+			int32_t waveXMax = OLED_MAIN_WIDTH_PIXELS - 5;
+			int32_t waveWidth = waveXMax - waveXMin + 1;
+
+			// Draw subtle baseline
+			canvas.drawHorizontalLine(yCenter, waveXMin, waveXMax);
+
+			if (drumSample && drumSample->clusters.getNumElements() > 0 && drumSample->lengthInSamples > 0) {
+				uint64_t totalSamples = drumSample->lengthInSamples;
+				int32_t totalClusters = drumSample->clusters.getNumElements();
+				int32_t bytesPerSampleFrame = drumSample->numChannels * drumSample->byteDepth;
+
+				for (int32_t col = 0; col < waveWidth; col++) {
+					uint32_t colStartSample = (uint64_t)col * totalSamples / waveWidth;
+					uint32_t colEndSample = (uint64_t)(col + 1) * totalSamples / waveWidth;
+					if (colEndSample <= colStartSample) {
+						colEndSample = colStartSample + 1;
+					}
+					if (colEndSample > totalSamples) {
+						colEndSample = totalSamples;
+					}
+
+					int32_t colStartByte = colStartSample * bytesPerSampleFrame + drumSample->audioDataStartPosBytes;
+					int32_t colEndByte = colEndSample * bytesPerSampleFrame + drumSample->audioDataStartPosBytes;
+
+					int32_t colStartCluster = colStartByte >> audioFileManager.clusterSizeMagnitude;
+					int32_t colEndCluster = colEndByte >> audioFileManager.clusterSizeMagnitude;
+
+					int32_t minVal8 = 127;
+					int32_t maxVal8 = -128;
+
+					int32_t startClusterIdx = std::clamp<int32_t>(colStartCluster, 0, totalClusters - 1);
+					int32_t endClusterIdx = std::clamp<int32_t>(colEndCluster, 0, totalClusters - 1);
+
+					for (int32_t c = startClusterIdx; c <= endClusterIdx; c++) {
+						SampleCluster* sc = drumSample->clusters.getElement(c);
+						if (!sc) continue;
+
+						if (sc->investigatedWholeLength && (endClusterIdx > startClusterIdx)) {
+							if (sc->minValue < minVal8) minVal8 = sc->minValue;
+							if (sc->maxValue > maxVal8) maxVal8 = sc->maxValue;
+							continue;
+						}
+
+						Cluster* cl = sc->getCluster(drumSample, c, CLUSTER_LOAD_IMMEDIATELY);
+						if (!cl || !cl->loaded || !cl->data) continue;
+
+						int32_t cStartByte = (c == colStartCluster) ? (colStartByte & (audioFileManager.clusterSize - 1)) : 0;
+						int32_t cEndByte =
+						    (c == colEndCluster) ? (colEndByte & (audioFileManager.clusterSize - 1)) : audioFileManager.clusterSize;
+						if (cEndByte == 0 && c == colEndCluster && c > colStartCluster) {
+							cEndByte = audioFileManager.clusterSize;
+						}
+
+						int32_t alignOffset = drumSample->byteDepth - 4;
+						int32_t bytePos = cStartByte + alignOffset;
+						int32_t byteEndPos = cEndByte + alignOffset;
+
+						int32_t maxByteLimit = audioFileManager.clusterSize + alignOffset;
+						if (byteEndPos > maxByteLimit) byteEndPos = maxByteLimit;
+
+						int32_t numSamplesInSpan = (cEndByte - cStartByte) / drumSample->byteDepth;
+						int32_t byteInc = drumSample->byteDepth;
+
+						if (numSamplesInSpan > 64) {
+							int32_t step = numSamplesInSpan / 64;
+							if (drumSample->numChannels == 2 && !(step & 1)) step++;
+							byteInc *= step;
+						}
+
+						while (bytePos < byteEndPos) {
+							if (bytePos >= 0 && (bytePos + 4) <= maxByteLimit) {
+								int32_t sample32 = *(int32_t*)&cl->data[bytePos];
+								int32_t sample8 = sample32 >> 24;
+								if (sample8 < minVal8) minVal8 = sample8;
+								if (sample8 > maxVal8) maxVal8 = sample8;
+							}
+							bytePos += byteInc;
+						}
+					}
+
+					if (minVal8 > maxVal8) {
+						minVal8 = -4;
+						maxVal8 = 4;
+					}
+
+					int32_t lineTopY = yCenter - (maxVal8 * halfHeight / 128);
+					int32_t lineBottomY = yCenter - (minVal8 * halfHeight / 128);
+
+					lineTopY = std::clamp(lineTopY, yMin, yMax);
+					lineBottomY = std::clamp(lineBottomY, yMin, yMax);
+					if (lineTopY > lineBottomY) std::swap(lineTopY, lineBottomY);
+
+					if (lineTopY == lineBottomY) {
+						if (lineTopY > yMin) lineTopY--;
+						else if (lineBottomY < yMax) lineBottomY++;
+					}
+
+					canvas.drawVerticalLine(waveXMin + col, lineTopY, lineBottomY);
+				}
+			}
+			return;
+		}
 
 		char const* outputTypeText = getOutputTypeName(outputType, channel);
 
