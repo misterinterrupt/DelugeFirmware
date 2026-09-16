@@ -68,6 +68,8 @@ StemExport::StemExport() {
 	exportToSilence = true;
 	includeSongFX = false;
 	renderOffline = true;
+	exportOnlyUnmuted = false;
+	numLoopsToExport = 0;
 
 	timePlaybackStopped = 0xFFFFFFFF;
 	timeThereWasLastSomeActivity = 0xFFFFFFFF;
@@ -267,7 +269,8 @@ int32_t StemExport::disarmAllInstrumentsForStemExport() {
 				    3) the output type is not MIDI or CV
 				*/
 				OutputType outputType = output->type;
-				if (!output->mutedInArrangementMode && !output->isEmpty(false) && outputType != OutputType::MIDI_OUT
+				bool isMuted = output->mutedInArrangementMode;
+				if (!isMuted && !output->isEmpty(false) && outputType != OutputType::MIDI_OUT
 				    && outputType != OutputType::CV) {
 					output->exportStem = true;
 					totalNumStemsToExport++;
@@ -366,7 +369,8 @@ int32_t StemExport::disarmAllClipsForStemExport() {
 				    2) the output type is not MIDI or CV
 				*/
 				OutputType outputType = clip->output->type;
-				if (!clip->isEmpty(false) && outputType != OutputType::MIDI_OUT && outputType != OutputType::CV) {
+				bool isMuted = !clip->activeIfNoSolo;
+				if (!clip->isEmpty(false) && outputType != OutputType::MIDI_OUT && outputType != OutputType::CV && (!exportOnlyUnmuted || !isMuted)) {
 					clip->exportStem = true;
 					totalNumStemsToExport++;
 				}
@@ -432,6 +436,22 @@ bool StemExport::writeLoopEndPos() {
 	return false;
 }
 
+namespace {
+	uint64_t stem_export_gcd(uint64_t a, uint64_t b) {
+		while (b != 0) {
+			uint64_t temp = b;
+			b = a % b;
+			a = temp;
+		}
+		return a;
+	}
+
+	uint64_t stem_export_lcm(uint64_t a, uint64_t b) {
+		if (a == 0 || b == 0) return 0;
+		return (a / stem_export_gcd(a, b)) * b;
+	}
+}
+
 /// iterates through all clips, arming one clip at a time for recording
 /// simulates the button combo action of pressing record + play twice to enable resample
 /// and stop recording at the end of the clip's loop length
@@ -440,12 +460,40 @@ int32_t StemExport::exportClipStems(StemExportType stemExportType) {
 	int32_t totalNumClips = disarmAllClipsForStemExport();
 
 	if (totalNumClips) {
+		uint64_t globalLcm = 1;
+
+		if (numLoopsToExport > 0) {
+			// Calculate the LCM of all exported clips to reach the "1" for all loops
+			for (int32_t idxClip = 0; idxClip < totalNumClips; ++idxClip) {
+				Clip* clip = currentSong->sessionClips.getClipAtIndex(idxClip);
+				if (clip && clip->exportStem) {
+					if (clip->loopLength > 0) {
+						globalLcm = stem_export_lcm(globalLcm, clip->loopLength);
+					}
+					if (clip->type == ClipType::INSTRUMENT) {
+						InstrumentClip* instrumentClip = (InstrumentClip*)clip;
+						int32_t totalNumNoteRows = instrumentClip->noteRows.getNumElements();
+						for (int32_t idxNoteRow = 0; idxNoteRow < totalNumNoteRows; ++idxNoteRow) {
+							NoteRow* thisNoteRow = instrumentClip->noteRows.getElement(idxNoteRow);
+							if (thisNoteRow && !thisNoteRow->hasNoNotes() && thisNoteRow->loopLengthIfIndependent > 0) {
+								globalLcm = stem_export_lcm(globalLcm, thisNoteRow->loopLengthIfIndependent);
+							}
+						}
+					}
+				}
+			}
+		}
+
 		// now we're going to iterate through all clips to find the ones that should be exported
 		for (int32_t idxClip = totalNumClips - 1; idxClip >= 0; --idxClip) {
 			Clip* clip = currentSong->sessionClips.getClipAtIndex(idxClip);
 			if (clip) {
-				getLoopLengthOfLongestNotEmptyNoteRow(clip);
-				getLoopEndPointInSamplesForAudioFile(clip->loopLength);
+				if (numLoopsToExport > 0) {
+					loopLengthToStopStemExport = (int32_t)(globalLcm * numLoopsToExport);
+				} else {
+					getLoopLengthOfLongestNotEmptyNoteRow(clip);
+				}
+				getLoopEndPointInSamplesForAudioFile(loopLengthToStopStemExport);
 
 				bool started = startCurrentStemExport(stemExportType, clip->output, clip->activeIfNoSolo, idxClip,
 				                                      clip->exportStem);

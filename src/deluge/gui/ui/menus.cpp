@@ -1223,12 +1223,30 @@ ToggleBool configureSongFXMenu{STRING_FOR_CONFIGURE_EXPORT_STEMS_SONGFX, STRING_
                                stemExport.includeSongFX};
 ToggleBool configureOfflineRenderingMenu{STRING_FOR_CONFIGURE_EXPORT_STEMS_OFFLINE_RENDERING,
                                          STRING_FOR_CONFIGURE_EXPORT_STEMS_OFFLINE_RENDERING, stemExport.renderOffline};
+ToggleBool configureOnlyUnmutedMenu{STRING_FOR_CONFIGURE_EXPORT_STEMS_ONLY_UNMUTED,
+                                     STRING_FOR_CONFIGURE_EXPORT_STEMS_ONLY_UNMUTED, stemExport.exportOnlyUnmuted};
+
+class StemExportLoops final : public menu_item::Integer {
+public:
+	StemExportLoops() : Integer(STRING_FOR_CONFIGURE_EXPORT_STEMS_LOOPS, STRING_FOR_CONFIGURE_EXPORT_STEMS_LOOPS) {}
+
+	void readCurrentValue() override { this->setValue(stemExport.numLoopsToExport); }
+	void writeCurrentValue() override { stemExport.numLoopsToExport = this->getValue(); }
+
+protected:
+	[[nodiscard]] int32_t getMaxValue() const override { return 999; }
+	[[nodiscard]] int32_t getMinValue() const override { return 0; }
+};
+StemExportLoops configureLoopsMenu{};
+
 menu_item::Submenu configureStemExportMenu{STRING_FOR_CONFIGURE_EXPORT_STEMS,
                                            {
                                                &configureNormalizationMenu,
                                                &configureSilenceMenu,
                                                &configureSongFXMenu,
                                                &configureOfflineRenderingMenu,
+                                               &configureOnlyUnmutedMenu,
+                                               &configureLoopsMenu,
                                            }};
 
 menu_item::Submenu stemExportMenu{

@@ -47,6 +47,8 @@ public:
 	bool exportToSilence;
 	bool includeSongFX;
 	bool renderOffline;
+	bool exportOnlyUnmuted;
+	int32_t numLoopsToExport;
 
 	// export instruments
 	int32_t disarmAllInstrumentsForStemExport();
