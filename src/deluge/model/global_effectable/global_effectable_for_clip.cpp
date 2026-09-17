@@ -112,6 +112,10 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 	}
 	q31_t compThreshold = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
 	compressor.setThreshold(compThreshold);
+	compressor.setRatio(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RATIO));
+	compressor.setAttack(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_ATTACK));
+	compressor.setRelease(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RELEASE));
+	compressor.setBlend(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_BLEND));
 	StereoSample globalEffectableBuffer[SSI_TX_BUFFER_NUM_SAMPLES] __attribute__((aligned(CACHE_LINE_SIZE)));
 
 	memset(globalEffectableBuffer, 0, sizeof(StereoSample) * numSamples);

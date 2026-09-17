@@ -115,12 +115,53 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 	else if (whichModButton == 5) {
 		displayModFXSettings(on);
 	}
+	// Stutter / Custom 1
+	else if (whichModButton == 6) {
+		if (on) {
+			custom1Shifted = Buttons::isShiftButtonPressed();
+			if (display->haveOLED()) {
+				if (custom1Shifted) {
+					display->popupText("Compressor:\nAttack / Release");
+				}
+				else {
+					display->popupText("Compressor:\nThreshold / Ratio");
+				}
+			}
+			else {
+				if (custom1Shifted) {
+					display->displayPopup("AT.RL");
+				}
+				else {
+					display->displayPopup("TH.RA");
+				}
+			}
+		}
+	}
+	// Custom 2 / Custom 3
+	else if (whichModButton == 7 || whichModButton == 2) {
+		if (on) {
+			custom3Shifted = Buttons::isShiftButtonPressed();
+			if (display->haveOLED()) {
+				if (custom3Shifted) {
+					display->popupText("Comp & Sidechain:\nBlend / Sidechain Shape");
+				}
+				else {
+					display->popupText("Comp & Sidechain:\nBlend / Sidechain Vol");
+				}
+			}
+			else {
+				if (custom3Shifted) {
+					display->displayPopup("BL.SS");
+				}
+				else {
+					display->displayPopup("BL.SV");
+				}
+			}
+		}
+	}
 	// Other Mod Buttons
 	else {
-		// Env Attack / Release not relevant for global effectable context
-		if (whichModButton != 2) {
-			displayOtherModKnobSettings(whichModButton, on);
-		}
+		displayOtherModKnobSettings(whichModButton, on);
 	}
 }
 
@@ -707,17 +748,40 @@ int32_t GlobalEffectable::getParameterFromKnob(int32_t whichModEncoder) {
 			}
 		}
 	}
-	else if (modKnobMode == 6) {
-		if (whichModEncoder != 0) {
-			return params::UNPATCHED_STUTTER_RATE;
-		}
-	}
-	else if (modKnobMode == 7) {
-		if (whichModEncoder != 0) {
-			return params::UNPATCHED_SAMPLE_RATE_REDUCTION;
+	else if (modKnobMode == 6) { // Stutter / Custom 1
+		if (custom1Shifted) {
+			if (whichModEncoder != 0) {
+				return params::UNPATCHED_COMPRESSOR_RELEASE;
+			}
+			else {
+				return params::UNPATCHED_COMPRESSOR_ATTACK;
+			}
 		}
 		else {
-			return params::UNPATCHED_BITCRUSHING;
+			if (whichModEncoder != 0) {
+				return params::UNPATCHED_COMPRESSOR_RATIO;
+			}
+			else {
+				return params::UNPATCHED_COMPRESSOR_THRESHOLD;
+			}
+		}
+	}
+	else if (modKnobMode == 7 || modKnobMode == 2) { // Custom 2 / Custom 3
+		if (custom3Shifted) {
+			if (whichModEncoder != 0) {
+				return params::UNPATCHED_SIDECHAIN_SHAPE;
+			}
+			else {
+				return params::UNPATCHED_COMPRESSOR_BLEND;
+			}
+		}
+		else {
+			if (whichModEncoder != 0) {
+				return params::UNPATCHED_SIDECHAIN_VOLUME;
+			}
+			else {
+				return params::UNPATCHED_COMPRESSOR_BLEND;
+			}
 		}
 	}
 	return 255;

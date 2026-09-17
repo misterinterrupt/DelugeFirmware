@@ -126,6 +126,8 @@ public:
 	LFO modFXLFO;
 
 	RMSFeedbackCompressor compressor;
+	bool custom1Shifted = false;
+	bool custom3Shifted = false;
 
 	// Grain
 	int32_t wrapsToShutdown;

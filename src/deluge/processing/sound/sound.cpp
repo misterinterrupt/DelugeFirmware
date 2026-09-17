@@ -2415,6 +2415,10 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 
 	q31_t compThreshold = paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
 	compressor.setThreshold(compThreshold);
+	compressor.setRatio(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_RATIO));
+	compressor.setAttack(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_ATTACK));
+	compressor.setRelease(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_RELEASE));
+	compressor.setBlend(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_BLEND));
 	if (compThreshold > 0) {
 		compressor.renderVolNeutral((StereoSample*)soundBuffer, numSamples, postFXVolume);
 	}
@@ -4236,10 +4240,47 @@ void Sound::modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTime
 	         && ourModKnobBottom->paramDescriptor.isSetToParamWithNoSource(params::GLOBAL_DELAY_FEEDBACK)) {
 		displayDelaySettings(on);
 	}
-	else if ((ourModKnobTop->paramDescriptor.hasJustOneSource()
-	          && ourModKnobTop->paramDescriptor.getTopLevelSource() == PatchSource::SIDECHAIN)
-	         && ourModKnobBottom->paramDescriptor.isSetToParamWithNoSource(params::GLOBAL_REVERB_AMOUNT)) {
-		displaySidechainAndReverbSettings(on);
+	else if (whichModButton == 6) {
+		if (on) {
+			custom1Shifted = Buttons::isShiftButtonPressed();
+			if (display->haveOLED()) {
+				if (custom1Shifted) {
+					display->popupText("Compressor:\nAttack / Release");
+				}
+				else {
+					display->popupText("Compressor:\nThreshold / Ratio");
+				}
+			}
+			else {
+				if (custom1Shifted) {
+					display->displayPopup("AT.RL");
+				}
+				else {
+					display->displayPopup("TH.RA");
+				}
+			}
+		}
+	}
+	else if (whichModButton == 7 || whichModButton == 2) {
+		if (on) {
+			custom3Shifted = Buttons::isShiftButtonPressed();
+			if (display->haveOLED()) {
+				if (custom3Shifted) {
+					display->popupText("Comp & Sidechain:\nBlend / Sidechain Shape");
+				}
+				else {
+					display->popupText("Comp & Sidechain:\nBlend / Sidechain Vol");
+				}
+			}
+			else {
+				if (custom3Shifted) {
+					display->displayPopup("BL.SS");
+				}
+				else {
+					display->displayPopup("BL.SV");
+				}
+			}
+		}
 	}
 	else {
 		displayOtherModKnobSettings(whichModButton, on);
@@ -4267,6 +4308,25 @@ ModelStackWithAutoParam* Sound::getParamFromModEncoderDeeper(int32_t whichModEnc
 	ParamManagerForTimeline* paramManager = (ParamManagerForTimeline*)modelStack->paramManager;
 
 	int32_t modKnobMode = *getModKnobMode();
+
+	if (modKnobMode == 6) {
+		paramId = custom1Shifted
+		              ? (whichModEncoder == 0 ? params::UNPATCHED_COMPRESSOR_ATTACK : params::UNPATCHED_COMPRESSOR_RELEASE)
+		              : (whichModEncoder == 0 ? params::UNPATCHED_COMPRESSOR_THRESHOLD : params::UNPATCHED_COMPRESSOR_RATIO);
+		summary = paramManager->getUnpatchedParamSetSummary();
+		ModelStackWithParamId* newModelStack1 =
+		    modelStack->addParamCollectionAndId(summary->paramCollection, summary, paramId);
+		return newModelStack1->paramCollection->getAutoParamFromId(newModelStack1, allowCreation);
+	}
+	if (modKnobMode == 7 || modKnobMode == 2) {
+		paramId = custom3Shifted
+		              ? (whichModEncoder == 0 ? (int32_t)params::UNPATCHED_COMPRESSOR_BLEND : (int32_t)params::UNPATCHED_SIDECHAIN_SHAPE)
+		              : (whichModEncoder == 0 ? (int32_t)params::UNPATCHED_COMPRESSOR_BLEND : (int32_t)params::UNPATCHED_SIDECHAIN_VOLUME);
+		summary = paramManager->getUnpatchedParamSetSummary();
+		ModelStackWithParamId* newModelStack1 =
+		    modelStack->addParamCollectionAndId(summary->paramCollection, summary, paramId);
+		return newModelStack1->paramCollection->getAutoParamFromId(newModelStack1, allowCreation);
+	}
 	ModKnob* knob = &modKnobs[modKnobMode][whichModEncoder];
 
 	if (knob->paramDescriptor.isJustAParam()) {

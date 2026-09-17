@@ -201,7 +201,11 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		    [UNPATCHED_MOD_FX_OFFSET] = STRING_FOR_MODFX_OFFSET,
 		    [UNPATCHED_MOD_FX_FEEDBACK] = STRING_FOR_MODFX_FEEDBACK,
 		    [UNPATCHED_SIDECHAIN_SHAPE] = STRING_FOR_SIDECHAIN_SHAPE,
-		    [UNPATCHED_COMPRESSOR_THRESHOLD] = STRING_FOR_THRESHOLD};
+		    [UNPATCHED_COMPRESSOR_THRESHOLD] = STRING_FOR_THRESHOLD,
+		    [UNPATCHED_COMPRESSOR_RATIO] = STRING_FOR_RATIO,
+		    [UNPATCHED_COMPRESSOR_ATTACK] = STRING_FOR_ATTACK,
+		    [UNPATCHED_COMPRESSOR_RELEASE] = STRING_FOR_RELEASE,
+		    [UNPATCHED_COMPRESSOR_BLEND] = STRING_FOR_BLEND};
 		return l10n::get(NAMES[p]);
 	}
 
@@ -391,6 +395,18 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 
 		case UNPATCHED_COMPRESSOR_THRESHOLD:
 			return "compressorThreshold";
+
+		case UNPATCHED_COMPRESSOR_RATIO:
+			return "compressorRatio";
+
+		case UNPATCHED_COMPRESSOR_ATTACK:
+			return "compressorAttack";
+
+		case UNPATCHED_COMPRESSOR_RELEASE:
+			return "compressorRelease";
+
+		case UNPATCHED_COMPRESSOR_BLEND:
+			return "compressorBlend";
 
 		case UNPATCHED_NUM_SHARED:
 		    // Intentionally not handled

@@ -140,6 +140,10 @@ void ModControllableAudio::initParams(ParamManager* paramManager) {
 
 	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_SHAPE].setCurrentValueBasicForSetup(-601295438);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_THRESHOLD].setCurrentValueBasicForSetup(0);
+	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RATIO].setCurrentValueBasicForSetup(0);
+	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_ATTACK].setCurrentValueBasicForSetup(0);
+	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RELEASE].setCurrentValueBasicForSetup(0);
+	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_BLEND].setCurrentValueBasicForSetup(0);
 }
 
 bool ModControllableAudio::hasBassAdjusted(ParamManager* paramManager) {
