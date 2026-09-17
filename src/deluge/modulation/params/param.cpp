@@ -209,6 +209,10 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		return l10n::get(NAMES[p]);
 	}
 
+	if (p == static_cast<int32_t>(UnpatchedGlobal::UNPATCHED_SIDECHAIN_VOLUME)) {
+		return l10n::get(STRING_FOR_SIDECHAIN_LEVEL);
+	}
+
 	constexpr ParamType unc = UNPATCHED_NUM_SHARED;
 
 	if (kind == Kind::UNPATCHED_SOUND && p < util::to_underlying(UNPATCHED_SOUND_MAX_NUM)) {
