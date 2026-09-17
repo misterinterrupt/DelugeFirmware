@@ -23,6 +23,7 @@
 #include "hid/display/oled_canvas/canvas.h"
 
 class ClipMinder;
+class InstrumentClipMinder;
 class MIDIDevice;
 class RootUI;
 class TimelineView;
@@ -119,6 +120,7 @@ public:
 	/// Convert this clip to a clip minder. Returns true for views which manage a single clip,
 	/// false for song level views
 	virtual ClipMinder* toClipMinder() { return NULL; }
+	virtual InstrumentClipMinder* toInstrumentClipMinder();
 
 	/// \brief Convert this view to a TimelineView
 	///

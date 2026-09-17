@@ -160,4 +160,24 @@ private:
 	int8_t validateChordNo(int8_t chordNo);
 };
 
+struct ChordMatchResult {
+	char chordName[24] = {0};       // e.g. "Major", "Minor", "7", "Maj7", "sus4", "dim", "aug", "5", "6", "9", "m7b5"
+	char short7Seg[8] = {0};        // e.g. "MA", "m", "7", "M7", "m7", "dim", "aug", "su4"
+	char rootName[8] = {0};          // e.g. "C", "F#", "Bb"
+	char bassName[8] = {0};          // e.g. "E" (if inversion like C/E)
+	char intervalName[24] = {0};     // e.g. "Perfect 5th", "Major 3rd"
+	char shortIntervalName[8] = {0}; // e.g. "P5", "M3"
+	bool isChord = false;
+	bool isInversion = false;
+	bool isDyad = false;
+};
+
+// Analyzes a set of sorted MIDI notes (n_0, n_1, ...) and returns chord/interval analysis
+ChordMatchResult identifyNotesRelationship(const int16_t* notes, size_t count);
+
+// Formats the overlay string for OLED and 7SEG display
+void formatNotesOverlayText(const int16_t* notes, size_t count, char* oledBuf, size_t oledBufSize, char* sevenSegBuf,
+                            size_t sevenSegBufSize);
+
 } // namespace deluge::gui::ui::keyboard
+

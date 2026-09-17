@@ -18,7 +18,9 @@
 #include "gui/ui/keyboard/chords.h"
 #include "hid/display/display.h"
 #include "io/debug/log.h"
+#include "util/functions.h"
 #include <array>
+#include <cstdio>
 #include <stdlib.h>
 
 namespace deluge::gui::ui::keyboard {
@@ -305,4 +307,262 @@ const std::array<Chord, 10> otherChords = {
     kEmptyChord, kEmptyChord, kEmptyChord, kEmptyChord, kEmptyChord,
 };
 
+static const char* kNoteNamesSharp[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+
+struct KnownChordDef {
+	const char* name;
+	const char* short7Seg;
+	NoteSet set;
+};
+
+static const KnownChordDef kChordDefs[] = {
+    {"Major", "MA", NoteSet({ROOT, MAJ3, P5})},
+    {"Minor", "m", NoteSet({ROOT, MIN3, P5})},
+    {"7th", "7", NoteSet({ROOT, MAJ3, P5, MIN7})},
+    {"Major 7th", "M7", NoteSet({ROOT, MAJ3, P5, MAJ7})},
+    {"Minor 7th", "m7", NoteSet({ROOT, MIN3, P5, MIN7})},
+    {"Diminished", "dim", NoteSet({ROOT, MIN3, DIM5})},
+    {"Augmented", "aug", NoteSet({ROOT, MAJ3, AUG5})},
+    {"Suspended 2nd", "su2", NoteSet({ROOT, MAJ2, P5})},
+    {"Suspended 4th", "su4", NoteSet({ROOT, P4, P5})},
+    {"5th (Power Chord)", "5", NoteSet({ROOT, P5})},
+    {"Major 6th", "6", NoteSet({ROOT, MAJ3, P5, MAJ6})},
+    {"Minor 6th", "m6", NoteSet({ROOT, MIN3, P5, MAJ6})},
+    {"9th", "9", NoteSet({ROOT, MAJ3, P5, MIN7, MAJ2})},
+    {"Major 9th", "M9", NoteSet({ROOT, MAJ3, P5, MAJ7, MAJ2})},
+    {"Minor 9th", "m9", NoteSet({ROOT, MIN3, P5, MIN7, MAJ2})},
+    {"Diminished 7th", "dim7", NoteSet({ROOT, MIN3, DIM5, DIM7})},
+    {"Half-Diminished 7th", "m7b5", NoteSet({ROOT, MIN3, DIM5, MIN7})},
+    {"7th Suspended 4th", "7su4", NoteSet({ROOT, P4, P5, MIN7})},
+    {"7th Suspended 2nd", "7su2", NoteSet({ROOT, MAJ2, P5, MIN7})},
+    {"Minor Major 7th", "-M7", NoteSet({ROOT, MIN3, P5, MAJ7})},
+    {"6/9", "69", NoteSet({ROOT, MAJ3, P5, MAJ6, MAJ2})},
+    {"Add 9th", "add9", NoteSet({ROOT, MAJ2, MAJ3, P5})},
+    {"Minor Add 9th", "madd9", NoteSet({ROOT, MAJ2, MIN3, P5})},
+    {"Add 4th", "ad4", NoteSet({ROOT, MAJ3, P4, P5})},
+    {"Minor Add 4th", "mad4", NoteSet({ROOT, MIN3, P4, P5})},
+    {"7th Sharp 9th", "7#9", NoteSet({ROOT, MAJ3, P5, MIN7, MIN3})},
+    {"7th Flat 9th", "7b9", NoteSet({ROOT, MAJ3, P5, MIN7, MIN2})},
+    {"7th Flat 5th", "7b5", NoteSet({ROOT, MAJ3, DIM5, MIN7})},
+    {"Augmented 7th", "au7", NoteSet({ROOT, MAJ3, AUG5, MIN7})},
+};
+
+ChordMatchResult identifyNotesRelationship(const int16_t* notes, size_t count) {
+	ChordMatchResult result;
+	if (count < 2 || !notes) {
+		return result;
+	}
+
+	// 1. Dyad (2 notes) interval check
+	if (count == 2) {
+		int16_t n0 = notes[0];
+		int16_t n1 = notes[1];
+		int32_t diff = n1 - n0;
+		int32_t semitones = (diff >= 0 ? diff : -diff) % 12;
+
+		result.isDyad = true;
+		const char* fullName = "";
+		const char* shortCode = "";
+
+		switch (semitones) {
+		case 0:
+			fullName = (diff == 0) ? "Unison" : "Octave";
+			shortCode = (diff == 0) ? "P1" : "P8";
+			break;
+		case 1:
+			fullName = "Minor 2nd";
+			shortCode = "m2";
+			break;
+		case 2:
+			fullName = "Major 2nd";
+			shortCode = "M2";
+			break;
+		case 3:
+			fullName = "Minor 3rd";
+			shortCode = "m3";
+			break;
+		case 4:
+			fullName = "Major 3rd";
+			shortCode = "M3";
+			break;
+		case 5:
+			fullName = "Perfect 4th";
+			shortCode = "P4";
+			break;
+		case 6:
+			fullName = "Tritone";
+			shortCode = "TT";
+			break;
+		case 7:
+			fullName = "Perfect 5th";
+			shortCode = "P5";
+			break;
+		case 8:
+			fullName = "Minor 6th";
+			shortCode = "m6";
+			break;
+		case 9:
+			fullName = "Major 6th";
+			shortCode = "M6";
+			break;
+		case 10:
+			fullName = "Minor 7th";
+			shortCode = "m7";
+			break;
+		case 11:
+			fullName = "Major 7th";
+			shortCode = "M7";
+			break;
+		}
+
+		snprintf(result.intervalName, sizeof(result.intervalName), "%s", fullName);
+		snprintf(result.shortIntervalName, sizeof(result.shortIntervalName), "%s", shortCode);
+	}
+
+	// 2. Build NoteSet of present pitch classes (multi-octave mapped)
+	NoteSet presentPitches;
+	for (size_t i = 0; i < count; i++) {
+		presentPitches.add((notes[i] % 12 + 12) % 12);
+	}
+
+	int8_t bassPitchClass = (notes[0] % 12 + 12) % 12;
+
+	// 3. Search for best chord root & quality match across all 12 candidate roots
+	int32_t bestScore = -1;
+	int8_t bestRoot = -1;
+	const KnownChordDef* bestDef = nullptr;
+
+	for (int8_t r = 0; r < 12; r++) {
+		NoteSet intervalSet;
+		for (size_t i = 0; i < count; i++) {
+			int8_t pc = (notes[i] % 12 + 12) % 12;
+			int8_t rel = (pc - r + 12) % 12;
+			intervalSet.add(rel);
+		}
+
+		for (const auto& def : kChordDefs) {
+			bool isMatch = false;
+			int32_t score = 0;
+
+			if (intervalSet == def.set) {
+				isMatch = true;
+				score = def.set.count() * 10 + 20;
+			}
+			else if (def.set.has(P5) && intervalSet.count() >= 3) {
+				NoteSet defWithoutP5 = def.set;
+				defWithoutP5.remove(P5);
+				if (intervalSet == defWithoutP5) {
+					isMatch = true;
+					score = defWithoutP5.count() * 10 + 10;
+				}
+			}
+
+			if (isMatch) {
+				if (r == bassPitchClass) {
+					score += 15; // Favor root position over inversion
+				}
+				if (score > bestScore) {
+					bestScore = score;
+					bestRoot = r;
+					bestDef = &def;
+				}
+			}
+		}
+	}
+
+	if (bestDef && bestRoot >= 0) {
+		result.isChord = true;
+		snprintf(result.rootName, sizeof(result.rootName), "%s", kNoteNamesSharp[bestRoot]);
+		snprintf(result.chordName, sizeof(result.chordName), "%s", bestDef->name);
+		snprintf(result.short7Seg, sizeof(result.short7Seg), "%s", bestDef->short7Seg);
+		snprintf(result.bassName, sizeof(result.bassName), "%s", kNoteNamesSharp[bassPitchClass]);
+		result.isInversion = (bestRoot != bassPitchClass);
+	}
+
+	return result;
+}
+
+void formatNotesOverlayText(const int16_t* notes, size_t count, char* oledBuf, size_t oledBufSize, char* sevenSegBuf,
+                            size_t sevenSegBufSize) {
+	if (!notes || count == 0) {
+		if (oledBuf) oledBuf[0] = '\0';
+		if (sevenSegBuf) sevenSegBuf[0] = '\0';
+		return;
+	}
+
+	if (count == 1) {
+		int32_t isNat = 1;
+		noteCodeToString(notes[0], oledBuf, &isNat, true);
+		if (sevenSegBuf) {
+			snprintf(sevenSegBuf, sevenSegBufSize, "%s", oledBuf);
+		}
+		return;
+	}
+
+	ChordMatchResult match = identifyNotesRelationship(notes, count);
+
+	char line1[48] = {0};
+	char line2[64] = {0};
+
+	if (match.isChord) {
+		if (match.isInversion) {
+			snprintf(line1, sizeof(line1), "%s %s / %s Bass", match.rootName, match.chordName, match.bassName);
+			if (sevenSegBuf) {
+				snprintf(sevenSegBuf, sevenSegBufSize, "%s/%s", match.rootName, match.bassName);
+			}
+		}
+		else {
+			snprintf(line1, sizeof(line1), "%s %s", match.rootName, match.chordName);
+			if (sevenSegBuf) {
+				snprintf(sevenSegBuf, sevenSegBufSize, "%s %s", match.rootName, match.short7Seg);
+			}
+		}
+
+		size_t pos = 0;
+		for (size_t i = 0; i < count && pos < sizeof(line2) - 8; i++) {
+			char nBuf[8];
+			int32_t isNat = 1;
+			noteCodeToString(notes[i], nBuf, &isNat, true);
+			pos += snprintf(line2 + pos, sizeof(line2) - pos, "%s%s", (i > 0 ? "  " : ""), nBuf);
+		}
+	}
+	else if (match.isDyad) {
+		char n0[8], n1[8];
+		int32_t isNat = 1;
+		noteCodeToString(notes[0], n0, &isNat, true);
+		noteCodeToString(notes[1], n1, &isNat, true);
+
+		snprintf(line1, sizeof(line1), "%s to %s : %s", kNoteNamesSharp[(notes[0] % 12 + 12) % 12],
+		         kNoteNamesSharp[(notes[1] % 12 + 12) % 12], match.intervalName);
+		snprintf(line2, sizeof(line2), "%s  %s", n0, n1);
+
+		if (sevenSegBuf) {
+			char n0Short[8];
+			noteCodeToString(notes[0], n0Short, &isNat, false);
+			snprintf(sevenSegBuf, sevenSegBufSize, "%s %s", n0Short, match.shortIntervalName);
+		}
+	}
+	else {
+		snprintf(line1, sizeof(line1), "%s Cluster (%zu Notes)", kNoteNamesSharp[(notes[0] % 12 + 12) % 12], count);
+		size_t pos2 = 0;
+		for (size_t i = 0; i < count && pos2 < sizeof(line2) - 8; i++) {
+			char nBuf[8];
+			int32_t isNat = 1;
+			noteCodeToString(notes[i], nBuf, &isNat, true);
+			pos2 += snprintf(line2 + pos2, sizeof(line2) - pos2, "%s%s", (i > 0 ? "  " : ""), nBuf);
+		}
+		if (sevenSegBuf) {
+			char n0Short[8];
+			int32_t isNat = 1;
+			noteCodeToString(notes[0], n0Short, &isNat, false);
+			snprintf(sevenSegBuf, sevenSegBufSize, "%s *", n0Short);
+		}
+	}
+
+	if (oledBuf) {
+		snprintf(oledBuf, oledBufSize, "%s\n%s", line1, line2);
+	}
+}
+
 } // namespace deluge::gui::ui::keyboard
+

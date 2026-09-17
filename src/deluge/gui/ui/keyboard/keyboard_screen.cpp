@@ -373,6 +373,9 @@ void KeyboardScreen::updateActiveNotes() {
 			redrawNumericDisplay();
 		}
 	}
+	else if (lastNotesState.count > currentNotesState.count && currentNotesState.count > 0) {
+		drawNoteCode(currentNotesState.notes[0].note);
+	}
 }
 
 void KeyboardScreen::noteOff(ModelStack& modelStack, Instrument& activeInstrument, bool clipIsActiveOnInstrument,
@@ -900,7 +903,7 @@ void KeyboardScreen::setLedStates() {
 
 void KeyboardScreen::drawNoteCode(int32_t noteCode) {
 	// Might not want to actually do this...
-	if (!getCurrentUI()->toClipMinder()) {
+	if (!getCurrentUI() || (!getCurrentUI()->toClipMinder() && (!getRootUI() || !getRootUI()->toClipMinder()))) {
 		return;
 	}
 

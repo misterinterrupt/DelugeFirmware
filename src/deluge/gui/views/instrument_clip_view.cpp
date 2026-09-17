@@ -4137,7 +4137,7 @@ void InstrumentClipView::someAuditioningHasEnded(bool recalculateLastAuditionedN
 
 void InstrumentClipView::drawNoteCode(uint8_t yDisplay) {
 	// Might not want to actually do this...
-	if (!getCurrentUI()->toClipMinder()) {
+	if (!getCurrentUI() || (!getCurrentUI()->toClipMinder() && (!getRootUI() || !getRootUI()->toClipMinder()))) {
 		return;
 	}
 

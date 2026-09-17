@@ -20,7 +20,11 @@
 #include "definitions_cxx.hpp"
 #include "hid/button.h"
 
+class InstrumentClipMinder;
+
 class ClipMinder {
 public:
 	ActionResult buttonAction(deluge::hid::Button b, bool on);
+	virtual InstrumentClipMinder* toInstrumentClipMinder() { return nullptr; }
 };
+

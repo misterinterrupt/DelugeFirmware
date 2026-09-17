@@ -18,6 +18,7 @@
 #include "model/clip/instrument_clip_minder.h"
 #include "definitions_cxx.hpp"
 #include "gui/l10n/l10n.h"
+#include "gui/ui/keyboard/chords.h"
 #include "gui/ui/keyboard/keyboard_screen.h"
 #include "gui/ui/load/load_instrument_preset_ui.h"
 #include "gui/ui/menus.h"
@@ -28,6 +29,10 @@
 #include "gui/views/automation_view.h"
 #include "gui/views/instrument_clip_view.h"
 #include "gui/views/view.h"
+#include "model/instrument/melodic_instrument.h"
+#include "model/note/note.h"
+#include <algorithm>
+#include <vector>
 #include "hid/buttons.h"
 #include "hid/led/indicator_leds.h"
 #include "io/midi/midi_engine.h"
@@ -513,22 +518,129 @@ void InstrumentClipMinder::calculateDefaultRootNote() {
 void InstrumentClipMinder::drawActualNoteCode(int16_t noteCode) {
 	// If we're in Chords mode, don't display the note name because the Chord class will display the chord name
 	InstrumentClip* clip = getCurrentInstrumentClip();
-	if (clip->onKeyboardScreen
+	if (clip && (clip->onKeyboardScreen || getRootUI() == &keyboardScreen || getCurrentUI() == &keyboardScreen)
 	    && ((clip->keyboardState.currentLayout == KeyboardLayoutType::KeyboardLayoutTypeChordLibrary)
 	        || (clip->keyboardState.currentLayout == KeyboardLayoutType::KeyboardLayoutTypeChord))) {
 		return;
 	}
 
-	char noteName[5];
-	int32_t isNatural = 1; // gets modified inside noteCodeToString to be 0 if sharp.
-	noteCodeToString(noteCode, noteName, &isNatural);
+	std::vector<int16_t> activeNotes;
+	if (noteCode >= 0) {
+		activeNotes.push_back(noteCode);
+	}
+
+	// 1. From MelodicInstrument notesAuditioned
+	Instrument* inst = getCurrentInstrument();
+	if (inst && inst->type != OutputType::KIT) {
+		MelodicInstrument* melodic = (MelodicInstrument*)inst;
+		for (int32_t i = 0; i < melodic->notesAuditioned.getNumElements(); i++) {
+			EarlyNote* en = (EarlyNote*)melodic->notesAuditioned.getElementAddress(i);
+			if (en && en->stillActive) {
+				activeNotes.push_back(en->note);
+			}
+		}
+	}
+
+	// 2. From KeyboardScreen currentNotesState
+	if ((clip && clip->onKeyboardScreen) || getRootUI() == &keyboardScreen || getCurrentUI() == &keyboardScreen) {
+		const auto& notesState = keyboardScreen.getCurrentNotesState();
+		for (size_t i = 0; i < notesState.count; i++) {
+			activeNotes.push_back(notesState.notes[i].note);
+		}
+	}
+
+	// 3. From InstrumentClipView & AutomationView audition pads & step edit pad presses
+	if (getCurrentUI() == &instrumentClipView || getRootUI() == &instrumentClipView
+	    || getCurrentUI() == &automationView || getRootUI() == &automationView) {
+		for (int32_t y = 0; y < kDisplayHeight; y++) {
+			if (instrumentClipView.auditionPadIsPressed[y] && clip) {
+				activeNotes.push_back(clip->getYNoteFromYDisplay(y, currentSong));
+			}
+		}
+
+		if (instrumentClipView.numEditPadPresses > 0 && clip) {
+			for (int32_t ep = 0; ep < kEditPadPressBufferSize; ep++) {
+				if (instrumentClipView.editPadPresses[ep].isActive) {
+					uint8_t xDisp = instrumentClipView.editPadPresses[ep].xDisplay;
+					uint8_t yDisp = instrumentClipView.editPadPresses[ep].yDisplay;
+					activeNotes.push_back(clip->getYNoteFromYDisplay(yDisp, currentSong));
+
+					int32_t squareStart = instrumentClipView.getPosFromSquare(xDisp);
+					int32_t effectiveLength = clip->getLoopLength();
+					uint32_t squareWidth = instrumentClipView.getSquareWidth(xDisp, effectiveLength);
+
+					for (int32_t r = 0; r < clip->noteRows.getNumElements(); r++) {
+						NoteRow* nr = clip->noteRows.getElement(r);
+						if (!nr) continue;
+						for (int32_t nIdx = 0; nIdx < nr->notes.getNumElements(); nIdx++) {
+							Note* n = nr->notes.getElement(nIdx);
+							if (n && (n->pos < squareStart + (int32_t)squareWidth)
+							    && (n->pos + (int32_t)n->getLength() > squareStart)) {
+								activeNotes.push_back(nr->y);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 4. Sequence vertical column notes for any auditioned/held notes that overlap a step in clip sequence
+	if (clip && !activeNotes.empty()) {
+		std::vector<int16_t> initialNotes = activeNotes;
+		for (int16_t heldNote : initialNotes) {
+			NoteRow* nrHeld = clip->getNoteRowForYNote(heldNote);
+			if (nrHeld && nrHeld->notes.getNumElements() > 0) {
+				// Find target position for matching vertical notes
+				int32_t targetPos = -1;
+				if (playbackHandler.isEitherClockActive()) {
+					targetPos = clip->getActualCurrentPosAsIfPlayingInForwardDirection();
+				}
+				for (int32_t nIdx = 0; nIdx < nrHeld->notes.getNumElements(); nIdx++) {
+					Note* n = nrHeld->notes.getElement(nIdx);
+					if (!n) continue;
+					// If playback is active, check if note overlaps playhead, otherwise pick matching note
+					if (targetPos >= 0 && (n->pos > targetPos || n->pos + (int32_t)n->getLength() <= targetPos)) {
+						continue;
+					}
+					int32_t nStart = n->pos;
+					int32_t nEnd = n->pos + (int32_t)n->getLength();
+					for (int32_t r = 0; r < clip->noteRows.getNumElements(); r++) {
+						NoteRow* nrOther = clip->noteRows.getElement(r);
+						if (!nrOther || nrOther == nrHeld) continue;
+						for (int32_t oIdx = 0; oIdx < nrOther->notes.getNumElements(); oIdx++) {
+							Note* nOther = nrOther->notes.getElement(oIdx);
+							if (nOther && (nOther->pos < nEnd) && (nOther->pos + (int32_t)nOther->getLength() > nStart)) {
+								activeNotes.push_back(nrOther->y);
+							}
+						}
+					}
+					if (targetPos < 0) {
+						break; // When not playing, match against the first relevant note in row to avoid merging distant steps
+					}
+				}
+			}
+		}
+	}
+
+	// Deduplicate and sort activeNotes
+	std::sort(activeNotes.begin(), activeNotes.end());
+	activeNotes.erase(std::unique(activeNotes.begin(), activeNotes.end()), activeNotes.end());
+
+	if (activeNotes.empty()) {
+		return;
+	}
+
+	char oledBuf[128] = {0};
+	char sevenSegBuf[32] = {0};
+	deluge::gui::ui::keyboard::formatNotesOverlayText(activeNotes.data(), activeNotes.size(), oledBuf, sizeof(oledBuf),
+	                                                  sevenSegBuf, sizeof(sevenSegBuf));
 
 	if (display->haveOLED()) {
-		display->popupTextTemporary(noteName);
+		display->popupText(oledBuf);
 	}
 	else {
-		uint8_t drawDot = !isNatural ? 0 : 255;
-		display->setText(noteName, false, drawDot, true);
+		display->setText(sevenSegBuf, false, 255, true);
 	}
 }
 

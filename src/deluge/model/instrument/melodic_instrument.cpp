@@ -22,6 +22,8 @@
 #include "gui/views/automation_view.h"
 #include "gui/views/instrument_clip_view.h"
 #include "gui/views/view.h"
+#include "hid/display/oled.h"
+#include "model/clip/instrument_clip_minder.h"
 #include "io/midi/midi_device.h"
 #include "io/midi/midi_follow.h"
 #include "memory/general_memory_allocator.h"
@@ -230,6 +232,13 @@ justAuditionNote:
 				*/
 				beginAuditioningForNote(modelStack->toWithSong(), // Safe, cos we won't reference this again
 				                        note, velocity, mpeValues, midiChannel);
+				InstrumentClipMinder* minder = getCurrentUI() ? getCurrentUI()->toInstrumentClipMinder() : nullptr;
+				if (!minder && getRootUI()) {
+					minder = getRootUI()->toInstrumentClipMinder();
+				}
+				if (minder) {
+					minder->drawActualNoteCode(note);
+				}
 			}
 		}
 
@@ -278,6 +287,24 @@ justAuditionNote:
 			// that input to a MIDIInstrument (with external synth attached)
 			endAuditioningForNote(modelStack->toWithSong(), // Safe, cos we won't reference this again
 			                      note, velocity);
+			InstrumentClipMinder* minder = getCurrentUI() ? getCurrentUI()->toInstrumentClipMinder() : nullptr;
+			if (!minder && getRootUI()) {
+				minder = getRootUI()->toInstrumentClipMinder();
+			}
+			if (minder) {
+				if (notesAuditioned.getNumElements() > 0) {
+					EarlyNote* en = (EarlyNote*)notesAuditioned.getElementAddress(0);
+					if (en && en->stillActive) {
+						minder->drawActualNoteCode(en->note);
+					}
+				}
+				else if (display->haveOLED()) {
+					deluge::hid::display::OLED::removePopup();
+				}
+				else {
+					minder->redrawNumericDisplay();
+				}
+			}
 		}
 	} // end match switch
 

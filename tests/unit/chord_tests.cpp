@@ -90,3 +90,73 @@ TEST(ChordTests, adjustVoicingOffsetBoundsCheck) {
 		CHECK_EQUAL(kUniqueVoicings - 2, chordList.voicingOffset[chordNo]);
 	}
 }
+
+TEST(ChordTests, DyadIntervalIdentification) {
+	using deluge::gui::ui::keyboard::identifyNotesRelationship;
+	using deluge::gui::ui::keyboard::ChordMatchResult;
+
+	int16_t notes[2] = {60, 67}; // C4, G4
+	ChordMatchResult result = identifyNotesRelationship(notes, 2);
+	CHECK(result.isDyad);
+	STRCMP_EQUAL("Perfect 5th", result.intervalName);
+	STRCMP_EQUAL("P5", result.shortIntervalName);
+}
+
+TEST(ChordTests, MajorTriadIdentification) {
+	using deluge::gui::ui::keyboard::identifyNotesRelationship;
+	using deluge::gui::ui::keyboard::ChordMatchResult;
+
+	int16_t notes[3] = {60, 64, 67}; // C4, E4, G4
+	ChordMatchResult result = identifyNotesRelationship(notes, 3);
+	CHECK(result.isChord);
+	CHECK(!result.isInversion);
+	STRCMP_EQUAL("C", result.rootName);
+	STRCMP_EQUAL("Major", result.chordName);
+}
+
+TEST(ChordTests, MinorTriadIdentification) {
+	using deluge::gui::ui::keyboard::identifyNotesRelationship;
+	using deluge::gui::ui::keyboard::ChordMatchResult;
+
+	int16_t notes[3] = {60, 63, 67}; // C4, Eb4, G4
+	ChordMatchResult result = identifyNotesRelationship(notes, 3);
+	CHECK(result.isChord);
+	CHECK(!result.isInversion);
+	STRCMP_EQUAL("C", result.rootName);
+	STRCMP_EQUAL("m", result.chordName);
+}
+
+TEST(ChordTests, MultiOctaveChordIdentification) {
+	using deluge::gui::ui::keyboard::identifyNotesRelationship;
+	using deluge::gui::ui::keyboard::ChordMatchResult;
+
+	int16_t notes[3] = {48, 64, 79}; // C3, E4, G5
+	ChordMatchResult result = identifyNotesRelationship(notes, 3);
+	CHECK(result.isChord);
+	STRCMP_EQUAL("C", result.rootName);
+	STRCMP_EQUAL("Major", result.chordName);
+}
+
+TEST(ChordTests, InversionChordIdentification) {
+	using deluge::gui::ui::keyboard::identifyNotesRelationship;
+	using deluge::gui::ui::keyboard::ChordMatchResult;
+
+	int16_t notes[3] = {64, 67, 72}; // E4, G4, C5 (C Major 1st inversion)
+	ChordMatchResult result = identifyNotesRelationship(notes, 3);
+	CHECK(result.isChord);
+	CHECK(result.isInversion);
+	STRCMP_EQUAL("C", result.rootName);
+	STRCMP_EQUAL("E", result.bassName);
+}
+
+TEST(ChordTests, Dominant7thIdentification) {
+	using deluge::gui::ui::keyboard::identifyNotesRelationship;
+	using deluge::gui::ui::keyboard::ChordMatchResult;
+
+	int16_t notes[4] = {60, 64, 67, 70}; // C4, E4, G4, Bb4
+	ChordMatchResult result = identifyNotesRelationship(notes, 4);
+	CHECK(result.isChord);
+	STRCMP_EQUAL("C", result.rootName);
+	STRCMP_EQUAL("7", result.chordName);
+}
+

@@ -21,7 +21,14 @@
 #include "hid/display/display.h"
 #include "hid/display/oled.h"
 #include "hid/led/pad_leds.h"
+#include "model/clip/instrument_clip_minder.h"
 #include <utility>
+
+InstrumentClipMinder* UI::toInstrumentClipMinder() {
+	ClipMinder* cm = toClipMinder();
+	return cm ? cm->toInstrumentClipMinder() : nullptr;
+}
+
 
 using deluge::hid::display::OLED;
 

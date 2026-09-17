@@ -63,6 +63,8 @@ public:
 	const char* getName() { return "keyboard_screen"; }
 	void checkNewInstrument(Instrument* newInstrument);
 
+	inline const NotesState& getCurrentNotesState() const { return currentNotesState; }
+
 private:
 	bool opened();
 	void focusRegained();
