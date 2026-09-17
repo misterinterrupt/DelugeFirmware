@@ -4245,18 +4245,18 @@ void Sound::modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTime
 			custom1Shifted = Buttons::isShiftButtonPressed();
 			if (display->haveOLED()) {
 				if (custom1Shifted) {
-					display->popupText("Compressor:\nAttack / Release");
+					display->popupText("Compressor:\nRatio / Attack");
 				}
 				else {
-					display->popupText("Compressor:\nThreshold / Ratio");
+					display->popupText("Compressor:\nStutter / Threshold");
 				}
 			}
 			else {
 				if (custom1Shifted) {
-					display->displayPopup("AT.RL");
+					display->displayPopup("RA.AT");
 				}
 				else {
-					display->displayPopup("TH.RA");
+					display->displayPopup("ST.TH");
 				}
 			}
 		}
@@ -4266,18 +4266,18 @@ void Sound::modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTime
 			custom3Shifted = Buttons::isShiftButtonPressed();
 			if (display->haveOLED()) {
 				if (custom3Shifted) {
-					display->popupText("Compressor:\nHPF / Sidechain Shape");
+					display->popupText("Compressor:\nSidechain Vol / Shape");
 				}
 				else {
-					display->popupText("Compressor:\nBlend / Sidechain Vol");
+					display->popupText("Compressor:\nRelease / Blend");
 				}
 			}
 			else {
 				if (custom3Shifted) {
-					display->displayPopup("HPF  SSHP");
+					display->displayPopup("SV.SS");
 				}
 				else {
-					display->displayPopup("BL.SV");
+					display->displayPopup("RL.BL");
 				}
 			}
 		}
@@ -4311,8 +4311,8 @@ ModelStackWithAutoParam* Sound::getParamFromModEncoderDeeper(int32_t whichModEnc
 
 	if (modKnobMode == 6) {
 		paramId = custom1Shifted
-		              ? (whichModEncoder == 0 ? params::UNPATCHED_COMPRESSOR_ATTACK : params::UNPATCHED_COMPRESSOR_RELEASE)
-		              : (whichModEncoder == 0 ? params::UNPATCHED_COMPRESSOR_THRESHOLD : params::UNPATCHED_COMPRESSOR_RATIO);
+		              ? (whichModEncoder == 0 ? params::UNPATCHED_COMPRESSOR_RATIO : params::UNPATCHED_COMPRESSOR_ATTACK)
+		              : (whichModEncoder == 0 ? (int32_t)params::UNPATCHED_STUTTER_RATE : params::UNPATCHED_COMPRESSOR_THRESHOLD);
 		summary = paramManager->getUnpatchedParamSetSummary();
 		ModelStackWithParamId* newModelStack1 =
 		    modelStack->addParamCollectionAndId(summary->paramCollection, summary, paramId);
@@ -4320,8 +4320,8 @@ ModelStackWithAutoParam* Sound::getParamFromModEncoderDeeper(int32_t whichModEnc
 	}
 	if (modKnobMode == 7 || modKnobMode == 2) {
 		paramId = custom3Shifted
-		              ? (whichModEncoder == 0 ? (int32_t)params::UNPATCHED_COMPRESSOR_BLEND : (int32_t)params::UNPATCHED_SIDECHAIN_SHAPE)
-		              : (whichModEncoder == 0 ? (int32_t)params::UNPATCHED_COMPRESSOR_BLEND : (int32_t)params::UNPATCHED_SIDECHAIN_VOLUME);
+		              ? (whichModEncoder == 0 ? (int32_t)params::UNPATCHED_SIDECHAIN_VOLUME : (int32_t)params::UNPATCHED_SIDECHAIN_SHAPE)
+		              : (whichModEncoder == 0 ? (int32_t)params::UNPATCHED_COMPRESSOR_RELEASE : (int32_t)params::UNPATCHED_COMPRESSOR_BLEND);
 		summary = paramManager->getUnpatchedParamSetSummary();
 		ModelStackWithParamId* newModelStack1 =
 		    modelStack->addParamCollectionAndId(summary->paramCollection, summary, paramId);

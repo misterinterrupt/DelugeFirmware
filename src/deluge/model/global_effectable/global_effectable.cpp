@@ -121,18 +121,18 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 			custom1Shifted = Buttons::isShiftButtonPressed();
 			if (display->haveOLED()) {
 				if (custom1Shifted) {
-					display->popupText("Compressor:\nAttack / Release");
+					display->popupText("Compressor:\nRatio / Attack");
 				}
 				else {
-					display->popupText("Compressor:\nThreshold / Ratio");
+					display->popupText("Compressor:\nStutter / Threshold");
 				}
 			}
 			else {
 				if (custom1Shifted) {
-					display->displayPopup("AT.RL");
+					display->displayPopup("RA.AT");
 				}
 				else {
-					display->displayPopup("TH.RA");
+					display->displayPopup("ST.TH");
 				}
 			}
 		}
@@ -143,18 +143,18 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 			custom3Shifted = Buttons::isShiftButtonPressed();
 			if (display->haveOLED()) {
 				if (custom3Shifted) {
-					display->popupText("Compressor:\nHPF / Sidechain Shape");
+					display->popupText("Compressor:\nSidechain Vol / Shape");
 				}
 				else {
-					display->popupText("Compressor:\nBlend / Sidechain Vol");
+					display->popupText("Compressor:\nRelease / Blend");
 				}
 			}
 			else {
 				if (custom3Shifted) {
-					display->displayPopup("HPF  SSHP");
+					display->displayPopup("SV.SS");
 				}
 				else {
-					display->displayPopup("BL.SV");
+					display->displayPopup("RL.BL");
 				}
 			}
 		}
@@ -751,18 +751,18 @@ int32_t GlobalEffectable::getParameterFromKnob(int32_t whichModEncoder) {
 	else if (modKnobMode == 6) { // Stutter / Custom 1
 		if (custom1Shifted) {
 			if (whichModEncoder != 0) {
-				return params::UNPATCHED_COMPRESSOR_RELEASE;
+				return params::UNPATCHED_COMPRESSOR_ATTACK;
 			}
 			else {
-				return params::UNPATCHED_COMPRESSOR_ATTACK;
+				return params::UNPATCHED_COMPRESSOR_RATIO;
 			}
 		}
 		else {
 			if (whichModEncoder != 0) {
-				return params::UNPATCHED_COMPRESSOR_RATIO;
+				return params::UNPATCHED_COMPRESSOR_THRESHOLD;
 			}
 			else {
-				return params::UNPATCHED_COMPRESSOR_THRESHOLD;
+				return params::UNPATCHED_STUTTER_RATE;
 			}
 		}
 	}
@@ -772,15 +772,15 @@ int32_t GlobalEffectable::getParameterFromKnob(int32_t whichModEncoder) {
 				return params::UNPATCHED_SIDECHAIN_SHAPE;
 			}
 			else {
-				return params::UNPATCHED_COMPRESSOR_BLEND;
+				return params::UNPATCHED_SIDECHAIN_VOLUME;
 			}
 		}
 		else {
 			if (whichModEncoder != 0) {
-				return params::UNPATCHED_SIDECHAIN_VOLUME;
+				return params::UNPATCHED_COMPRESSOR_BLEND;
 			}
 			else {
-				return params::UNPATCHED_COMPRESSOR_BLEND;
+				return params::UNPATCHED_COMPRESSOR_RELEASE;
 			}
 		}
 	}

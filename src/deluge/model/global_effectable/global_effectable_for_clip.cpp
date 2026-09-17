@@ -189,9 +189,6 @@ int32_t GlobalEffectableForClip::getParameterFromKnob(int32_t whichModEncoder) {
 	if (modKnobMode == 4 && whichModEncoder) {
 		return params::UNPATCHED_SIDECHAIN_VOLUME;
 	}
-	else if (modKnobMode == 6 && !whichModEncoder) {
-		return params::UNPATCHED_PITCH_ADJUST;
-	}
 
 	return GlobalEffectable::getParameterFromKnob(whichModEncoder);
 }
