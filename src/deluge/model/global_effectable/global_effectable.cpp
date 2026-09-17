@@ -143,15 +143,15 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 			custom3Shifted = Buttons::isShiftButtonPressed();
 			if (display->haveOLED()) {
 				if (custom3Shifted) {
-					display->popupText("Comp & Sidechain:\nBlend / Sidechain Shape");
+					display->popupText("Compressor:\nHPF / Sidechain Shape");
 				}
 				else {
-					display->popupText("Comp & Sidechain:\nBlend / Sidechain Vol");
+					display->popupText("Compressor:\nBlend / Sidechain Vol");
 				}
 			}
 			else {
 				if (custom3Shifted) {
-					display->displayPopup("BL.SS");
+					display->displayPopup("HPF  SSHP");
 				}
 				else {
 					display->displayPopup("BL.SV");
