@@ -1305,6 +1305,8 @@ void View::setKnobIndicatorLevel(uint8_t whichModEncoder) {
 			knobPos = modelStackWithParam->modControllable->getKnobPosForNonExistentParam(whichModEncoder,
 			                                                                              modelStackWithParam);
 			knobPos += kKnobPosOffset;
+			isBipolar = modelStackWithParam->modControllable->isKnobBipolarForNonExistentParam(whichModEncoder,
+			                                                                                   modelStackWithParam);
 		}
 		// is it not just a param? then its a patch cable
 		else if (!((modelStackWithParam->paramId & 0x0000FF00) == 0x0000FF00)) {

@@ -289,15 +289,8 @@ ActionResult SampleBrowser::timerCallback() {
 
 			// Kit
 			else if (soundEditor.editingKit()) {
-
-				if (canImportWholeKit()) {
-					contextMenu = &gui::context_menu::sample_browser::kit;
-					goto considerContextMenu;
-				}
-				else {
-					display->displayPopup(deluge::l10n::get(
-					    deluge::l10n::String::STRING_FOR_CAN_ONLY_IMPORT_WHOLE_FOLDER_INTO_BRAND_NEW_KIT));
-				}
+				contextMenu = &gui::context_menu::sample_browser::kit;
+				goto considerContextMenu;
 			}
 
 			// Synth
@@ -370,17 +363,8 @@ void SampleBrowser::enterKeyPress() {
 
 		// If user wants to slice...
 		if (soundEditor.editingKit() && Buttons::isShiftButtonPressed()) {
-
-			// Can only do this for Kit Clips, and for source 0, not 1, AND there has to be only one drum present, which
-			// is assigned to the first NoteRow
-			if (canImportWholeKit()) {
-				display->displayPopup("SLICER");
-				openUI(&slicer);
-			}
-			else {
-				display->displayPopup(
-				    deluge::l10n::get(deluge::l10n::String::STRING_FOR_CAN_ONLY_USE_SLICER_FOR_BRAND_NEW_KIT));
-			}
+			display->displayPopup("SLICER");
+			openUI(&slicer);
 		}
 
 		// Otherwise, load it normally

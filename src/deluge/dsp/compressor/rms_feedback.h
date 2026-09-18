@@ -106,31 +106,53 @@ public:
 
 	/// Get the current theshold as a full-scale (0 to 2^31) number.
 	[[nodiscard]] inline constexpr q31_t getThreshold() const { return thresholdKnobPos; }
+
 	/// Set the threshold based on a full-scale (0 to 2^31) number.
 	///
-	/// 0 corresponds to a threshold of 0.2, 2^31 corresponds to a theshold of 1.
+	/// 0 corresponds to 0 dBFS (15.6f log-RMS), 2^31 corresponds to -60 dBFS (3.5f log-RMS).
 	constexpr void setThreshold(q31_t t) {
 		thresholdKnobPos = t;
-		threshold = 1 - 0.8f * (float(thresholdKnobPos) / ONE_Q31f);
+		float pos = float(thresholdKnobPos) / ONE_Q31f;
+		threshdb = 15.6f - pos * 12.1f;
+	}
+
+	/// Get/set Input Gain
+	[[nodiscard]] inline constexpr q31_t getInputGain() const { return inputGainKnobPos; }
+	constexpr void setInputGain(q31_t gain) {
+		inputGainKnobPos = gain;
+		// Map 0 to 2^31 -> 0 dB to +24 dB gain (0.0 to 2.76 log-RMS offset)
+		inputGaindB = (float(inputGainKnobPos) / ONE_Q31f) * 2.76f;
+	}
+
+	/// Get/set Makeup Gain
+	[[nodiscard]] inline constexpr q31_t getMakeupGain() const { return makeupGainKnobPos; }
+	constexpr void setMakeupGain(q31_t gain) {
+		makeupGainKnobPos = gain;
+		// Map 0 to 2^31 -> -12 dB to +24 dB makeup gain (-1.38 to +2.76 neppers)
+		float pos = float(makeupGainKnobPos) / ONE_Q31f;
+		makeupGaindB = -1.38f + pos * 4.14f;
 	}
 
 	/// Get the current ratio as a full-scale (0 to 2^31) number
 	[[nodiscard]] inline constexpr q31_t getRatio() const { return ratioKnobPos; }
 
 	/// Get the current ratio as an integer
-	///
-	/// @todo Thsi currently rounds (down) to the nearest integer, it would be nice to expose at least a little more of
-	/// the underlying precision.
 	[[nodiscard]] inline constexpr int32_t getRatioForDisplay() const { return ratio; }
 
 	/// Set the ratio based on a full-scale (0 to 2^31) number.
 	///
-	/// A inverse (1/x) mapping is used, where 0 corresponds to a ratio of 2:1, 2^31 corresponds to a ratio of 256:1.
+	/// 0 corresponds to a ratio of 1:1, 2^31 corresponds to a ratio of 256:1 limiting.
 	constexpr int32_t setRatio(q31_t rat) {
 		ratioKnobPos = rat;
-		fraction = 0.5f + (float(ratioKnobPos) / ONE_Q31f) / 2;
-		ratio = 1 / (1 - fraction);
-		return ratio;
+		float pos = float(ratioKnobPos) / ONE_Q31f;
+		fraction = pos;
+		if (fraction < 0.9961f) {
+			ratio = 1.0f / (1.0f - fraction);
+		}
+		else {
+			ratio = 256.0f;
+		}
+		return (int32_t)ratio;
 	}
 
 	/// Get the current sidechain cutoff frequency as a full-scale (0 to 2^31) integer
@@ -236,6 +258,10 @@ private:
 	q31_t attackKnobPos = 0;
 	q31_t releaseKnobPos = 0;
 	q31_t sideChainKnobPos = 0;
+	q31_t inputGainKnobPos = 0;
+	q31_t makeupGainKnobPos = 1073741824;
+	float inputGaindB = 0.0f;
+	float makeupGaindB = 0.0f;
 	q31_t dry;
 	q31_t wet;
 };

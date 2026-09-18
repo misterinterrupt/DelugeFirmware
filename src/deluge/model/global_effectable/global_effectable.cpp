@@ -121,40 +121,51 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 			custom1Shifted = Buttons::isShiftButtonPressed();
 			if (display->haveOLED()) {
 				if (custom1Shifted) {
-					display->popupText("Compressor:\nRatio / Attack");
+					display->popupText("Compressor:\nAttack / Release");
 				}
 				else {
-					display->popupText("Compressor:\nStutter / Threshold");
+					display->popupText("Compressor:\nStutter / Blend");
 				}
 			}
 			else {
 				if (custom1Shifted) {
-					display->displayPopup("RA.AT");
+					display->displayPopup("AT.RL");
 				}
 				else {
-					display->displayPopup("ST.TH");
+					display->displayPopup("ST.BL");
 				}
 			}
 		}
 	}
+	// Envelope Attack / Release (Sound only)
+	else if (whichModButton == 2) {
+		if (on) {
+			if (display->haveOLED()) {
+				display->popupText("Attack / Release:\n(Sound only)");
+			}
+			else {
+				display->displayPopup("AT.RL");
+			}
+		}
+	}
 	// Custom 2 / Custom 3
-	else if (whichModButton == 7 || whichModButton == 2) {
+	else if (whichModButton == 7) {
 		if (on) {
 			custom3Shifted = Buttons::isShiftButtonPressed();
 			if (display->haveOLED()) {
 				if (custom3Shifted) {
-					display->popupText("Compressor:\nSidechain Vol / Shape");
+					display->popupText("Compressor:\nInput / Makeup");
 				}
 				else {
-					display->popupText("Compressor:\nRelease / Blend");
+					display->popupText("Compressor:\nRatio / Threshold");
 				}
 			}
 			else {
 				if (custom3Shifted) {
-					display->displayPopup("SV.SS");
+					display->displayPopup("IG.MG");
 				}
 				else {
-					display->displayPopup("RL.BL");
+					display->displayPopup("RA.TH");
 				}
 			}
 		}
@@ -289,7 +300,7 @@ bool GlobalEffectable::modEncoderButtonAction(uint8_t whichModEncoder, bool on,
 	int32_t modKnobMode = *getModKnobMode();
 
 	// Stutter section
-	if (modKnobMode == 6 && whichModEncoder == 1) {
+	if (modKnobMode == 6 && !custom1Shifted && whichModEncoder == 1) {
 		if (on) {
 			beginStutter((ParamManagerForTimeline*)modelStack->paramManager);
 		}
@@ -677,6 +688,15 @@ ActionResult GlobalEffectable::modEncoderActionForNonExistentParam(int32_t offse
 
 		return ActionResult::DEALT_WITH;
 	}
+	else if (*getModKnobMode() == 2) {
+		if (display->haveOLED()) {
+			display->popupText("Attack / Release:\n(Sound only)");
+		}
+		else {
+			display->displayPopup("AT.RL");
+		}
+		return ActionResult::DEALT_WITH;
+	}
 	return ActionResult::NOT_DEALT_WITH;
 }
 
@@ -750,37 +770,37 @@ int32_t GlobalEffectable::getParameterFromKnob(int32_t whichModEncoder) {
 	}
 	else if (modKnobMode == 6) { // Stutter / Custom 1
 		if (custom1Shifted) {
-			if (whichModEncoder != 0) {
+			if (whichModEncoder == 1) {
 				return params::UNPATCHED_COMPRESSOR_ATTACK;
 			}
 			else {
-				return params::UNPATCHED_COMPRESSOR_RATIO;
+				return params::UNPATCHED_COMPRESSOR_RELEASE;
 			}
 		}
 		else {
-			if (whichModEncoder != 0) {
-				return params::UNPATCHED_COMPRESSOR_THRESHOLD;
+			if (whichModEncoder == 1) {
+				return params::UNPATCHED_STUTTER_RATE;
 			}
 			else {
-				return params::UNPATCHED_STUTTER_RATE;
+				return params::UNPATCHED_COMPRESSOR_BLEND;
 			}
 		}
 	}
-	else if (modKnobMode == 7 || modKnobMode == 2) { // Custom 2 / Custom 3
+	else if (modKnobMode == 7) { // Custom 2 / Custom 3
 		if (custom3Shifted) {
-			if (whichModEncoder != 0) {
-				return params::UNPATCHED_SIDECHAIN_SHAPE;
+			if (whichModEncoder == 1) {
+				return params::UNPATCHED_COMPRESSOR_INPUT_GAIN;
 			}
 			else {
-				return params::UNPATCHED_SIDECHAIN_VOLUME;
+				return params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN;
 			}
 		}
 		else {
-			if (whichModEncoder != 0) {
-				return params::UNPATCHED_COMPRESSOR_BLEND;
+			if (whichModEncoder == 1) {
+				return params::UNPATCHED_COMPRESSOR_RATIO;
 			}
 			else {
-				return params::UNPATCHED_COMPRESSOR_RELEASE;
+				return params::UNPATCHED_COMPRESSOR_THRESHOLD;
 			}
 		}
 	}

@@ -32,14 +32,12 @@ audio_compressor::CompParam threshold{STRING_FOR_THRESHOLD, STRING_FOR_THRESHOLD
 audio_compressor::Ratio compRatio{STRING_FOR_RATIO, STRING_FOR_RATIO};
 audio_compressor::Attack compAttack{STRING_FOR_ATTACK, STRING_FOR_ATTACK};
 audio_compressor::Release compRelease{STRING_FOR_RELEASE, STRING_FOR_RELEASE};
-audio_compressor::SideHPF compHPF{STRING_FOR_HPF, STRING_FOR_HPF};
 audio_compressor::Blend compBlend{STRING_FOR_BLEND, STRING_FOR_BLEND};
-std::array<MenuItem*, 6> child3 = {
+std::array<MenuItem*, 5> child3 = {
     &threshold,
     &compRatio,
     &compAttack,
     &compRelease,
-    &compHPF,
     &compBlend,
 };
 Submenu audioCompMenu{STRING_FOR_COMMUNITY_FEATURE_MASTER_COMPRESSOR, child3};

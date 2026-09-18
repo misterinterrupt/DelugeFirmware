@@ -1607,8 +1607,9 @@ void PerformanceSessionView::modEncoderButtonAction(uint8_t whichModEncoder, boo
 			if (modKnobModePointer) {
 				modKnobMode = *modKnobModePointer;
 
+				ModControllableAudio* audio = (ModControllableAudio*)view.activeModControllableModelStack.modControllable;
 				// Stutter section
-				if ((modKnobMode == 6) && (whichModEncoder == 1)) {
+				if ((modKnobMode == 6) && (audio && !audio->custom1Shifted) && (whichModEncoder == 1)) {
 					char modelStackMemory[MODEL_STACK_MAX_SIZE];
 					ModelStackWithThreeMainThings* modelStack =
 					    currentSong->setupModelStackWithSongAsTimelineCounter(modelStackMemory);

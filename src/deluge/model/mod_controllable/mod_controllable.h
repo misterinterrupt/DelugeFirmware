@@ -56,6 +56,9 @@ public:
 	virtual int32_t getKnobPosForNonExistentParam(
 	    int32_t whichModEncoder,
 	    ModelStackWithAutoParam* modelStack); // modelStack->autoParam will be NULL in this rare case!!
+	virtual bool isKnobBipolarForNonExistentParam(int32_t whichModEncoder, ModelStackWithAutoParam* modelStack) {
+		return false;
+	}
 	virtual ActionResult modEncoderActionForNonExistentParam(int32_t offset, int32_t whichModEncoder,
 	                                                         ModelStackWithAutoParam* modelStack) {
 		return ActionResult::NOT_DEALT_WITH;

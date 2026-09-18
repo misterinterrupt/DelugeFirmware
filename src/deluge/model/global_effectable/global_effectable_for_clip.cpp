@@ -116,6 +116,8 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 	compressor.setAttack(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_ATTACK));
 	compressor.setRelease(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RELEASE));
 	compressor.setBlend(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_BLEND));
+	compressor.setInputGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_INPUT_GAIN));
+	compressor.setMakeupGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN));
 	StereoSample globalEffectableBuffer[SSI_TX_BUFFER_NUM_SAMPLES] __attribute__((aligned(CACHE_LINE_SIZE)));
 
 	memset(globalEffectableBuffer, 0, sizeof(StereoSample) * numSamples);

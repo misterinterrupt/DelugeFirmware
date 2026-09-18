@@ -537,6 +537,8 @@ PLACE_SDRAM_DATA Language english{
         {STRING_FOR_VOLUME_DUCKING, "Volume ducking"},
         {STRING_FOR_SIDECHAIN, "Sidechain"},
         {STRING_FOR_THRESHOLD, "Threshold"},
+        {STRING_FOR_INPUT_GAIN, "Input Gain"},
+        {STRING_FOR_MAKEUP_GAIN, "Makeup Gain"},
         {STRING_FOR_RATIO, "Ratio"},
         {STRING_FOR_BLEND, "Blend"},
         {STRING_FOR_ATTACK, "ATTACK"},

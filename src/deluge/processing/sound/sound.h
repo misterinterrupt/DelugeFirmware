@@ -258,14 +258,23 @@ public:
 	void detachSourcesFromAudioFiles();
 	void confirmNumVoices(char const* error);
 
+	int32_t scaleKitEnvelopeParam(int32_t p, int32_t val);
+
 	inline int32_t getSmoothedPatchedParamValue(int32_t p,
 	                                            ParamManager* paramManager) { // Yup, inlining this helped a tiny bit.
+		int32_t val;
 		if (paramLPF.p == p) {
-			return paramLPF.currentValue;
+			val = paramLPF.currentValue;
 		}
 		else {
-			return paramManager->getPatchedParamSet()->getValue(p);
+			val = paramManager->getPatchedParamSet()->getValue(p);
 		}
+		if (p == deluge::modulation::params::LOCAL_ENV_0_ATTACK
+		    || p == deluge::modulation::params::LOCAL_ENV_0_RELEASE
+		    || p == deluge::modulation::params::LOCAL_ENV_0_DECAY) {
+			val = scaleKitEnvelopeParam(p, val);
+		}
+		return val;
 	}
 
 	void notifyValueChangeViaLPF(int32_t p, bool shouldDoParamLPF, ModelStackWithThreeMainThings const* modelStack,

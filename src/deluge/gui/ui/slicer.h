@@ -56,6 +56,9 @@ public:
 	void renderOLED(deluge::hid::display::oled_canvas::Canvas& canvas) override;
 
 	int16_t numClips;
+	bool preservingState{false};
+
+	void executeSliceConfirmed();
 
 	// ui
 	UIType getUIType() { return UIType::SLICER; }

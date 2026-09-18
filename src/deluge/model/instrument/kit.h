@@ -135,10 +135,18 @@ public:
 	                                   bool shouldLimitDelayFeedback, bool isClipActive, int32_t pitchAdjust,
 	                                   int32_t amplitudeAtStart, int32_t amplitudeAtEnd);
 
+	void modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTimeline* paramManager) final;
+	ActionResult modEncoderActionForNonExistentParam(int32_t offset, int32_t whichModEncoder,
+	                                                ModelStackWithAutoParam* modelStack) final;
+	int32_t getKnobPosForNonExistentParam(int32_t whichModEncoder, ModelStackWithAutoParam* modelStack) final;
+	bool isKnobBipolarForNonExistentParam(int32_t whichModEncoder, ModelStackWithAutoParam* modelStack) final;
+
 	char const* getXMLTag() { return "kit"; }
 
 	Drum* firstDrum;
 	Drum* selectedDrum;
+	int32_t kitAttackOffset{0};  // -64 to +64 (0 = 50%, no scaling)
+	int32_t kitReleaseOffset{0}; // -64 to +64 (0 = 50%, no scaling)
 
 	OrderedResizeableArrayWith32bitKey drumsWithRenderingActive;
 

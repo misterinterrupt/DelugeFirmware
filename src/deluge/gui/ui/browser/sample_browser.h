@@ -51,6 +51,7 @@ public:
 	void scrollFinished();
 	bool importFolderAsKit();
 	bool importFolderAsMultisamples();
+	bool canImportWholeKit();
 	ActionResult timerCallback();
 	bool claimCurrentFile(int32_t mayDoPitchDetection = 1, int32_t mayDoSingleCycle = 1,
 	                      int32_t mayDoWaveTable = 1); // 0 means no. 1 means auto. 2 means yes definitely
@@ -72,7 +73,6 @@ private:
 	void displayCurrentFilename();
 	void previewIfPossible(int32_t movementDirection = 1);
 	void audioFileIsNowSet();
-	bool canImportWholeKit();
 	bool loadAllSamplesInFolder(bool detectPitch, int32_t* getNumSamples, Sample*** getSortArea,
 	                            bool* getDoingSingleCycle = NULL, int32_t* getNumCharsInPrefix = NULL);
 	Error getCurrentFilePath(String* path);

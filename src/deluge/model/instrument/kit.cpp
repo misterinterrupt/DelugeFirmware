@@ -1692,3 +1692,102 @@ ModelStackWithAutoParam* Kit::getModelStackWithParamForKitRow(ModelStackWithTime
 
 	return modelStackWithParam;
 }
+
+void Kit::modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTimeline* paramManager) {
+	if (whichModButton == 2) {
+		if (on) {
+			if (display->haveOLED()) {
+				display->popupText("Kit:\nAttack / Release");
+			}
+			else {
+				display->displayPopup("AT.RL");
+			}
+		}
+		return;
+	}
+	GlobalEffectableForClip::modButtonAction(whichModButton, on, paramManager);
+}
+
+ActionResult Kit::modEncoderActionForNonExistentParam(int32_t offset, int32_t whichModEncoder,
+                                                       ModelStackWithAutoParam* modelStack) {
+	if (*getModKnobMode() == 2) {
+		int32_t& currentOffset = (whichModEncoder == 1) ? kitAttackOffset : kitReleaseOffset;
+		int32_t targetParam = (whichModEncoder == 1) ? params::LOCAL_ENV_0_ATTACK : params::LOCAL_ENV_0_RELEASE;
+
+		int32_t newOffset = std::clamp<int32_t>(currentOffset + offset, -64, 64);
+		if (newOffset != currentOffset) {
+			currentOffset = newOffset;
+
+			for (Drum* thisDrum = firstDrum; thisDrum; thisDrum = thisDrum->next) {
+				if (thisDrum->type == DrumType::SOUND) {
+					SoundDrum* soundDrum = (SoundDrum*)thisDrum;
+					ParamManager* pm = nullptr;
+					if (activeClip) {
+						NoteRow* noteRow = ((InstrumentClip*)activeClip)->getNoteRowForDrum(thisDrum);
+						if (noteRow) {
+							pm = &noteRow->paramManager;
+						}
+					}
+					if (!pm && modelStack && modelStack->song) {
+						pm = modelStack->song->getBackedUpParamManagerPreferablyWithClip(soundDrum, activeClip);
+					}
+					if (pm) {
+						if (whichModEncoder == 2) {
+							soundDrum->recalculatePatchingToParam(params::LOCAL_ENV_0_RELEASE, (ParamManagerForTimeline*)pm);
+							soundDrum->recalculatePatchingToParam(params::LOCAL_ENV_0_DECAY, (ParamManagerForTimeline*)pm);
+						}
+						else {
+							soundDrum->recalculatePatchingToParam(params::LOCAL_ENV_0_ATTACK, (ParamManagerForTimeline*)pm);
+						}
+					}
+				}
+			}
+		}
+
+		int32_t displayPercent = (currentOffset * 50) / 64; // -50% to +50%, center = 0%
+
+		if (display->haveOLED()) {
+			DEF_STACK_STRING_BUF(popupMsg, 40);
+			if (whichModEncoder == 1) {
+				popupMsg.append("Kit Attack: ");
+			}
+			else {
+				popupMsg.append("Kit Release: ");
+			}
+			if (displayPercent > 0) {
+				popupMsg.append("+");
+			}
+			popupMsg.appendInt(displayPercent);
+			popupMsg.append("%");
+			display->popupText(popupMsg.c_str());
+		}
+		else {
+			display->displayPopup(displayPercent);
+		}
+
+		return ActionResult::ACTIONED_AND_CAUSED_CHANGE;
+	}
+
+	return GlobalEffectableForClip::modEncoderActionForNonExistentParam(offset, whichModEncoder, modelStack);
+}
+
+int32_t Kit::getKnobPosForNonExistentParam(int32_t whichModEncoder, ModelStackWithAutoParam* modelStack) {
+	if (*getModKnobMode() == 2) {
+		if (whichModEncoder == 1) {
+			return kitAttackOffset;
+		}
+		else {
+			return kitReleaseOffset;
+		}
+	}
+
+	return GlobalEffectableForClip::getKnobPosForNonExistentParam(whichModEncoder, modelStack);
+}
+
+bool Kit::isKnobBipolarForNonExistentParam(int32_t whichModEncoder, ModelStackWithAutoParam* modelStack) {
+	if (*getModKnobMode() == 2) {
+		return true;
+	}
+	return GlobalEffectableForClip::isKnobBipolarForNonExistentParam(whichModEncoder, modelStack);
+}
+

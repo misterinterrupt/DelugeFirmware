@@ -145,7 +145,7 @@ bool Voice::noteOn(ModelStackWithVoice* modelStack, int32_t newNoteCodeBeforeArp
 	for (int32_t e = 0; e < kNumEnvelopes; e++) {
 
 		// If no attack-stage...
-		if (paramManager->getPatchedParamSet()->getValue(params::LOCAL_ENV_0_ATTACK + e) == -2147483648u) {
+		if (sound->getSmoothedPatchedParamValue(params::LOCAL_ENV_0_ATTACK + e, paramManager) == -2147483648u) {
 			envelopes[e].lastValue = 2147483647;
 		}
 

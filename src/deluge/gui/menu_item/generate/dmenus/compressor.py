@@ -53,6 +53,6 @@ menu = Submenu(
     "audioCompMenu",
     ["{name}", "%%CHILDREN%%"],
     "compressor/index.md",
-    [threshold, ratio, attack, release, hpf, blend],
+    [threshold, ratio, attack, release, blend],
     name="STRING_FOR_COMMUNITY_FEATURE_MASTER_COMPRESSOR",
 )

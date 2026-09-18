@@ -18,6 +18,7 @@
 #include "gui/ui/slicer.h"
 #include "definitions_cxx.hpp"
 #include "gui/colour/colour.h"
+#include "gui/context_menu/sample_browser/confirm_slice.h"
 #include "gui/ui/browser/sample_browser.h"
 #include "gui/ui/sound_editor.h"
 #include "gui/views/instrument_clip_view.h"
@@ -34,6 +35,7 @@
 #include "model/instrument/kit.h"
 #include "model/model_stack.h"
 #include "model/sample/sample.h"
+#include "model/note/note_row.h"
 #include "model/song/song.h"
 #include "model/voice/voice.h"
 #include "model/voice/voice_sample.h"
@@ -55,6 +57,14 @@ Slicer slicer{};
 namespace params = deluge::modulation::params;
 
 void Slicer::focusRegained() {
+
+	if (preservingState) {
+		preservingState = false;
+		if (display->have7SEG()) {
+			redraw();
+		}
+		return;
+	}
 
 	actionLogger.deleteAllLogs();
 
@@ -311,6 +321,42 @@ void Slicer::selectEncoderAction(int8_t offset) {
 	}
 }
 
+void Slicer::executeSliceConfirmed() {
+	if (slicerMode == SLICER_MODE_REGION) {
+		doSlice();
+	}
+	else {
+		getCurrentKit()->firstDrum->unassignAllVoices(); // stop
+		numClips = numManualSlice;
+		doSlice();
+		Kit* kit = getCurrentKit();
+		InstrumentClip* clip = getCurrentInstrumentClip();
+		int32_t selectedNoteRowIndex = 0;
+		clip->getNoteRowForDrum((Drum*)soundEditor.currentSound, &selectedNoteRowIndex);
+		if (selectedNoteRowIndex < 0) {
+			selectedNoteRowIndex = 0;
+		}
+		for (int32_t i = 0; i < numManualSlice; i++) {
+			int32_t targetRowIndex = selectedNoteRowIndex + i;
+			Drum* drum = nullptr;
+			if (targetRowIndex < clip->noteRows.getNumElements()) {
+				NoteRow* row = clip->noteRows.getElement(targetRowIndex);
+				if (row) {
+					drum = row->drum;
+				}
+			}
+			if (drum && drum->type == DrumType::SOUND) {
+				SoundDrum* soundDrum = (SoundDrum*)drum;
+				MultisampleRange* range = (MultisampleRange*)soundDrum->sources[0].getOrCreateFirstRange();
+				range->sampleHolder.startPos = manualSlicePoints[i].startPos;
+				range->sampleHolder.endPos = (i == numManualSlice - 1) ? waveformBasicNavigator.sample->lengthInSamples
+				                                                       : this->manualSlicePoints[i + 1].startPos;
+				range->sampleHolder.transpose = manualSlicePoints[i].transpose;
+			}
+		}
+	}
+}
+
 ActionResult Slicer::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
 	using namespace deluge::hid::button;
 
@@ -392,23 +438,17 @@ ActionResult Slicer::buttonAction(deluge::hid::Button b, bool on, bool inCardRou
 		if (inCardRoutine) {
 			return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 		}
-		if (slicerMode == SLICER_MODE_REGION) {
-			doSlice();
+		if (sampleBrowser.canImportWholeKit()) {
+			executeSliceConfirmed();
 		}
 		else {
-			getCurrentKit()->firstDrum->unassignAllVoices(); // stop
-			numClips = numManualSlice;
-			doSlice();
-			Kit* kit = getCurrentKit();
-			for (int32_t i = 0; i < numManualSlice; i++) {
-				Drum* drum = kit->getDrumFromIndex(i);
-				SoundDrum* soundDrum = (SoundDrum*)drum;
-				MultisampleRange* range = (MultisampleRange*)soundDrum->sources[0].getOrCreateFirstRange();
-				Sample* sample = (Sample*)range->sampleHolder.audioFile;
-				range->sampleHolder.startPos = manualSlicePoints[i].startPos;
-				range->sampleHolder.endPos = (i == numManualSlice - 1) ? waveformBasicNavigator.sample->lengthInSamples
-				                                                       : this->manualSlicePoints[i + 1].startPos;
-				range->sampleHolder.transpose = manualSlicePoints[i].transpose;
+			preservingState = true;
+			bool available = context_menu::confirmSlice.setupAndCheckAvailability();
+			if (available) {
+				openUI(&context_menu::confirmSlice);
+			}
+			else {
+				executeSliceConfirmed();
 			}
 		}
 	}
@@ -452,6 +492,7 @@ void Slicer::stopAnyPreviewing() {
 		range->sampleHolder.setAudioFile(NULL);
 	}
 }
+
 void Slicer::preview(int64_t startPoint, int64_t endPoint, int32_t transpose, int32_t on) {
 	if (on) {
 		Kit* kit = getCurrentKit();
@@ -593,6 +634,30 @@ void Slicer::doSlice() {
 
 	AudioEngine::stopAnyPreviewing();
 
+	Kit* kit = getCurrentKit();
+	InstrumentClip* clip = getCurrentInstrumentClip();
+
+	// Check if currentSound is a transient blank drum created when entering sample browser
+	SoundDrum* initialDrum = (SoundDrum*)soundEditor.currentSound;
+	if (initialDrum && initialDrum->type == DrumType::SOUND) {
+		MultisampleRange* initRange = (MultisampleRange*)initialDrum->sources[0].getOrCreateFirstRange();
+		if (initRange && initRange->sampleHolder.filePath.isEmpty()) {
+			int32_t blankRowIndex = -1;
+			clip->getNoteRowForDrum((Drum*)initialDrum, &blankRowIndex);
+			if (blankRowIndex > 0) {
+				NoteRow* rowBelow = clip->noteRows.getElement(blankRowIndex - 1);
+				if (rowBelow && rowBelow->drum && rowBelow->drum->type == DrumType::SOUND) {
+					soundEditor.currentSound = (SoundDrum*)rowBelow->drum;
+				}
+			}
+			instrumentClipView.deleteDrum(initialDrum);
+		}
+	}
+
+	SoundDrum* firstDrum = (SoundDrum*)soundEditor.currentSound;
+	firstDrum->unassignAllVoices();
+	firstDrum->sources[0].detachAllAudioFiles();
+
 	Error error = sampleBrowser.claimAudioFileForInstrument();
 	if (error != Error::NONE) {
 getOut:
@@ -600,125 +665,103 @@ getOut:
 		return;
 	}
 
-	Kit* kit = getCurrentKit();
-
-	// Do the first Drum
+	int32_t selectedNoteRowIndex = 0;
+	clip->getNoteRowForDrum((Drum*)soundEditor.currentSound, &selectedNoteRowIndex);
+	if (selectedNoteRowIndex < 0) {
+		selectedNoteRowIndex = 0;
+	}
 
 	// Ensure osc type is "sample"
 	if (soundEditor.currentSource->oscType != OscType::SAMPLE) {
-		soundEditor.currentSound->unassignAllVoices();
 		soundEditor.currentSource->setOscType(OscType::SAMPLE);
 	}
 
 	char modelStackMemory[MODEL_STACK_MAX_SIZE];
-	{
-		ModelStackWithThreeMainThings* modelStack = soundEditor.getCurrentModelStack(modelStackMemory);
-		ParamCollectionSummary* summary = modelStack->paramManager->getPatchedParamSetSummary();
-		ParamSet* paramSet = (ParamSet*)summary->paramCollection;
-		int32_t paramId = params::LOCAL_OSC_A_VOLUME + soundEditor.currentSourceIndex;
-		ModelStackWithAutoParam* modelStackWithParam =
-		    modelStack->addParam(paramSet, summary, paramId, &paramSet->params[paramId]);
-
-		// Reset osc volume, if it's not automated
-		if (!modelStackWithParam->autoParam->isAutomated()) {
-			modelStackWithParam->autoParam->setCurrentValueWithNoReversionOrRecording(modelStackWithParam, 2147483647);
-			//((ParamManagerBase*)soundEditor.currentParamManager)->setPatchedParamValue(params::LOCAL_OSC_A_VOLUME +
-			// soundEditor.currentSourceIndex, 2147483647, 0xFFFFFFFF, 0, soundEditor.currentSound, currentSong,
-			// getCurrentClip(), false);
-		}
-
-		SoundDrum* firstDrum = (SoundDrum*)soundEditor.currentSound;
-
-		if (firstDrum->nameIsDiscardable) {
-			firstDrum->name.set("1");
-		}
+	ModelStackWithTimelineCounter* modelStack = currentSong->setupModelStackWithCurrentClip(modelStackMemory);
+	if (modelStack) {
 
 		MultisampleRange* firstRange = (MultisampleRange*)firstDrum->sources[0].getOrCreateFirstRange();
-
 		Sample* sample = (Sample*)firstRange->sampleHolder.audioFile;
 
-		uint32_t lengthInSamples = sample->lengthInSamples;
+		String sampleFilePath;
+		sampleFilePath.set(&sample->filePath);
 
+		uint32_t lengthInSamples = sample->lengthInSamples;
 		uint32_t lengthSamplesPerSlice = lengthInSamples / numClips;
 		uint32_t lengthMSPerSlice = lengthSamplesPerSlice * 1000 / sample->sampleRate;
+		bool doEnvelopes = (lengthMSPerSlice >= 90);
 
-		bool doEnvelopes =
-		    (lengthMSPerSlice >= 90); // Only do fades in and out if we've got at least 100ms to play with
+		for (int32_t i = 0; i < numClips; i++) {
+			int32_t targetRowIndex = selectedNoteRowIndex + i;
+			Drum* existingDrum = nullptr;
+			NoteRow* targetNoteRow = nullptr;
 
-		firstRange->sampleHolder.startPos = 0;
-		uint32_t nextDrumStart = lengthInSamples / numClips;
-		firstRange->sampleHolder.endPos = nextDrumStart;
+			if (targetRowIndex < clip->noteRows.getNumElements()) {
+				targetNoteRow = clip->noteRows.getElement(targetRowIndex);
+				if (targetNoteRow) {
+					existingDrum = targetNoteRow->drum;
+				}
+			}
 
-		firstDrum->sources[0].repeatMode =
-		    (lengthMSPerSlice < 2002) ? SampleRepeatMode::ONCE : FlashStorage::defaultSliceMode;
+			uint64_t sliceStart = (uint64_t)lengthInSamples * i / numClips;
+			uint64_t sliceEnd = (uint64_t)lengthInSamples * (i + 1) / numClips;
 
-		firstDrum->sources[0].sampleControls.reversed = false;
+			SoundDrum* drumToUse = nullptr;
 
-#if 1 || ALPHA_OR_BETA_VERSION
-		if (!firstRange->sampleHolder.audioFile) {
-			FREEZE_WITH_ERROR("i032"); // Trying to narrow down E368 that Kevin F got
-		}
-#endif
+			if (existingDrum && existingDrum->type == DrumType::SOUND) {
+				drumToUse = (SoundDrum*)existingDrum;
+				drumToUse->unassignAllVoices();
+				drumToUse->sources[0].detachAllAudioFiles();
+				drumToUse->sources[1].detachAllAudioFiles();
 
-		firstRange->sampleHolder.claimClusterReasons(firstDrum->sources[0].sampleControls.reversed, CLUSTER_ENQUEUE);
-		if (doEnvelopes) {
-			ParamCollectionSummary* summary = modelStack->paramManager->getPatchedParamSetSummary();
-			ModelStackWithParamId* modelStackWithParamId =
-			    modelStack->addParamCollectionAndId(summary->paramCollection, summary, params::LOCAL_ENV_0_RELEASE);
-			ModelStackWithAutoParam* modelStackWithAutoParam =
-			    modelStackWithParamId->paramCollection->getAutoParamFromId(modelStackWithParamId);
-			modelStackWithAutoParam->autoParam->setCurrentValueWithNoReversionOrRecording(
-			    modelStackWithAutoParam, getParamFromUserValue(params::LOCAL_ENV_0_RELEASE, 1));
-		}
+				// Completely reset C++ SoundDrum object state back to constructor defaults
+				drumToUse->~SoundDrum();
+				new (drumToUse) SoundDrum();
+				drumToUse->kit = kit;
+			}
+			else {
+				void* drumMemory = GeneralMemoryAllocator::get().allocMaxSpeed(sizeof(SoundDrum));
+				if (!drumMemory) {
+					error = Error::INSUFFICIENT_RAM;
+					goto getOut;
+				}
+				drumToUse = new (drumMemory) SoundDrum();
+				kit->addDrum(drumToUse);
+			}
 
-		// Do the rest of the Drums
-		for (int32_t i = 1; i < numClips; i++) {
-
-			// Make the Drum and its ParamManager
 			ParamManagerForTimeline paramManager;
 			error = paramManager.setupWithPatching();
 			if (error != Error::NONE) {
 				goto getOut;
 			}
 
-			void* drumMemory = GeneralMemoryAllocator::get().allocMaxSpeed(sizeof(SoundDrum));
-			if (!drumMemory) {
-ramError:
+			Sound::initParams(&paramManager);
+			drumToUse->setupAsSample(&paramManager);
+
+			char newName[5];
+			intToString(i + 1, newName);
+			error = drumToUse->name.set(newName);
+
+			MultisampleRange* range = (MultisampleRange*)drumToUse->sources[0].getOrCreateFirstRange();
+			if (!range) {
+				if (!existingDrum) {
+					drumToUse->~SoundDrum();
+					delugeDealloc(drumToUse);
+				}
 				error = Error::INSUFFICIENT_RAM;
 				goto getOut;
 			}
 
-			SoundDrum* newDrum = new (drumMemory) SoundDrum();
+			range->sampleHolder.startPos = sliceStart;
+			range->sampleHolder.endPos = sliceEnd;
 
-			MultisampleRange* range = (MultisampleRange*)newDrum->sources[0].getOrCreateFirstRange();
-			if (!range) {
-ramError2:
-				newDrum->~SoundDrum();
-				delugeDealloc(drumMemory);
-				goto ramError;
-			}
-
-			char newName[5];
-			intToString(i + 1, newName);
-			error = newDrum->name.set(newName);
-			if (error != Error::NONE) {
-				goto ramError2;
-			}
-
-			Sound::initParams(&paramManager);
-
-			kit->addDrum(newDrum);
-			newDrum->setupAsSample(&paramManager);
-
-			range->sampleHolder.startPos = nextDrumStart;
-			nextDrumStart = (uint64_t)lengthInSamples * (i + 1) / numClips;
-			range->sampleHolder.endPos = nextDrumStart;
-
-			newDrum->sources[0].repeatMode =
+			drumToUse->sources[0].repeatMode =
 			    (lengthMSPerSlice < 2002) ? SampleRepeatMode::ONCE : FlashStorage::defaultSliceMode;
+			drumToUse->sources[0].sampleControls.reversed = false;
 
-			range->sampleHolder.filePath.set(&sample->filePath);
+			range->sampleHolder.filePath.set(&sampleFilePath);
 			range->sampleHolder.loadFile(false, false, true);
+			range->sampleHolder.claimClusterReasons(false, CLUSTER_ENQUEUE);
 
 			if (doEnvelopes) {
 				paramManager.getPatchedParamSet()->params[params::LOCAL_ENV_0_ATTACK].setCurrentValueBasicForSetup(
@@ -729,15 +772,33 @@ ramError2:
 				}
 			}
 
-			// I moved this here, from being earlier/above. Is this fine?
-			currentSong->backUpParamManager(newDrum, getCurrentClip(), &paramManager, true);
+			// If note row already exists, clear old automation and assign clean paramManager to targetNoteRow
+			if (targetNoteRow) {
+				ModelStackWithNoteRow* modelStackWithNoteRow = modelStack->addNoteRow(targetRowIndex, targetNoteRow);
+				targetNoteRow->clear(nullptr, modelStackWithNoteRow, true, false);
+				targetNoteRow->setDrum(drumToUse, kit, modelStackWithNoteRow, nullptr, &paramManager, false);
+
+				ParamManagerForTimeline tempBackupPM;
+				if (tempBackupPM.setupWithPatching() == Error::NONE) {
+					tempBackupPM.cloneParamCollectionsFrom(&targetNoteRow->paramManager, false, true);
+					currentSong->backUpParamManager(drumToUse, getCurrentClip(), &tempBackupPM, true);
+				}
+			}
+			else {
+				// Update backedUpParamManager in Song for newly created drum
+				currentSong->backUpParamManager(drumToUse, getCurrentClip(), &paramManager, true);
+			}
 		}
 
-		// Make NoteRows for all these new Drums
+		// Make NoteRows for any newly added Drums
 		getCurrentKit()->resetDrumTempValues();
-		firstDrum->noteRowAssignedTemp = 1;
+		for (int32_t r = 0; r < clip->noteRows.getNumElements(); r++) {
+			NoteRow* nr = clip->noteRows.getElement(r);
+			if (nr && nr->drum) {
+				nr->drum->noteRowAssignedTemp = 1;
+			}
+		}
 	}
-	ModelStackWithTimelineCounter* modelStack = (ModelStackWithTimelineCounter*)modelStackMemory;
 	getCurrentInstrumentClip()->assignDrumsToNoteRows(modelStack);
 
 	getCurrentInstrument()->beenEdited();

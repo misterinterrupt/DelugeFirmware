@@ -143,7 +143,9 @@ void ModControllableAudio::initParams(ParamManager* paramManager) {
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RATIO].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_ATTACK].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RELEASE].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_BLEND].setCurrentValueBasicForSetup(0);
+	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_BLEND].setCurrentValueBasicForSetup(2147483647);
+	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_INPUT_GAIN].setCurrentValueBasicForSetup(0);
+	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN].setCurrentValueBasicForSetup(1073741824);
 }
 
 bool ModControllableAudio::hasBassAdjusted(ParamManager* paramManager) {
@@ -841,6 +843,10 @@ void ModControllableAudio::writeParamAttributesToFile(Serializer& writer, ParamM
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
 	unpatchedParams->writeParamAsAttribute(writer, "compressorThreshold", params::UNPATCHED_COMPRESSOR_THRESHOLD,
 	                                       writeAutomation, false, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "compressorInputGain", params::UNPATCHED_COMPRESSOR_INPUT_GAIN,
+	                                       writeAutomation, false, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "compressorMakeupGain", params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN,
+	                                       writeAutomation, false, valuesForOverride);
 }
 
 void ModControllableAudio::writeParamTagsToFile(Serializer& writer, ParamManager* paramManager, bool writeAutomation,
@@ -923,6 +929,16 @@ bool ModControllableAudio::readParamTagFromFile(Deserializer& reader, char const
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_THRESHOLD,
 		                           readAutomationUpToPos);
 		reader.exitTag("compressorThreshold");
+	}
+	else if (!strcmp(tagName, "compressorInputGain")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_INPUT_GAIN,
+		                           readAutomationUpToPos);
+		reader.exitTag("compressorInputGain");
+	}
+	else if (!strcmp(tagName, "compressorMakeupGain")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN,
+		                           readAutomationUpToPos);
+		reader.exitTag("compressorMakeupGain");
 	}
 
 	else {

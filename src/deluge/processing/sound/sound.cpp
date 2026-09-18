@@ -40,6 +40,7 @@
 #include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
 #include "model/timeline_counter.h"
+#include "processing/sound/sound_drum.h"
 #include "model/voice/voice.h"
 #include "model/voice/voice_sample.h"
 #include "model/voice/voice_vector.h"
@@ -142,11 +143,10 @@ Sound::Sound() : patcher(&patchableInfoForSound) {
 	modKnobs[5][0].paramDescriptor.setToHaveParamAndSource(params::LOCAL_PITCH_ADJUST, PatchSource::LFO_GLOBAL);
 
 	modKnobs[6][1].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_STUTTER_RATE);
-	modKnobs[6][0].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_PORTAMENTO);
+	modKnobs[6][0].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_COMPRESSOR_BLEND);
 
-	modKnobs[7][1].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START
-	                                                  + params::UNPATCHED_SAMPLE_RATE_REDUCTION);
-	modKnobs[7][0].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_BITCRUSHING);
+	modKnobs[7][1].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_COMPRESSOR_RATIO);
+	modKnobs[7][0].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_COMPRESSOR_THRESHOLD);
 	voicePriority = VoicePriority::MEDIUM;
 	whichExpressionSourcesChangedAtSynthLevel = 0;
 
@@ -241,8 +241,6 @@ void Sound::setupAsSample(ParamManagerForTimeline* paramManager) {
 
 	patchedParams->params[params::LOCAL_LPF_RESONANCE].setCurrentValueBasicForSetup(-2147483648);
 	patchedParams->params[params::LOCAL_LPF_FREQ].setCurrentValueBasicForSetup(2147483647);
-
-	modKnobs[6][0].paramDescriptor.setToHaveParamOnly(params::LOCAL_PITCH_ADJUST);
 
 	paramManager->getPatchCableSet()->numPatchCables = 1;
 	paramManager->getPatchCableSet()->patchCables[0].setup(PatchSource::VELOCITY, params::LOCAL_VOLUME,
@@ -425,6 +423,34 @@ void Sound::patchedParamPresetValueChanged(uint8_t p, ModelStackWithSoundFlags* 
 			recalculateAllVoicePhaseIncrements(modelStack);
 		}
 	}
+}
+
+int32_t Sound::scaleKitEnvelopeParam(int32_t p, int32_t val) {
+	if (isDrum()) {
+		SoundDrum* soundDrum = static_cast<SoundDrum*>(this);
+		if (soundDrum && soundDrum->kit) {
+			int32_t offset = 0;
+			if (p == params::LOCAL_ENV_0_ATTACK) {
+				offset = soundDrum->kit->kitAttackOffset;
+			}
+			else if (p == params::LOCAL_ENV_0_RELEASE || p == params::LOCAL_ENV_0_DECAY) {
+				offset = soundDrum->kit->kitReleaseOffset;
+			}
+			if (offset != 0) {
+				if (offset > 0) {
+					int64_t headroom = 2147483647LL - (int64_t)val;
+					int64_t delta = (headroom * offset) / 64;
+					return val + (int32_t)delta;
+				}
+				else {
+					int64_t headroom = (int64_t)val - (-2147483648LL);
+					int64_t delta = (headroom * offset) / 64;
+					return val + (int32_t)delta;
+				}
+			}
+		}
+	}
+	return val;
 }
 
 void Sound::recalculatePatchingToParam(uint8_t p, ParamManagerForTimeline* paramManager) {
@@ -2419,6 +2445,8 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 	compressor.setAttack(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_ATTACK));
 	compressor.setRelease(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_RELEASE));
 	compressor.setBlend(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_BLEND));
+	compressor.setInputGain(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_INPUT_GAIN));
+	compressor.setMakeupGain(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN));
 	if (compThreshold > 0) {
 		compressor.renderVolNeutral((StereoSample*)soundBuffer, numSamples, postFXVolume);
 	}
@@ -4245,39 +4273,39 @@ void Sound::modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTime
 			custom1Shifted = Buttons::isShiftButtonPressed();
 			if (display->haveOLED()) {
 				if (custom1Shifted) {
-					display->popupText("Compressor:\nRatio / Attack");
+					display->popupText("Compressor:\nAttack / Release");
 				}
 				else {
-					display->popupText("Compressor:\nStutter / Threshold");
+					display->popupText("Compressor:\nStutter / Blend");
 				}
 			}
 			else {
 				if (custom1Shifted) {
-					display->displayPopup("RA.AT");
+					display->displayPopup("AT.RL");
 				}
 				else {
-					display->displayPopup("ST.TH");
+					display->displayPopup("ST.BL");
 				}
 			}
 		}
 	}
-	else if (whichModButton == 7 || whichModButton == 2) {
+	else if (whichModButton == 7) {
 		if (on) {
 			custom3Shifted = Buttons::isShiftButtonPressed();
 			if (display->haveOLED()) {
 				if (custom3Shifted) {
-					display->popupText("Compressor:\nSidechain Vol / Shape");
+					display->popupText("Compressor:\nInput / Makeup");
 				}
 				else {
-					display->popupText("Compressor:\nRelease / Blend");
+					display->popupText("Compressor:\nRatio / Threshold");
 				}
 			}
 			else {
 				if (custom3Shifted) {
-					display->displayPopup("SV.SS");
+					display->displayPopup("IG.MG");
 				}
 				else {
-					display->displayPopup("RL.BL");
+					display->displayPopup("RA.TH");
 				}
 			}
 		}
@@ -4311,17 +4339,17 @@ ModelStackWithAutoParam* Sound::getParamFromModEncoderDeeper(int32_t whichModEnc
 
 	if (modKnobMode == 6) {
 		paramId = custom1Shifted
-		              ? (whichModEncoder == 0 ? params::UNPATCHED_COMPRESSOR_RATIO : params::UNPATCHED_COMPRESSOR_ATTACK)
-		              : (whichModEncoder == 0 ? (int32_t)params::UNPATCHED_STUTTER_RATE : params::UNPATCHED_COMPRESSOR_THRESHOLD);
+		              ? (whichModEncoder == 1 ? params::UNPATCHED_COMPRESSOR_ATTACK : params::UNPATCHED_COMPRESSOR_RELEASE)
+		              : (whichModEncoder == 1 ? (int32_t)params::UNPATCHED_STUTTER_RATE : params::UNPATCHED_COMPRESSOR_BLEND);
 		summary = paramManager->getUnpatchedParamSetSummary();
 		ModelStackWithParamId* newModelStack1 =
 		    modelStack->addParamCollectionAndId(summary->paramCollection, summary, paramId);
 		return newModelStack1->paramCollection->getAutoParamFromId(newModelStack1, allowCreation);
 	}
-	if (modKnobMode == 7 || modKnobMode == 2) {
+	if (modKnobMode == 7) {
 		paramId = custom3Shifted
-		              ? (whichModEncoder == 0 ? (int32_t)params::UNPATCHED_SIDECHAIN_VOLUME : (int32_t)params::UNPATCHED_SIDECHAIN_SHAPE)
-		              : (whichModEncoder == 0 ? (int32_t)params::UNPATCHED_COMPRESSOR_RELEASE : (int32_t)params::UNPATCHED_COMPRESSOR_BLEND);
+		              ? (whichModEncoder == 1 ? (int32_t)params::UNPATCHED_COMPRESSOR_INPUT_GAIN : (int32_t)params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN)
+		              : (whichModEncoder == 1 ? (int32_t)params::UNPATCHED_COMPRESSOR_RATIO : (int32_t)params::UNPATCHED_COMPRESSOR_THRESHOLD);
 		summary = paramManager->getUnpatchedParamSetSummary();
 		ModelStackWithParamId* newModelStack1 =
 		    modelStack->addParamCollectionAndId(summary->paramCollection, summary, paramId);
@@ -4360,10 +4388,7 @@ bool Sound::modEncoderButtonAction(uint8_t whichModEncoder, bool on, ModelStackW
 
 	int32_t modKnobMode = *getModKnobMode();
 
-	ModKnob* ourModKnob = &modKnobs[modKnobMode][whichModEncoder];
-
-	if (ourModKnob->paramDescriptor.isSetToParamWithNoSource(params::UNPATCHED_START
-	                                                         + params::UNPATCHED_STUTTER_RATE)) {
+	if (modKnobMode == 6 && !custom1Shifted && whichModEncoder == 1) {
 		if (on) {
 			beginStutter((ParamManagerForTimeline*)modelStack->paramManager);
 		}
@@ -4375,8 +4400,10 @@ bool Sound::modEncoderButtonAction(uint8_t whichModEncoder, bool on, ModelStackW
 		return false;
 	}
 
+	ModKnob* ourModKnob = &modKnobs[modKnobMode][1 - whichModEncoder];
+
 	// Switch delay pingpong
-	else if (ourModKnob->paramDescriptor.isSetToParamWithNoSource(params::GLOBAL_DELAY_RATE)) {
+	if (ourModKnob->paramDescriptor.isSetToParamWithNoSource(params::GLOBAL_DELAY_RATE)) {
 		if (on) {
 			if (runtimeFeatureSettings.get(RuntimeFeatureSettingType::AltGoldenKnobDelayParams)
 			    == RuntimeFeatureStateToggle::On) {

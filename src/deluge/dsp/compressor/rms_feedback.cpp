@@ -23,37 +23,24 @@ RMSFeedbackCompressor::RMSFeedbackCompressor() {
 	setAttack(5 << 24);
 	setRelease(5 << 24);
 	setThreshold(0);
-	setRatio(64 << 24);
+	setRatio(0);
 	setSidechain(0);
 	setBlend(ONE_Q31);
-	// Default to the maximum useful base gain
-	baseGain_ = 1.35f;
+	setInputGain(0);
+	setMakeupGain(1073741824);
+	baseGain_ = 0.0f;
 }
-// 16 is ln(1<<24) - 1, i.e. where we start clipping
-// since this applies to output
+
 void RMSFeedbackCompressor::updateER(float numSamples, q31_t finalVolume) {
-
-	// 33551360
-	//  int32_t volumePostFX = getParamNeutralValue(Param::Global::VOLUME_POST_FX);
-	// We offset the final volume by a minuscule amount to avoid a finalVolume of zero resulting in NaNs propagating.
-	//
-	// Maximum value: 2.08 neppers, since finalVolume is at most 0x7fffffff (representing ~8 in 3.29 signed fixed point)
-	float songVolumedB = logf(finalVolume + 1e-10);
-
-	threshdb = songVolumedB * threshold;
-	// this is effectively where song volume gets applied, so we'll stick an IIR filter (e.g. the envelope) here to
-	// reduce clicking
 	float lastER = er;
-	er = std::max<float>((songVolumedB - threshdb - 1) * fraction, 0);
-	// using the envelope is convenient since it means makeup gain and compression amount change at the same rate
-	er = runEnvelope(lastER, er, numSamples);
+	float maxLevel = 15.6f;
+	float thresholdDeficit = std::max(0.0f, maxLevel - threshdb);
+	float desiredER = thresholdDeficit * fraction * 0.5f;
+	er = runEnvelope(lastER, desiredER, numSamples);
 }
-/// This renders at a 'neutral' volume, so that at threshold zero the volume in unchanged
+
 void RMSFeedbackCompressor::renderVolNeutral(StereoSample* buffer, uint16_t numSamples, q31_t finalVolume) {
-	// this is a bit gross - the compressor can inherently apply volume changes, but in the case of the per clip
-	// compressor that's already been handled by the reverb send, and the logic there is tightly coupled such that
-	// I couldn't extract correct volume levels from it.
-	render(buffer, numSamples, 1 << 27, 1 << 27, finalVolume >> 3);
+	render(buffer, numSamples, 1 << 30, 1 << 30, finalVolume);
 }
 constexpr uint8_t saturationAmount = 3;
 void RMSFeedbackCompressor::render(StereoSample* buffer, uint16_t numSamples, q31_t volAdjustL, q31_t volAdjustR,
@@ -74,18 +61,17 @@ void RMSFeedbackCompressor::render(StereoSample* buffer, uint16_t numSamples, q3
 	// we update this every time since we won't know if the song volume changed
 	updateER(numSamples, finalVolume);
 
-	float over = std::max<float>(0, (rms - threshdb));
+	float effectiveRMS = rms + inputGaindB;
+	float over = std::max<float>(0.0f, (effectiveRMS - threshdb));
 
 	state = runEnvelope(state, over, numSamples);
 
 	float reduction = -state * fraction;
 
-	// this is the most gain available without overflow
-	// Amount of gain. Must not exceed 3.43 as that will result in a gain > 31
-	float dbGain = baseGain_ + er + reduction;
+	float dbGain = baseGain_ + er + reduction + makeupGaindB + inputGaindB;
 
-	float gain = std::exp((dbGain));
-	gain = std::min<float>(gain, 31);
+	float gain = std::exp(dbGain);
+	gain = std::min<float>(gain, 31.0f);
 
 	// Compute linear volume adjustments as 13.18 signed fixed-point numbers (though stored as floats due to their
 	// use as an intermediate value prior to the increment computation below)
