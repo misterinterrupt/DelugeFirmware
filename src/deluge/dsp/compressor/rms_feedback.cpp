@@ -32,11 +32,7 @@ RMSFeedbackCompressor::RMSFeedbackCompressor() {
 }
 
 void RMSFeedbackCompressor::updateER(float numSamples, q31_t finalVolume) {
-	float lastER = er;
-	float maxLevel = 15.6f;
-	float thresholdDeficit = std::max(0.0f, maxLevel - threshdb);
-	float desiredER = thresholdDeficit * fraction * 0.5f;
-	er = runEnvelope(lastER, desiredER, numSamples);
+	er = 0.0f;
 }
 
 void RMSFeedbackCompressor::renderVolNeutral(StereoSample* buffer, uint16_t numSamples, q31_t finalVolume) {

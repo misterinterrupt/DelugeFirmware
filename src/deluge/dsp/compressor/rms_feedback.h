@@ -43,6 +43,8 @@ public:
 		er = 0;
 		mean = 0;
 		onLastTime = false;
+		currentVolumeL = 0;
+		currentVolumeR = 0;
 	}
 
 	/// Render the compressor in-place using the provided buffer.
@@ -78,11 +80,11 @@ public:
 	///
 	/// The parameter is exponentially mapped to a number between 0.5 and 70-ish ms
 	constexpr int32_t setAttack(q31_t attack) {
-		// this exp will be between 1 and 7ish, half the knob range is about 2.5
-		attackMS = 0.5 + (std::exp(2 * float(attack) / ONE_Q31f) - 1) * 10;
-		a_ = (-1000.0f / kSampleRate) / attackMS;
 		attackKnobPos = attack;
-		return attackMS;
+		float normA = float(attack) / ONE_Q31f;
+		attackMS = 0.5f + normA * normA * 99.5f;
+		a_ = (-1000.0f / kSampleRate) / attackMS;
+		return (int32_t)attackMS;
 	};
 
 	/// Get the current release time constant in terms of the full knob range (0 to 2^31)
@@ -95,13 +97,14 @@ public:
 
 	/// Set the release time constant from a full-scale (0 to 2^31) number.
 	///
-	/// The parameter is exponentially mapped to a number between 50 and 400-ish ms
+	/// Inverted release knob param with smooth quadratic mapping between 10ms and 500ms
 	constexpr int32_t setRelease(q31_t release) {
-		// this exp will be between 1 and 7ish, half the knob range is about 2.5
-		releaseMS = 50 + (std::exp(2 * float(release) / ONE_Q31f) - 1) * 50;
-		r_ = (-1000.0f / kSampleRate) / releaseMS;
 		releaseKnobPos = release;
-		return releaseMS;
+		q31_t effRelease = ONE_Q31 - release;
+		float normR = float(effRelease) / ONE_Q31f;
+		releaseMS = 10.0f + normR * normR * 490.0f;
+		r_ = (-1000.0f / kSampleRate) / releaseMS;
+		return (int32_t)releaseMS;
 	};
 
 	/// Get the current theshold as a full-scale (0 to 2^31) number.
