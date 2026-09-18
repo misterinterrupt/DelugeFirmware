@@ -38,7 +38,20 @@ void RMSFeedbackCompressor::updateER(float numSamples, q31_t finalVolume) {
 void RMSFeedbackCompressor::renderVolNeutral(StereoSample* buffer, uint16_t numSamples, q31_t finalVolume) {
 	render(buffer, numSamples, 1 << 30, 1 << 30, finalVolume);
 }
-constexpr uint8_t saturationAmount = 3;
+constexpr uint8_t saturationAmount = 0;
+
+[[gnu::always_inline]] inline int32_t applyWarmCompressorSaturation(int32_t sample, uint32_t* lastWorkingValue) {
+	// Soft saturation with clean headroom (saturationAmount = 0)
+	int32_t sat = getTanHAntialiased(sample, lastWorkingValue, saturationAmount);
+
+	// Add subtle 2nd-order asymmetric bias for analog tube warmth and bulbous bass response
+	int64_t mag = (sample < 0) ? -(int64_t)sample : (int64_t)sample;
+	int32_t x2 = (int32_t)(((int64_t)sample * mag) >> 31);
+	int32_t warm = sat + (x2 >> 3);
+
+	return std::clamp<int32_t>(warm, -1073741824, 1073741824);
+}
+
 void RMSFeedbackCompressor::render(StereoSample* buffer, uint16_t numSamples, q31_t volAdjustL, q31_t volAdjustR,
                                    q31_t finalVolume) {
 	// make a copy for blending if we need to
@@ -87,10 +100,10 @@ void RMSFeedbackCompressor::render(StereoSample* buffer, uint16_t numSamples, q3
 		currentVolumeR += amplitudeIncrementR;
 		// Need to shift left by 4 because currentVolumeL is a 5.26 signed number rather than a 1.30 signed.
 		thisSample->l = multiply_32x32_rshift32(thisSample->l, currentVolumeL) << 4;
-		thisSample->l = getTanHAntialiased(thisSample->l, &lastSaturationTanHWorkingValue[0], saturationAmount);
+		thisSample->l = applyWarmCompressorSaturation(thisSample->l, &lastSaturationTanHWorkingValue[0]);
 
 		thisSample->r = multiply_32x32_rshift32(thisSample->r, currentVolumeR) << 4;
-		thisSample->r = getTanHAntialiased(thisSample->r, &lastSaturationTanHWorkingValue[1], saturationAmount);
+		thisSample->r = applyWarmCompressorSaturation(thisSample->r, &lastSaturationTanHWorkingValue[1]);
 		// wet/dry blend
 		if (wet != ONE_Q31) {
 			thisSample->l = multiply_32x32_rshift32(thisSample->l, wet);
