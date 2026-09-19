@@ -912,21 +912,33 @@ void renderSongFX(size_t numSamples) { // LPF and stutter for song (must happen 
 		}
 		logAction("mastercomp start");
 
+		UnpatchedParamSet* unpatchedParams = currentSong->paramManager.getUnpatchedParamSet();
+		q31_t compThreshold = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
+		currentSong->globalEffectable.compressor.setThreshold(compThreshold);
+		currentSong->globalEffectable.compressor.setRatio(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RATIO));
+		currentSong->globalEffectable.compressor.setAttack(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_ATTACK));
+		currentSong->globalEffectable.compressor.setRelease(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RELEASE));
+		currentSong->globalEffectable.compressor.setBlend(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_BLEND));
+		currentSong->globalEffectable.compressor.setInputGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_INPUT_GAIN));
+		currentSong->globalEffectable.compressor.setMakeupGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN));
+
 		int32_t songVolume =
 		    getFinalParameterValueVolume(
-		        134217728, cableToLinearParamShortcut(
-		                       currentSong->paramManager.getUnpatchedParamSet()->getValue(params::UNPATCHED_VOLUME)))
+		        134217728, cableToLinearParamShortcut(unpatchedParams->getValue(params::UNPATCHED_VOLUME)))
 		    >> 1;
-		if (currentSong->globalEffectable.compressor.getThreshold() > 0) {
+
+		masterVolumeAdjustmentL = multiply_32x32_rshift32(masterVolumeAdjustmentL, songVolume) << 6;
+		masterVolumeAdjustmentR = multiply_32x32_rshift32(masterVolumeAdjustmentR, songVolume) << 6;
+
+		if (compThreshold > 0) {
 			currentSong->globalEffectable.compressor.render(renderingBuffer.data(), numSamples,
 			                                                masterVolumeAdjustmentL >> 1, masterVolumeAdjustmentR >> 1,
-			                                                songVolume >> 3);
+			                                                0);
 			masterVolumeAdjustmentL = ONE_Q31;
 			masterVolumeAdjustmentR = ONE_Q31;
 		}
 		else {
-			masterVolumeAdjustmentL = multiply_32x32_rshift32(masterVolumeAdjustmentL, songVolume) << 6;
-			masterVolumeAdjustmentR = multiply_32x32_rshift32(masterVolumeAdjustmentR, songVolume) << 6;
+			currentSong->globalEffectable.compressor.reset();
 		}
 		logAction("mastercomp end");
 	}

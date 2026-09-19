@@ -181,7 +181,7 @@ Song::Song() : backedUpParamManagers(sizeof(BackedUpParamManager)) {
 	model = deluge::dsp::Reverb::Model::FREEVERB;
 
 	// setup base compressor gain to match 1.0
-	globalEffectable.compressor.setBaseGain(0.85);
+	globalEffectable.compressor.setBaseGain(0.0);
 
 	// initialize automation arranger view variables
 	lastSelectedParamID = kNoSelection;

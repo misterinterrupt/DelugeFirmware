@@ -45,6 +45,8 @@ public:
 		onLastTime = false;
 		currentVolumeL = 0;
 		currentVolumeR = 0;
+		lastDampValue[0] = 0;
+		lastDampValue[1] = 0;
 	}
 
 	/// Render the compressor in-place using the provided buffer.
@@ -112,11 +114,11 @@ public:
 
 	/// Set the threshold based on a full-scale (0 to 2^31) number.
 	///
-	/// 0 corresponds to 0 dBFS (15.6f log-RMS), 2^31 corresponds to -60 dBFS (3.5f log-RMS).
+	/// 0 corresponds to 0 dBFS (21.5f log-RMS), 2^31 corresponds to -60 dBFS (3.5f log-RMS).
 	constexpr void setThreshold(q31_t t) {
 		thresholdKnobPos = t;
 		float pos = float(thresholdKnobPos) / ONE_Q31f;
-		threshdb = 15.6f - pos * 12.1f;
+		threshdb = 21.5f - pos * 18.0f;
 	}
 
 	/// Get/set Input Gain
@@ -131,9 +133,9 @@ public:
 	[[nodiscard]] inline constexpr q31_t getMakeupGain() const { return makeupGainKnobPos; }
 	constexpr void setMakeupGain(q31_t gain) {
 		makeupGainKnobPos = gain;
-		// Map 0 to 2^31 -> -12 dB to +24 dB makeup gain (-1.38 to +2.76 neppers)
+		// Map 0 to 2^31 -> -24 dB to +24 dB makeup gain (-2.76 to +2.76 neppers, 0 dB at default 50% / pos 0.5)
 		float pos = float(makeupGainKnobPos) / ONE_Q31f;
-		makeupGaindB = -1.38f + pos * 4.14f;
+		makeupGaindB = (pos - 0.5f) * 5.52f;
 	}
 
 	/// Get the current ratio as a full-scale (0 to 2^31) number
@@ -240,6 +242,7 @@ private:
 	float mean = 0;
 	/// tanh working values for output saturation
 	uint32_t lastSaturationTanHWorkingValue[2] = {0};
+	int32_t lastDampValue[2] = {0};
 	bool onLastTime = false;
 
 	// sidechain filter
