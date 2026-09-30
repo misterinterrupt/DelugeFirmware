@@ -4,15 +4,18 @@
 #include "hid/display/display.h"
 #include "io/debug/log.h"
 #include "processing/engines/audio_engine.h"
+#include "storage/audio/audio_file_manager.h"
+#include "playback/playback_handler.h"
 
 extern "C" void openUSBPeripheral();
 extern "C" void closeUSBPeripheral();
 extern "C" void openUSBPeripheralPMSC();
 extern "C" void closeUSBPeripheralPMSC();
 
-#include "playback/playback_handler.h"
-
 extern PlaybackHandler playbackHandler;
+extern AudioFileManager audioFileManager;
+extern bool sdRoutineLock;
+extern volatile uint32_t usbLock;
 
 namespace deluge::storage {
 
@@ -25,16 +28,23 @@ void UsbDiskModeManager::enterUsbDiskMode() {
 
 	D_PRINTLN("Entering USB Disk Mode: Stopping playback and unmounting FatFs...");
 
-	// 1. End active playback and recording
+	// 1. End active playback and recording, and unassign all audio voices
 	playbackHandler.endPlayback();
+	AudioEngine::unassignAllVoices(true);
 
-	// 2. Unmount FatFs filesystem safely to hand block-level control to host PC
+	// 2. Mark card ejected in audioFileManager and lock SD routine access
+	audioFileManager.cardEjected = true;
+	sdRoutineLock = true;
+
+	// 3. Unmount FatFs filesystem safely to hand block-level control to host PC
 	f_mount(NULL, "", 0);
 
-	// 3. Switch USB Peripheral mode to Mass Storage Class (PMSC)
+	// 4. Lock USB stack and switch USB Peripheral mode to Mass Storage Class (PMSC)
+	usbLock = 1;
 	closeUSBPeripheral();
 	pmsc_scsi_init();
 	openUSBPeripheralPMSC();
+	usbLock = 0;
 
 	active_ = true;
 
@@ -53,13 +63,19 @@ void UsbDiskModeManager::exitUsbDiskMode() {
 
 	D_PRINTLN("Exiting USB Disk Mode: Restoring USB MIDI and remounting FatFs...");
 
-	// 1. Teardown PMSC endpoints and re-initialize USB stack back into USB MIDI
+	// 1. Lock USB stack, teardown PMSC endpoints and re-initialize USB stack back into USB MIDI
+	usbLock = 1;
 	closeUSBPeripheralPMSC();
 	pmsc_clear_eject();
 	openUSBPeripheral();
+	usbLock = 0;
 
 	// 2. Remount FatFs filesystem
 	f_mount(&g_diskModeFatFs, "", 1);
+
+	// 3. Restore SD routine lock and card status
+	sdRoutineLock = false;
+	audioFileManager.cardEjected = false;
 
 	active_ = false;
 

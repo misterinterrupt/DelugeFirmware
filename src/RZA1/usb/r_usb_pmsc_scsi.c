@@ -5,10 +5,13 @@
 #include <string.h>
 
 static bool g_pmsc_ejected = false;
+static bool g_pmsc_active = false;
 static uint32_t g_sd_sector_count = 0;
+static uint8_t g_cbw_buffer[31];
 
 void pmsc_scsi_init(void) {
     g_pmsc_ejected = false;
+    g_pmsc_active = true;
     DSTATUS stat = disk_initialize(0);
     if ((stat & STA_NOINIT) == 0) {
         DWORD sector_count = 0;
@@ -24,6 +27,7 @@ bool pmsc_is_ejected(void) {
 
 void pmsc_clear_eject(void) {
     g_pmsc_ejected = false;
+    g_pmsc_active = false;
 }
 
 // Renesas USB Driver PMSC hooks
@@ -36,6 +40,7 @@ void usb_pmsc_mass_strage_reset(uint16_t value, uint16_t index, uint16_t length)
 }
 
 void usb_pmsc_get_max_lun(uint16_t value, uint16_t index, uint16_t length) {
+    if (!g_pmsc_active) return;
     // Single LUN (LUN 0)
     static uint8_t max_lun = 0;
     usb_ctrl_t ctrl;
@@ -45,7 +50,11 @@ void usb_pmsc_get_max_lun(uint16_t value, uint16_t index, uint16_t length) {
 }
 
 void usb_pmsc_receive_cbw(void) {
-    // Prepare endpoint OUT to receive CBW
+    if (!g_pmsc_active) return;
+    usb_ctrl_t ctrl;
+    ctrl.module = USB_IP0;
+    ctrl.type = USB_PMSC;
+    R_USB_Read(&ctrl, g_cbw_buffer, sizeof(usb_cbw_t));
 }
 
 static void send_csw(uint32_t tag, uint32_t residue, uint8_t status) {

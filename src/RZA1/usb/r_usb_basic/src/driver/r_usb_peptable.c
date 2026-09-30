@@ -84,7 +84,7 @@ uint16_t g_usb_pstd_eptbl[] = {
 /************/
 /* for PMSC */
 /************/
-#if defined(USB_CFG_PMSC_USE)
+#if defined(USB_CFG_PMSC_USE) && !defined(USB_CFG_PMIDI_USE)
     USB_CFG_PMSC_BULK_IN, /* Pipe No. */
     /* TYPE    / BFRE        / DBLB         / CNTMD         / SHTNAK         / DIR      / EPNUM */
     USB_NULL | USB_BFREOFF | USB_CFG_DBLB | USB_CFG_CNTMD | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
@@ -100,7 +100,7 @@ uint16_t g_usb_pstd_eptbl[] = {
     USB_NULL,                                                                                     /* PIPEMAXP */
     USB_NULL,                                                                                     /* PIPEPERI */
     USB_NULL,                                                                                     /* reserve */
-#endif /* defined(USB_CFG_PCDC_USE) */
+#endif /* defined(USB_CFG_PMSC_USE) && !defined(USB_CFG_PMIDI_USE) */
 
 /************/
 /* for PMIDI */
