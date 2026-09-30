@@ -202,6 +202,22 @@ void hw_usb_pmodule_init(void)
     USB200.D0FIFOSEL = USB0_CFIFO_MBW;
     USB200.D1FIFOSEL = USB0_CFIFO_MBW;
 
+    /* The direct FIFOSEL writes above bypass the fifoSels[] shadow used by
+     * usb_cstd_chg_curpipe() to skip redundant register writes. Invalidate the
+     * shadow so the next FIFO access reprograms the port - otherwise a stale
+     * value from the previous USB session (e.g. ISEL|pipe0 from MIDI) makes
+     * chg_curpipe skip the write while the register holds different settings,
+     * FRDY never asserts, and every EP0 control read fails with USB_FIFOERROR
+     * (host sees NAK timeouts, device never enumerates). */
+    {
+        extern uint16_t fifoSels[];
+        uint16_t f;
+        for (f = 0; f < USB_FIFO_ACCESS_NUM_MAX; f++)
+        {
+            fifoSels[f] = 0xFFFFu; /* never matches a real CURPIPE/ISEL value */
+        }
+    }
+
     USB200.INTENB0 = (USB_BEMPE | USB_NRDYE | USB_BRDYE | USB_VBSE | USB_DVSE | USB_CTRE);
 #else
     USB201.SUSPMODE |= USB_SUSPM;
