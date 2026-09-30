@@ -53,6 +53,7 @@
 External variables and functions
 ***********************************************************************************************************************/
 extern uint16_t g_usb_usbmode;
+extern void usb_std_clr_uclksel_flg(void);
 #if USB_CFG_DMA == USB_CFG_ENABLE
 extern usb_dma_int_t g_usb_cstd_dma_int; /* DMA Interrupt Info */
 extern void usb_cstd_dxfifo_handler(usb_utr_t* ptr, uint16_t useport);
@@ -166,6 +167,10 @@ usb_err_t usb_module_stop(uint8_t ip_type)
         return USB_ERR_PARA;
     }
     g_usb_is_opened[ip_type] = false;
+
+    /* Gating the module clock also powers down the USB PLL, so force the next
+     * open to re-run the UCKSEL/UPLLE init sequence in hw_usb_pmodule_init(). */
+    usb_std_clr_uclksel_flg();
 
     return USB_SUCCESS;
 } /* End of function usb_module_stop() */

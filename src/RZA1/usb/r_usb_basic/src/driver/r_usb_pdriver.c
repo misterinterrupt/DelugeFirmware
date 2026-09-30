@@ -72,6 +72,13 @@ uint16_t g_usb_peri_connected; /* Status for USB connect. */
 
 extern uint16_t g_usb_open_class; /* Set of open device classes (bit per usb_class_t) */
 
+/* Temporary diagnostics for USB disk mode bring-up, rendered on the display. */
+volatile uint32_t g_usb_dbg_reset = 0; /* bus resets seen */
+volatile uint32_t g_usb_dbg_ctrt = 0;  /* control-transfer (SETUP) interrupts */
+volatile uint32_t g_usb_dbg_brdy0 = 0; /* EP0 data-stage interrupts */
+volatile uint32_t g_usb_dbg_pump = 0;  /* events processed by the PCD task */
+volatile uint32_t g_usb_dbg_gdesc = 0; /* GET_DESCRIPTOR data stages handled */
+
 /* Driver registration */
 usb_pcdreg_t g_usb_pstd_driver;
 usb_setup_t g_usb_pstd_req_reg; /* Device Request - Request structure */
@@ -105,6 +112,7 @@ static void usb_pstd_interrupt(uint16_t type, uint16_t status)
     {
         /* BRDY, BEMP, NRDY */
         case USB_INT_BRDY0: // BRDY (receive finished arriving) for pipe0
+            g_usb_dbg_brdy0++;
             usb_pstd_brdy_pipe(status);
             break;
 
@@ -197,6 +205,7 @@ static void usb_pstd_interrupt(uint16_t type, uint16_t status)
                 case USB_DS_DFLT:
 
                     USB_PRINTF0("USB-reset int peri\n");
+                    g_usb_dbg_reset++;
                     usb_pstd_bus_reset();
 
                     break;
@@ -236,6 +245,7 @@ static void usb_pstd_interrupt(uint16_t type, uint16_t status)
         /* CTRT */
         case USB_INT_CTRT:
 
+            g_usb_dbg_ctrt++;
             stginfo = (uint16_t)(status & USB_CTSQ);
             if (USB_CS_IDST == stginfo)
             {
@@ -358,6 +368,7 @@ void usb_pstd_pcd_task(void)
     while (g_usb_pstd_usb_int.wp != g_usb_pstd_usb_int.rp)
     {
         /* Pop Interrupt info */
+        g_usb_dbg_pump++;
         usb_pstd_interrupt(
             g_usb_pstd_usb_int.buf[g_usb_pstd_usb_int.rp].type, g_usb_pstd_usb_int.buf[g_usb_pstd_usb_int.rp].status);
 
