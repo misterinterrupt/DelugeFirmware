@@ -1129,7 +1129,7 @@ static void usb_pstd_set_configuration3(void)
             usb_cstd_set_buf(USB_NULL, (uint16_t)USB_PIPE0);
             cfgok = USB_OK;
 
-            if ((g_usb_pstd_req_value > 0) && (g_usb_pstd_req_value != g_usb_pstd_config_num))
+            if (g_usb_pstd_req_value > 0)
             {
                 usb_pstd_clr_eptbl_index();
                 ifc = usb_pstd_get_interface_num(g_usb_pstd_req_value);
@@ -1145,6 +1145,11 @@ static void usb_pstd_set_configuration3(void)
 
                 /* Set pipe configuration register */
                 usb_pstd_set_pipe_register((uint16_t)USB_PERIPIPE, p_table);
+
+#if defined(USB_CFG_PMSC_USE)
+                extern void usb_pmsc_receive_cbw(void);
+                usb_pmsc_receive_cbw();
+#endif
             }
         }
         if (USB_ERROR == cfgok)
