@@ -132,8 +132,12 @@ static void usb_pstd_interrupt(uint16_t type, uint16_t status)
             break;
 
         case USB_INT_BEMP0: // BEMP (send finished) for pipe0
+        {
+            extern volatile uint32_t g_usb_dbg_bemp0;
+            g_usb_dbg_bemp0++;
             usb_pstd_bemp_pipe(status);
             break;
+        }
 
         case USB_INT_BEMP: // BEMP (send finished) for non-0 pipe
 #if defined(USB_CFG_PMSC_USE)
