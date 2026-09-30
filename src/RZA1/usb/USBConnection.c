@@ -99,6 +99,8 @@ extern void hw_usb_pset_dprpu(void);
 extern void hw_usb_pclear_dprpu(void);
 extern void usb_cpu_delay_xms(uint16_t time);
 
+extern uint16_t g_usb_open_class;
+
 void openUSBPeripheral(void)
 {
     hw_usb_pclear_dprpu();
@@ -108,7 +110,7 @@ void openUSBPeripheral(void)
     usb_cfg_t cfg;
 
     ctrl.module        = WHICH_USB_MODULE;
-    ctrl.type          = USB_PMSC;
+    ctrl.type          = USB_PVND;
     cfg.usb_speed      = USB_FS;
     cfg.usb_mode       = USB_PERI;
     cfg.p_usb_reg      = &usb_descriptor;
@@ -140,6 +142,8 @@ void openUSBPeripheralPMSC(void)
     cfg.usb_mode  = USB_PERI;
     cfg.p_usb_reg = &usb_pmsc_descriptor;
 
+    g_usb_open_class |= (1 << USB_PMSC);
+
     usb_pdriver_init(&ctrl, &cfg);
 
     hw_usb_pset_dprpu();
@@ -152,11 +156,13 @@ void closeUSBPeripheralPMSC(void)
     hw_usb_pclear_dprpu();
     usb_cpu_delay_xms(100);
 
+    g_usb_open_class &= ~(1 << USB_PMSC);
+
     usb_ctrl_t ctrl;
     usb_cfg_t cfg;
 
     ctrl.module   = WHICH_USB_MODULE;
-    ctrl.type     = USB_PMSC;
+    ctrl.type     = USB_PVND;
     cfg.usb_speed = USB_FS;
     cfg.usb_mode  = USB_PERI;
     cfg.p_usb_reg = &usb_descriptor;

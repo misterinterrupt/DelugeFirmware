@@ -51,6 +51,28 @@
 /***********************************************************************************************************************
  Exported global variables (to be accessed by other files)
  ***********************************************************************************************************************/
+#if defined(USB_CFG_PMSC_USE)
+uint16_t g_usb_pmsc_eptbl[] = {
+    USB_CFG_PMSC_BULK_IN, /* Pipe No. */
+    /* TYPE    / BFRE        / DBLB         / CNTMD         / SHTNAK         / DIR      / EPNUM */
+    USB_NULL | USB_BFREOFF | USB_CFG_DBLB | USB_CFG_CNTMD | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
+    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(8u),                                              /* PIPEBUF */
+    USB_NULL,                                                                                     /* PIPEMAXP */
+    USB_NULL,                                                                                     /* PIPEPERI */
+    USB_NULL,                                                                                     /* reserve */
+
+    USB_CFG_PMSC_BULK_OUT, /* Pipe No. */
+    /* TYPE    / BFRE        / DBLB         / CNTMD         / SHTNAK         / DIR      / EPNUM */
+    USB_NULL | USB_BFREOFF | USB_CFG_DBLB | USB_CFG_CNTMD | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
+    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(72u),                                             /* PIPEBUF */
+    USB_NULL,                                                                                     /* PIPEMAXP */
+    USB_NULL,                                                                                     /* PIPEPERI */
+    USB_NULL,                                                                                     /* reserve */
+
+    USB_PDTBLEND,                                                                                 /* Table End */
+};
+#endif
+
 uint16_t g_usb_pstd_eptbl[] = {
 /************/
 /* for PCDC */
@@ -81,26 +103,6 @@ uint16_t g_usb_pstd_eptbl[] = {
     USB_NULL,                                                                                     /* reserve */
 #endif /* defined(USB_CFG_PCDC_USE) */
 
-/************/
-/* for PMSC */
-/************/
-#if defined(USB_CFG_PMSC_USE) && !defined(USB_CFG_PMIDI_USE)
-    USB_CFG_PMSC_BULK_IN, /* Pipe No. */
-    /* TYPE    / BFRE        / DBLB         / CNTMD         / SHTNAK         / DIR      / EPNUM */
-    USB_NULL | USB_BFREOFF | USB_CFG_DBLB | USB_CFG_CNTMD | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
-    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(8u),                                              /* PIPEBUF */
-    USB_NULL,                                                                                     /* PIPEMAXP */
-    USB_NULL,                                                                                     /* PIPEPERI */
-    USB_NULL,                                                                                     /* reserve */
-
-    USB_CFG_PMSC_BULK_OUT, /* Pipe No. */
-    /* TYPE    / BFRE        / DBLB         / CNTMD         / SHTNAK         / DIR      / EPNUM */
-    USB_NULL | USB_BFREOFF | USB_CFG_DBLB | USB_CFG_CNTMD | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
-    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(72u),                                             /* PIPEBUF */
-    USB_NULL,                                                                                     /* PIPEMAXP */
-    USB_NULL,                                                                                     /* PIPEPERI */
-    USB_NULL,                                                                                     /* reserve */
-#endif /* defined(USB_CFG_PMSC_USE) && !defined(USB_CFG_PMIDI_USE) */
 
 /************/
 /* for PMIDI */

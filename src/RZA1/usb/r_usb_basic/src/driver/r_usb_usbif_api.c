@@ -441,7 +441,7 @@ usb_err_t R_USB_Close(usb_ctrl_t* p_ctrl)
  ***********************************************************************************************************************/
 usb_err_t R_USB_Read(usb_ctrl_t* p_ctrl, uint8_t* buf, uint32_t size)
 {
-#if defined(USB_CFG_HMSC_USE) || defined(USB_CFG_PMIDI_USE)
+#if (defined(USB_CFG_HMSC_USE) || defined(USB_CFG_PMIDI_USE)) && !defined(USB_CFG_PMSC_USE)
     return USB_ERR_NG;
 #else /* defined(USB_CFG_HMSC_USE) */
     usb_info_t info;
@@ -516,7 +516,7 @@ usb_err_t R_USB_Read(usb_ctrl_t* p_ctrl, uint8_t* buf, uint32_t size)
  ***********************************************************************************************************************/
 usb_err_t R_USB_Write(usb_ctrl_t* p_ctrl, uint8_t* buf, uint32_t size)
 {
-#if defined(USB_CFG_HMSC_USE) || defined(USB_CFG_PMIDI_USE)
+#if (defined(USB_CFG_HMSC_USE) || defined(USB_CFG_PMIDI_USE)) && !defined(USB_CFG_PMSC_USE)
     return USB_ERR_NG;
 #else /* defined(USB_CFG_HMSC_USE) */
     usb_info_t info;
@@ -590,7 +590,7 @@ usb_err_t R_USB_Write(usb_ctrl_t* p_ctrl, uint8_t* buf, uint32_t size)
  ***********************************************************************************************************************/
 usb_err_t R_USB_Stop(usb_ctrl_t* p_ctrl, uint16_t type)
 {
-#if defined(USB_CFG_HMSC_USE) || defined(USB_CFG_PMIDI_USE)
+#if (defined(USB_CFG_HMSC_USE) || defined(USB_CFG_PMIDI_USE)) && !defined(USB_CFG_PMSC_USE)
     return USB_ERR_NG;
 #else /* defined(USB_CFG_HMSC_USE) */
     usb_info_t info;

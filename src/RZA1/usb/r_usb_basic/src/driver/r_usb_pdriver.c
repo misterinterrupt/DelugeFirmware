@@ -1268,7 +1268,17 @@ void usb_peri_registration(usb_ctrl_t* ctrl, usb_cfg_t* cfg)
     usb_pcdreg_t pdriver;
 
     /* pdriver registration */
-    pdriver.p_pipetbl   = (uint16_t*)&g_usb_pstd_eptbl; /* Pipe Define Table address */
+#if defined(USB_CFG_PMSC_USE)
+    extern uint16_t g_usb_pmsc_eptbl[];
+    if (ctrl->type == USB_PMSC)
+    {
+        pdriver.p_pipetbl = (uint16_t*)&g_usb_pmsc_eptbl;
+    }
+    else
+#endif
+    {
+        pdriver.p_pipetbl = (uint16_t*)&g_usb_pstd_eptbl; /* Pipe Define Table address */
+    }
     pdriver.p_devicetbl = cfg->p_usb_reg->p_device;     /* Device descriptor Table address */
     pdriver.p_qualitbl  = cfg->p_usb_reg->p_qualifier;  /* Qualifier descriptor Table address */
     pdriver.p_configtbl = cfg->p_usb_reg->p_config_f;   /* Configuration descriptor Table address */
