@@ -133,6 +133,9 @@ void openUSBPeripheralPMSC(void)
     hw_usb_pclear_dprpu();
     usb_cpu_delay_xms(100);
 
+    usb_pstd_clr_mem();
+    usb_pstd_clr_eptbl_index();
+
     usb_ctrl_t ctrl;
     usb_cfg_t cfg;
 
@@ -155,6 +158,9 @@ void closeUSBPeripheralPMSC(void)
 {
     hw_usb_pclear_dprpu();
     usb_cpu_delay_xms(100);
+
+    usb_pstd_clr_mem();
+    usb_pstd_clr_eptbl_index();
 
     g_usb_open_class &= ~(1 << USB_PMSC);
 

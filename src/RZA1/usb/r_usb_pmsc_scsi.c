@@ -66,10 +66,7 @@ void usb_pmsc_mass_strage_reset(uint16_t value, uint16_t index, uint16_t length)
 void usb_pmsc_get_max_lun(uint16_t value, uint16_t index, uint16_t length) {
     if (!g_pmsc_active) return;
     static uint8_t max_lun = 0;
-    usb_ctrl_t ctrl;
-    ctrl.module = USB_IP0;
-    ctrl.type = USB_REQUEST;
-    R_USB_Write(&ctrl, &max_lun, 1);
+    usb_pstd_ctrl_read(1, &max_lun);
 }
 
 void usb_pmsc_receive_cbw(void) {
