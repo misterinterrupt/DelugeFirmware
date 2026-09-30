@@ -326,7 +326,7 @@ uint8_t g_midi_string4[] = {
     0x00,
 };
 
-uint8_t* g_midi_string_table[] = {g_midi_string0, g_midi_string1, g_midi_string2, g_midi_string3, g_midi_string4};
+uint8_t* g_midi_string_table[] = {g_midi_string0, g_midi_string1, g_midi_string2, g_midi_string3, g_midi_string4, 0};
 
 /***********************************************************************************************************************
 Private global variables and functions

@@ -46,6 +46,7 @@ void usb_cstd_usb_task();
 #include "RZA1/usb/userdef/r_usb_hmidi_config.h"
 
 extern uint16_t g_usb_peri_connected;
+extern uint16_t g_usb_open_class;
 
 uint8_t stopSendingAfterDeviceNum[USB_NUM_USBIP];
 uint8_t usbDeviceNumBeingSentToNow[USB_NUM_USBIP];
@@ -297,6 +298,11 @@ int32_t MidiEngine::getPotentialNumConnectedUSBMIDIDevices(int32_t ip) {
 void MidiEngine::flushUSBMIDIOutput() {
 
 	if (usbLock) {
+		return;
+	}
+
+	// While USB disk mode (mass storage) is open, don't arm any MIDI sends.
+	if (g_usb_open_class & (1u << USB_PMSC)) {
 		return;
 	}
 
@@ -847,6 +853,13 @@ void MidiEngine::checkIncomingUsbMidi() {
 		usbLock = 1;
 		usb_cstd_usb_task();
 		usbLock = 0;
+	}
+
+	// While USB disk mode (mass storage) is open, the bulk pipes belong to the PMSC driver - and PMSC's
+	// CBW pipe is the same pipe number the MIDI code arms below. Keep pumping the USB task above (it
+	// drives the mass-storage state machine) but don't touch any MIDI state or pipes.
+	if (g_usb_open_class & (1u << USB_PMSC)) {
+		return;
 	}
 
 	for (int32_t ip = 0; ip < USB_NUM_USBIP; ip++) {

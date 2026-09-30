@@ -70,6 +70,8 @@ uint16_t g_usb_pstd_pipe0_request;
 
 uint16_t g_usb_peri_connected; /* Status for USB connect. */
 
+extern uint16_t g_usb_open_class; /* Set of open device classes (bit per usb_class_t) */
+
 /* Driver registration */
 usb_pcdreg_t g_usb_pstd_driver;
 usb_setup_t g_usb_pstd_req_reg; /* Device Request - Request structure */
@@ -107,6 +109,17 @@ static void usb_pstd_interrupt(uint16_t type, uint16_t status)
             break;
 
         case USB_INT_BRDY: // BRDY (receive finished arriving) for non-0 pipe
+#if defined(USB_CFG_PMSC_USE)
+            if (g_usb_open_class & (1u << USB_PMSC))
+            {
+                /* Mass storage mode: the bulk pipes are PMSC's, so run the generic
+                 * handler which services every armed pipe and calls the class
+                 * transfer callbacks. The MIDI-specialized handler below only
+                 * knows about the MIDI pipes and would strand PMSC transfers. */
+                usb_pstd_brdy_pipe_process(status);
+                break;
+            }
+#endif
             usb_pstd_brdy_pipe_process_rohan_midi(status);
             break;
 
@@ -115,6 +128,13 @@ static void usb_pstd_interrupt(uint16_t type, uint16_t status)
             break;
 
         case USB_INT_BEMP: // BEMP (send finished) for non-0 pipe
+#if defined(USB_CFG_PMSC_USE)
+            if (g_usb_open_class & (1u << USB_PMSC))
+            {
+                usb_pstd_bemp_pipe_process(status);
+                break;
+            }
+#endif
             usb_pstd_bemp_pipe_process_rohan_midi(status);
             break;
 

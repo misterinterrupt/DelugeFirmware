@@ -520,7 +520,7 @@ static void usb_pstd_get_descriptor1(void)
             /*---- String descriptor ----*/
             case USB_DT_STRING:
 
-                if (idx < 7)
+                if ((idx < 7) && (USB_NULL != g_usb_pstd_driver.p_stringtbl[idx]))
                 {
                     p_table = g_usb_pstd_driver.p_stringtbl[idx];
                     len     = (uint16_t)(*(uint8_t*)((uint32_t)p_table + (uint32_t)0));
