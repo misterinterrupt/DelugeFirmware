@@ -32,6 +32,7 @@ Includes   <System Includes> , "Project Includes"
 ***********************************************************************************************************************/
 #include "RZA1/system/r_typedefs.h"
 #include "RZA1/usb/r_usb_basic/r_usb_basic_if.h"
+#include "RZA1/usb/r_usb_basic/src/driver/inc/r_usb_extern.h"
 
 #include "deluge/drivers/uart/uart.h"
 
@@ -121,17 +122,7 @@ void openUSBPeripheral(void)
 void closeUSBPeripheral(void)
 {
     hw_usb_pclear_dprpu();
-
-    usb_ctrl_t ctrl;
-    ctrl.module = WHICH_USB_MODULE;
-    ctrl.type   = USB_PMSC;
-
-    usb_err_t ret_code = R_USB_Close(&ctrl);
-    if (USB_SUCCESS != ret_code)
-    {
-        uartPrintln("Failed to close peripheral");
-    }
-
+    usb_cpu_delay_xms(50);
     usbCurrentlyInitialized = false;
 }
 
@@ -143,12 +134,13 @@ void openUSBPeripheralPMSC(void)
     usb_ctrl_t ctrl;
     usb_cfg_t cfg;
 
-    ctrl.module        = WHICH_USB_MODULE;
-    ctrl.type          = USB_PMSC;
-    cfg.usb_speed      = USB_FS;
-    cfg.usb_mode       = USB_PERI;
-    cfg.p_usb_reg      = &usb_pmsc_descriptor;
-    usb_err_t ret_code = R_USB_Open(&ctrl, &cfg);
+    ctrl.module   = WHICH_USB_MODULE;
+    ctrl.type     = USB_PMSC;
+    cfg.usb_speed = USB_FS;
+    cfg.usb_mode  = USB_PERI;
+    cfg.p_usb_reg = &usb_pmsc_descriptor;
+
+    usb_pdriver_init(&ctrl, &cfg);
 
     hw_usb_pset_dprpu();
 
@@ -158,16 +150,20 @@ void openUSBPeripheralPMSC(void)
 void closeUSBPeripheralPMSC(void)
 {
     hw_usb_pclear_dprpu();
+    usb_cpu_delay_xms(100);
 
     usb_ctrl_t ctrl;
-    ctrl.module = WHICH_USB_MODULE;
-    ctrl.type   = USB_PMSC;
+    usb_cfg_t cfg;
 
-    usb_err_t ret_code = R_USB_Close(&ctrl);
-    if (USB_SUCCESS != ret_code)
-    {
-        uartPrintln("Failed to close PMSC peripheral");
-    }
+    ctrl.module   = WHICH_USB_MODULE;
+    ctrl.type     = USB_PMSC;
+    cfg.usb_speed = USB_FS;
+    cfg.usb_mode  = USB_PERI;
+    cfg.p_usb_reg = &usb_descriptor;
 
-    usbCurrentlyInitialized = false;
+    usb_pdriver_init(&ctrl, &cfg);
+
+    hw_usb_pset_dprpu();
+
+    usbCurrentlyInitialized = true;
 }
