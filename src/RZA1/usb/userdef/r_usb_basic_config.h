@@ -56,6 +56,7 @@
  * */
 #define USB_CFG_PMIDI_USE
 #define USB_CFG_HMIDI_USE
+#define USB_CFG_PMSC_USE
 
 /**  [DMA use setting]
  * USB_CFG_ENABLE       : Uses DMA

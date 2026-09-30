@@ -66,6 +66,7 @@ enum RuntimeFeatureSettingType : uint32_t {
 	AlternativePlaybackStartBehaviour,
 	AccessibilityShortcuts,
 	EnableGridViewLoopPads,
+	UsbDiskMode,
 	MaxElement // Keep as boundary
 };
 

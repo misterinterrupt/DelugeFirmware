@@ -195,6 +195,11 @@ void RuntimeFeatureSettings::init() {
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::EnableGridViewLoopPads],
 	                  STRING_FOR_COMMUNITY_FEATURE_GRID_VIEW_LOOP_PADS, "enableGridViewLoopPads",
 	                  RuntimeFeatureStateToggle::Off);
+
+	// UsbDiskMode
+	SetupOnOffSetting(settings[RuntimeFeatureSettingType::UsbDiskMode],
+	                  STRING_FOR_USB_DISK_MODE, "usbDiskMode",
+	                  RuntimeFeatureStateToggle::Off);
 }
 
 void RuntimeFeatureSettings::readSettingsFromFile(StorageManager& bdsm) {

@@ -18,6 +18,7 @@
 #include "setting.h"
 #include "gui/menu_item/runtime_feature/setting.h"
 #include "model/settings/runtime_feature_settings.h"
+#include "processing/usb_disk_mode_manager.h"
 
 namespace deluge::gui::menu_item::runtime_feature {
 
@@ -39,6 +40,15 @@ void Setting::readCurrentValue() {
 void Setting::writeCurrentValue() {
 	runtimeFeatureSettings.settings[currentSettingIndex].value =
 	    runtimeFeatureSettings.settings[currentSettingIndex].options[this->getValue()].value;
+
+	if (currentSettingIndex == RuntimeFeatureSettingType::UsbDiskMode) {
+		if (runtimeFeatureSettings.settings[currentSettingIndex].value == RuntimeFeatureStateToggle::On) {
+			deluge::storage::UsbDiskModeManager::getInstance().enterUsbDiskMode();
+		}
+		else {
+			deluge::storage::UsbDiskModeManager::getInstance().exitUsbDiskMode();
+		}
+	}
 }
 
 deluge::vector<std::string_view> Setting::getOptions() {

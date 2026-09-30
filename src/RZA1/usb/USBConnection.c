@@ -41,16 +41,24 @@ extern uint8_t g_midi_device[];
 extern uint8_t g_midi_configuration[];
 extern uint8_t* g_midi_string_table[];
 
+extern uint8_t g_pmsc_device[];
+extern uint8_t g_pmsc_configuration[];
+extern uint8_t* g_pmsc_string_table[];
+
 static usb_descriptor_t usb_descriptor = {
     (uint8_t*)g_midi_device,        /* Pointer to the device descriptor */
     (uint8_t*)g_midi_configuration, /* Pointer to the configuration descriptor for Full-speed */
-    (uint8_t*)0,                    /* Pointer to the configuration descriptor for High-speed
-                                     * Does not work in FS mode on most devices if this is a copy of the FS config.
-                                     * It's unused under FS so set to null
-                                     */
+    (uint8_t*)0,
+    (uint8_t*)0,
+    (uint8_t**)g_midi_string_table
+};
 
-    (uint8_t*)0,                   // Don't think we need this /* Pointer to the qualifier descriptor */
-    (uint8_t**)g_midi_string_table /* Pointer to the string descriptor table */
+static usb_descriptor_t usb_pmsc_descriptor = {
+    (uint8_t*)g_pmsc_device,
+    (uint8_t*)g_pmsc_configuration,
+    (uint8_t*)0,
+    (uint8_t*)0,
+    (uint8_t**)g_pmsc_string_table
 };
 
 extern uint8_t usbCurrentlyInitialized;
@@ -96,12 +104,12 @@ void openUSBPeripheral(void)
     cfg.usb_speed      = USB_FS;
     cfg.usb_mode       = USB_PERI;
     cfg.p_usb_reg      = &usb_descriptor;
-    usb_err_t ret_code = R_USB_Open(&ctrl, &cfg); /* Initializes the USB module */
+    usb_err_t ret_code = R_USB_Open(&ctrl, &cfg);
 
     usbCurrentlyInitialized = true;
 }
 
-void closeUSBPeripheral(void) // You can't immediately close this after opening it - you'd better wait a little while.
+void closeUSBPeripheral(void)
 {
     usb_ctrl_t ctrl;
     ctrl.module = WHICH_USB_MODULE;
@@ -111,6 +119,36 @@ void closeUSBPeripheral(void) // You can't immediately close this after opening 
     if (USB_SUCCESS != ret_code)
     {
         uartPrintln("Failed to close peripheral");
+    }
+
+    usbCurrentlyInitialized = false;
+}
+
+void openUSBPeripheralPMSC(void)
+{
+    usb_ctrl_t ctrl;
+    usb_cfg_t cfg;
+
+    ctrl.module        = WHICH_USB_MODULE;
+    ctrl.type          = USB_PMSC;
+    cfg.usb_speed      = USB_FS;
+    cfg.usb_mode       = USB_PERI;
+    cfg.p_usb_reg      = &usb_pmsc_descriptor;
+    usb_err_t ret_code = R_USB_Open(&ctrl, &cfg);
+
+    usbCurrentlyInitialized = true;
+}
+
+void closeUSBPeripheralPMSC(void)
+{
+    usb_ctrl_t ctrl;
+    ctrl.module = WHICH_USB_MODULE;
+    ctrl.type   = USB_PMSC;
+
+    usb_err_t ret_code = R_USB_Close(&ctrl);
+    if (USB_SUCCESS != ret_code)
+    {
+        uartPrintln("Failed to close PMSC peripheral");
     }
 
     usbCurrentlyInitialized = false;
