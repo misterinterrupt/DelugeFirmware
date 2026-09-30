@@ -57,6 +57,7 @@ extern uint16_t g_usb_usbmode;
 extern usb_dma_int_t g_usb_cstd_dma_int; /* DMA Interrupt Info */
 extern void usb_cstd_dxfifo_handler(usb_utr_t* ptr, uint16_t useport);
 #endif /* USB_CFG_DMA == USB_CFG_ENABLE */
+extern void usb_std_clr_uclksel_flg(void);
 
 /***********************************************************************************************************************
  Private global variables and functions
@@ -166,6 +167,7 @@ usb_err_t usb_module_stop(uint8_t ip_type)
         return USB_ERR_PARA;
     }
     g_usb_is_opened[ip_type] = false;
+    usb_std_clr_uclksel_flg();
 
     return USB_SUCCESS;
 } /* End of function usb_module_stop() */
