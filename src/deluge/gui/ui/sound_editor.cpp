@@ -912,7 +912,7 @@ ActionResult SoundEditor::potentialShortcutPadAction(int32_t x, int32_t y, bool 
 				}
 			}
 			// Shortcut to edit a parameter
-			if (x < 14 || (x == 14 && y < 5)) {
+			if (x < 14 || (x == 14 && (getCurrentUI() != &soundEditor || y < 5))) {
 
 				if (editingCVOrMIDIClip()) {
 					if (x == 11) {

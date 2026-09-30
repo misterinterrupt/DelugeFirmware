@@ -7,6 +7,6 @@ bool isSampleModeSample(ModControllableAudio* modControllable, int32_t whichThin
 	Sound* sound = static_cast<Sound*>(modControllable);
 	Source* source = &sound->sources[whichThing];
 
-	return sound->getSynthMode() == ::SynthMode::SUBTRACTIVE && source->oscType == OscType::SAMPLE
-	       && source->hasAtLeastOneAudioFileLoaded();
+	return (sound->getSynthMode() == ::SynthMode::SUBTRACTIVE || sound->isDrum())
+	       && source->oscType == OscType::SAMPLE && source->hasAtLeastOneAudioFileLoaded();
 }

@@ -103,14 +103,26 @@ void Slicer::renderOLED(deluge::hid::display::oled_canvas::Canvas& canvas) {
 	canvas.drawHorizontalLine(windowMinY + 15, 26, OLED_MAIN_WIDTH_PIXELS - 22);
 	canvas.drawString("Num. slices", 30, windowMinY + 6, kTextSpacingX, kTextSpacingY);
 
-	char buffer[12];
-	intToString(slicerMode == SLICER_MODE_REGION ? numClips : numManualSlice, buffer);
+	char buffer[16];
+	int32_t currentCount = slicerMode == SLICER_MODE_REGION ? numClips : numManualSlice;
+	if (currentCount == 1) {
+		strcpy(buffer, "1 (MANUAL)");
+	}
+	else {
+		intToString(currentCount, buffer);
+	}
 	canvas.drawStringCentred(buffer, windowMinY + 18, kTextSpacingX, kTextSpacingY,
 	                         (OLED_MAIN_WIDTH_PIXELS >> 1) + horizontalShift);
 }
 
 void Slicer::redraw() {
-	display->setTextAsNumber(slicerMode == SLICER_MODE_REGION ? numClips : numManualSlice, 255, true);
+	int32_t currentCount = slicerMode == SLICER_MODE_REGION ? numClips : numManualSlice;
+	if (currentCount == 1) {
+		display->setText("MAN");
+	}
+	else {
+		display->setTextAsNumber(currentCount, 255, true);
+	}
 }
 
 bool Slicer::renderMainPads(uint32_t whichRows, RGB image[][kDisplayWidth + kSideBarWidth],
@@ -291,10 +303,10 @@ ActionResult Slicer::verticalEncoderAction(int32_t offset, bool inCardRoutine) {
 void Slicer::selectEncoderAction(int8_t offset) {
 	if (slicerMode == SLICER_MODE_REGION) {
 		numClips += offset;
-		if (numClips == 257) {
-			numClips = 2;
+		if (numClips > 256) {
+			numClips = 1;
 		}
-		else if (numClips == 1) {
+		else if (numClips < 1) {
 			numClips = 256;
 		}
 	}
