@@ -590,6 +590,8 @@ extern uint16_t g_usb_pstd_eptbl[];
 extern void usb_pmsc_receive_cbw(void);
 extern void usb_pmsc_get_max_lun(uint16_t value, uint16_t index, uint16_t length);
 extern void usb_pmsc_mass_strage_reset(uint16_t value, uint16_t index, uint16_t length);
+extern void usb_pmsc_read_complete(usb_utr_t* mess, uint16_t data1, uint16_t data2);
+extern void usb_pmsc_write_complete(usb_utr_t* mess, uint16_t data1, uint16_t data2);
 #endif /* defined(USB_CFG_PMSC_USE) */
 
 void usb_hstd_device_information(usb_utr_t* ptr, uint16_t devaddr, uint16_t* tbl);

@@ -2,16 +2,41 @@
 #include "RZA1/sdhi/inc/sdif.h"
 #include "diskio.h"
 #include "RZA1/usb/r_usb_basic/r_usb_basic_if.h"
+#include "RZA1/usb/r_usb_basic/src/driver/inc/r_usb_extern.h"
 #include <string.h>
 
+typedef enum {
+    PMSC_STATE_IDLE = 0,
+    PMSC_STATE_WAIT_CBW,
+    PMSC_STATE_DATA_IN,
+    PMSC_STATE_DATA_OUT,
+    PMSC_STATE_SEND_CSW
+} pmsc_state_t;
+
+static volatile pmsc_state_t g_pmsc_state = PMSC_STATE_IDLE;
 static bool g_pmsc_ejected = false;
 static bool g_pmsc_active = false;
 static uint32_t g_sd_sector_count = 0;
-static uint8_t g_cbw_buffer[31];
+
+static uint8_t g_cbw_buffer[31] __attribute__((aligned(4)));
+static uint8_t g_sec_buf[512] __attribute__((aligned(4)));
+
+static uint32_t g_cbw_tag = 0;
+static uint32_t g_cbw_transfer_len = 0;
+static uint32_t g_scsi_lba = 0;
+static uint16_t g_scsi_sector_count = 0;
+static uint16_t g_scsi_sector_index = 0;
+static uint8_t g_scsi_status = 0;
+
+static usb_csw_t g_csw __attribute__((aligned(4)));
+
+static void send_csw(uint32_t tag, uint32_t residue, uint8_t status);
+static void send_scsi_data(uint32_t tag, const uint8_t* data, uint32_t len, uint32_t expected_len);
 
 void pmsc_scsi_init(void) {
     g_pmsc_ejected = false;
     g_pmsc_active = true;
+    g_pmsc_state = PMSC_STATE_IDLE;
     DSTATUS stat = disk_initialize(0);
     if ((stat & STA_NOINIT) == 0) {
         DWORD sector_count = 0;
@@ -28,20 +53,18 @@ bool pmsc_is_ejected(void) {
 void pmsc_clear_eject(void) {
     g_pmsc_ejected = false;
     g_pmsc_active = false;
+    g_pmsc_state = PMSC_STATE_IDLE;
 }
 
-// Renesas USB Driver PMSC hooks
 void usb_pmsc_task(void) {
-    // Background PMSC task
 }
 
 void usb_pmsc_mass_strage_reset(uint16_t value, uint16_t index, uint16_t length) {
-    // Reset LUN state
+    usb_pmsc_receive_cbw();
 }
 
 void usb_pmsc_get_max_lun(uint16_t value, uint16_t index, uint16_t length) {
     if (!g_pmsc_active) return;
-    // Single LUN (LUN 0)
     static uint8_t max_lun = 0;
     usb_ctrl_t ctrl;
     ctrl.module = USB_IP0;
@@ -51,41 +74,101 @@ void usb_pmsc_get_max_lun(uint16_t value, uint16_t index, uint16_t length) {
 
 void usb_pmsc_receive_cbw(void) {
     if (!g_pmsc_active) return;
+    g_pmsc_state = PMSC_STATE_WAIT_CBW;
     usb_ctrl_t ctrl;
     ctrl.module = USB_IP0;
     ctrl.type = USB_PMSC;
     R_USB_Read(&ctrl, g_cbw_buffer, sizeof(usb_cbw_t));
 }
 
-static void send_csw(uint32_t tag, uint32_t residue, uint8_t status) {
-    usb_csw_t csw;
-    csw.dCSWSignature = 0x53425355; // "USBS"
-    csw.dCSWTag = tag;
-    csw.dCSWDataResidue = residue;
-    csw.bCSWStatus = status;
+void usb_pmsc_read_complete(usb_utr_t* mess, uint16_t data1, uint16_t data2) {
+    if (!g_pmsc_active) return;
 
+    if (g_pmsc_state == PMSC_STATE_WAIT_CBW) {
+        pmsc_process_cbw(g_cbw_buffer, sizeof(usb_cbw_t));
+    } else if (g_pmsc_state == PMSC_STATE_DATA_OUT) {
+        if (disk_write(0, g_sec_buf, g_scsi_lba + g_scsi_sector_index, 1) != RES_OK) {
+            g_scsi_status = 1;
+        }
+        g_scsi_sector_index++;
+        if (g_scsi_sector_index < g_scsi_sector_count && g_scsi_status == 0) {
+            usb_ctrl_t ctrl;
+            ctrl.module = USB_IP0;
+            ctrl.type = USB_PMSC;
+            R_USB_Read(&ctrl, g_sec_buf, 512);
+        } else {
+            uint32_t transferred = g_scsi_sector_index * 512;
+            uint32_t residue = (g_cbw_transfer_len > transferred) ? (g_cbw_transfer_len - transferred) : 0;
+            send_csw(g_cbw_tag, residue, g_scsi_status);
+        }
+    }
+}
+
+void usb_pmsc_write_complete(usb_utr_t* mess, uint16_t data1, uint16_t data2) {
+    if (!g_pmsc_active) return;
+
+    if (g_pmsc_state == PMSC_STATE_DATA_IN) {
+        if (g_scsi_sector_count > 0) {
+            g_scsi_sector_index++;
+            if (g_scsi_sector_index < g_scsi_sector_count && g_scsi_status == 0) {
+                if (disk_read(0, g_sec_buf, g_scsi_lba + g_scsi_sector_index, 1) != RES_OK) {
+                    g_scsi_status = 1;
+                }
+                usb_ctrl_t ctrl;
+                ctrl.module = USB_IP0;
+                ctrl.type = USB_PMSC;
+                R_USB_Write(&ctrl, g_sec_buf, 512);
+                return;
+            }
+            uint32_t transferred = g_scsi_sector_index * 512;
+            uint32_t residue = (g_cbw_transfer_len > transferred) ? (g_cbw_transfer_len - transferred) : 0;
+            send_csw(g_cbw_tag, residue, g_scsi_status);
+        } else {
+            uint32_t residue = (g_cbw_transfer_len > sizeof(g_sec_buf)) ? (g_cbw_transfer_len - sizeof(g_sec_buf)) : 0;
+            send_csw(g_cbw_tag, residue, 0);
+        }
+    } else if (g_pmsc_state == PMSC_STATE_SEND_CSW) {
+        usb_pmsc_receive_cbw();
+    }
+}
+
+static void send_csw(uint32_t tag, uint32_t residue, uint8_t status) {
+    g_csw.dCSWSignature = 0x53425355; // "USBS"
+    g_csw.dCSWTag = tag;
+    g_csw.dCSWDataResidue = residue;
+    g_csw.bCSWStatus = status;
+
+    g_pmsc_state = PMSC_STATE_SEND_CSW;
     usb_ctrl_t ctrl;
     ctrl.module = USB_IP0;
     ctrl.type = USB_PMSC;
-    R_USB_Write(&ctrl, (uint8_t*)&csw, sizeof(csw));
+    R_USB_Write(&ctrl, (uint8_t*)&g_csw, sizeof(g_csw));
 }
 
 static void send_scsi_data(uint32_t tag, const uint8_t* data, uint32_t len, uint32_t expected_len) {
+    g_cbw_tag = tag;
+    g_cbw_transfer_len = expected_len;
+    g_scsi_sector_count = 0;
+
+    if (len > sizeof(g_sec_buf)) len = sizeof(g_sec_buf);
+    memcpy(g_sec_buf, data, len);
+
+    g_pmsc_state = PMSC_STATE_DATA_IN;
     usb_ctrl_t ctrl;
     ctrl.module = USB_IP0;
     ctrl.type = USB_PMSC;
-    R_USB_Write(&ctrl, (uint8_t*)data, len);
-    uint32_t residue = (expected_len > len) ? (expected_len - len) : 0;
-    send_csw(tag, residue, 0);
+    R_USB_Write(&ctrl, g_sec_buf, len);
 }
 
 void pmsc_process_cbw(const uint8_t* cbw_bytes, uint32_t len) {
     if (len < sizeof(usb_cbw_t)) {
+        usb_pmsc_receive_cbw();
         return;
     }
 
     const usb_cbw_t* cbw = (const usb_cbw_t*)cbw_bytes;
     if (cbw->dCBWSignature != 0x43425355) { // "USBC"
+        usb_pmsc_receive_cbw();
         return;
     }
 
@@ -171,46 +254,45 @@ void pmsc_process_cbw(const uint8_t* cbw_bytes, uint32_t len) {
         break;
 
     case 0x28: { // READ (10)
-        uint32_t lba = (cbw->CBWCB[2] << 24) | (cbw->CBWCB[3] << 16) | (cbw->CBWCB[4] << 8) | cbw->CBWCB[5];
-        uint16_t sectors = (cbw->CBWCB[7] << 8) | cbw->CBWCB[8];
-        static uint8_t sec_buf[512];
-        usb_ctrl_t ctrl;
-        ctrl.module = USB_IP0;
-        ctrl.type = USB_PMSC;
-        uint8_t status = 0;
+        g_scsi_lba = (cbw->CBWCB[2] << 24) | (cbw->CBWCB[3] << 16) | (cbw->CBWCB[4] << 8) | cbw->CBWCB[5];
+        g_scsi_sector_count = (cbw->CBWCB[7] << 8) | cbw->CBWCB[8];
+        g_scsi_sector_index = 0;
+        g_scsi_status = 0;
+        g_cbw_tag = cbw->dCBWTag;
+        g_cbw_transfer_len = cbw->dCBWDataTransferLength;
 
-        for (uint16_t i = 0; i < sectors; i++) {
-            if (disk_read(0, sec_buf, lba + i, 1) != RES_OK) {
-                status = 1;
-                break;
+        if (g_scsi_sector_count == 0) {
+            send_csw(g_cbw_tag, 0, 0);
+        } else {
+            if (disk_read(0, g_sec_buf, g_scsi_lba, 1) != RES_OK) {
+                g_scsi_status = 1;
             }
-            R_USB_Write(&ctrl, sec_buf, 512);
+            g_pmsc_state = PMSC_STATE_DATA_IN;
+            usb_ctrl_t ctrl;
+            ctrl.module = USB_IP0;
+            ctrl.type = USB_PMSC;
+            R_USB_Write(&ctrl, g_sec_buf, 512);
         }
-        uint32_t transferred = sectors * 512;
-        uint32_t residue = (cbw->dCBWDataTransferLength > transferred) ? (cbw->dCBWDataTransferLength - transferred) : 0;
-        send_csw(cbw->dCBWTag, residue, status);
         break;
     }
 
     case 0x2A: { // WRITE (10)
-        uint32_t lba = (cbw->CBWCB[2] << 24) | (cbw->CBWCB[3] << 16) | (cbw->CBWCB[4] << 8) | cbw->CBWCB[5];
-        uint16_t sectors = (cbw->CBWCB[7] << 8) | cbw->CBWCB[8];
-        static uint8_t sec_buf[512];
-        usb_ctrl_t ctrl;
-        ctrl.module = USB_IP0;
-        ctrl.type = USB_PMSC;
-        uint8_t status = 0;
+        g_scsi_lba = (cbw->CBWCB[2] << 24) | (cbw->CBWCB[3] << 16) | (cbw->CBWCB[4] << 8) | cbw->CBWCB[5];
+        g_scsi_sector_count = (cbw->CBWCB[7] << 8) | cbw->CBWCB[8];
+        g_scsi_sector_index = 0;
+        g_scsi_status = 0;
+        g_cbw_tag = cbw->dCBWTag;
+        g_cbw_transfer_len = cbw->dCBWDataTransferLength;
 
-        for (uint16_t i = 0; i < sectors; i++) {
-            R_USB_Read(&ctrl, sec_buf, 512);
-            if (disk_write(0, sec_buf, lba + i, 1) != RES_OK) {
-                status = 1;
-                break;
-            }
+        if (g_scsi_sector_count == 0) {
+            send_csw(g_cbw_tag, 0, 0);
+        } else {
+            g_pmsc_state = PMSC_STATE_DATA_OUT;
+            usb_ctrl_t ctrl;
+            ctrl.module = USB_IP0;
+            ctrl.type = USB_PMSC;
+            R_USB_Read(&ctrl, g_sec_buf, 512);
         }
-        uint32_t transferred = sectors * 512;
-        uint32_t residue = (cbw->dCBWDataTransferLength > transferred) ? (cbw->dCBWDataTransferLength - transferred) : 0;
-        send_csw(cbw->dCBWTag, residue, status);
         break;
     }
 
