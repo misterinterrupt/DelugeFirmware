@@ -94,8 +94,15 @@ void closeUSBHost(void)
     usbCurrentlyInitialized = false;
 }
 
+extern void hw_usb_pset_dprpu(void);
+extern void hw_usb_pclear_dprpu(void);
+extern void usb_cpu_delay_xms(uint16_t time);
+
 void openUSBPeripheral(void)
 {
+    hw_usb_pclear_dprpu();
+    usb_cpu_delay_xms(100);
+
     usb_ctrl_t ctrl;
     usb_cfg_t cfg;
 
@@ -106,11 +113,15 @@ void openUSBPeripheral(void)
     cfg.p_usb_reg      = &usb_descriptor;
     usb_err_t ret_code = R_USB_Open(&ctrl, &cfg);
 
+    hw_usb_pset_dprpu();
+
     usbCurrentlyInitialized = true;
 }
 
 void closeUSBPeripheral(void)
 {
+    hw_usb_pclear_dprpu();
+
     usb_ctrl_t ctrl;
     ctrl.module = WHICH_USB_MODULE;
     ctrl.type   = USB_PMSC;
@@ -126,6 +137,9 @@ void closeUSBPeripheral(void)
 
 void openUSBPeripheralPMSC(void)
 {
+    hw_usb_pclear_dprpu();
+    usb_cpu_delay_xms(100);
+
     usb_ctrl_t ctrl;
     usb_cfg_t cfg;
 
@@ -136,11 +150,15 @@ void openUSBPeripheralPMSC(void)
     cfg.p_usb_reg      = &usb_pmsc_descriptor;
     usb_err_t ret_code = R_USB_Open(&ctrl, &cfg);
 
+    hw_usb_pset_dprpu();
+
     usbCurrentlyInitialized = true;
 }
 
 void closeUSBPeripheralPMSC(void)
 {
+    hw_usb_pclear_dprpu();
+
     usb_ctrl_t ctrl;
     ctrl.module = WHICH_USB_MODULE;
     ctrl.type   = USB_PMSC;
