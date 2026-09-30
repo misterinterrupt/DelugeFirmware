@@ -13,6 +13,7 @@ public:
 	}
 
 	bool isUsbDiskModeActive() const { return active_; }
+	bool isActive() const { return active_; }
 
 	/// Enter USB Disk Mode: halt audio engine, flush/unmount FatFs, init USB PMSC
 	void enterUsbDiskMode();

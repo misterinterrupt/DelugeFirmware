@@ -111,6 +111,7 @@
 #include "gui/menu_item/osc/type.h"
 #include "gui/menu_item/patch_cable_strength/fixed.h"
 #include "gui/menu_item/patch_cables.h"
+#include "gui/menu_item/usb_disk_mode.h"
 #include "gui/menu_item/patched_param/integer.h"
 #include "gui/menu_item/patched_param/integer_non_fm.h"
 #include "gui/menu_item/patched_param/pan.h"
@@ -1300,6 +1301,7 @@ Submenu settingsRootMenu{
         &sampleBrowserPreviewModeMenu,
         &flashStatusMenu,
         &recordSubmenu,
+        &usbDiskModeMenuItem,
         &runtimeFeatureSettingsMenu,
         &firmwareVersionMenu,
     },

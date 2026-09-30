@@ -40,15 +40,6 @@ void Setting::readCurrentValue() {
 void Setting::writeCurrentValue() {
 	runtimeFeatureSettings.settings[currentSettingIndex].value =
 	    runtimeFeatureSettings.settings[currentSettingIndex].options[this->getValue()].value;
-
-	if (currentSettingIndex == RuntimeFeatureSettingType::UsbDiskMode) {
-		if (runtimeFeatureSettings.settings[currentSettingIndex].value == RuntimeFeatureStateToggle::On) {
-			deluge::storage::UsbDiskModeManager::getInstance().enterUsbDiskMode();
-		}
-		else {
-			deluge::storage::UsbDiskModeManager::getInstance().exitUsbDiskMode();
-		}
-	}
 }
 
 deluge::vector<std::string_view> Setting::getOptions() {
