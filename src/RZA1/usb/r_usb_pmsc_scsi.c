@@ -68,7 +68,7 @@ void usb_pmsc_get_max_lun(uint16_t value, uint16_t index, uint16_t length) {
     static uint8_t max_lun = 0;
     usb_ctrl_t ctrl;
     ctrl.module = USB_IP0;
-    ctrl.type = USB_PMSC;
+    ctrl.type = USB_REQUEST;
     R_USB_Write(&ctrl, &max_lun, 1);
 }
 
