@@ -319,7 +319,7 @@ usb_er_t usb_ctrl_stop(usb_ctrl_t* p_ctrl)
     usb_utr_t utr;
 #endif /* (USB_CFG_MODE & USB_CFG_HOST) == USB_CFG_HOST */
 
-    if ((p_ctrl->type) > USB_PVND)
+    if ((p_ctrl->type >= USB_HCDC) && (p_ctrl->type <= USB_HMSC))
     {
 #if ((USB_CFG_MODE & USB_CFG_HOST) == USB_CFG_HOST)
         utr.ip  = p_ctrl->module;
@@ -352,7 +352,7 @@ usb_er_t usb_data_read(usb_ctrl_t* p_ctrl, uint8_t* buf, uint32_t size)
 
     pipe = usb_get_usepipe(p_ctrl, USB_READ);
 
-    if ((p_ctrl->type) > USB_PVND)
+    if ((p_ctrl->type >= USB_HCDC) && (p_ctrl->type <= USB_HMSC))
     {
 #if ((USB_CFG_MODE & USB_CFG_HOST) == USB_CFG_HOST)
         g_usb_read_request_size[p_ctrl->module][pipe] = size;
@@ -395,7 +395,7 @@ usb_er_t usb_data_write(usb_ctrl_t* p_ctrl, uint8_t* buf, uint32_t size)
 
     pipe = usb_get_usepipe(p_ctrl, USB_WRITE);
 
-    if ((p_ctrl->type) > USB_PVND)
+    if ((p_ctrl->type >= USB_HCDC) && (p_ctrl->type <= USB_HMSC))
     {
 #if ((USB_CFG_MODE & USB_CFG_HOST) == USB_CFG_HOST)
         g_usb_hdata[p_ctrl->module][pipe].keyword   = pipe;                                   /* Pipe No */
@@ -459,7 +459,7 @@ usb_er_t usb_data_stop(usb_ctrl_t* p_ctrl, uint16_t type)
         return USB_ERROR;
     }
 
-    if ((p_ctrl->type) > USB_PVND)
+    if ((p_ctrl->type >= USB_HCDC) && (p_ctrl->type <= USB_HMSC))
     {
         /* Host only */
 #if ((USB_CFG_MODE & USB_CFG_HOST) == USB_CFG_HOST)
@@ -490,7 +490,7 @@ uint8_t usb_get_usepipe(usb_ctrl_t* p_ctrl, uint8_t dir)
     uint8_t pipe = USB_NULL;
     uint8_t idx;
 
-    if ((p_ctrl->type) > USB_PVND)
+    if ((p_ctrl->type >= USB_HCDC) && (p_ctrl->type <= USB_HMSC))
     {
 #if ((USB_CFG_MODE & USB_CFG_HOST) == USB_CFG_HOST)
         /* Host */
