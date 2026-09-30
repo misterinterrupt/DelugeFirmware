@@ -1435,6 +1435,7 @@ void usb_peri_class_request_wnss(usb_setup_t* req)
     {
         if (USB_MASS_STORAGE_RESET == (req->type & USB_BREQUEST))
         {
+            usb_cstd_set_buf(USB_NULL, (uint16_t)USB_PIPE0);
             usb_pmsc_mass_strage_reset(req->value, req->index, req->length);
         }
         else
@@ -1447,10 +1448,7 @@ void usb_peri_class_request_wnss(usb_setup_t* req)
         usb_pstd_set_stall_pipe0(); /* Req Error */
     }
 
-    if (USB_MASS_STORAGE_RESET != (req->type & USB_BREQUEST))
-    {
-        usb_pstd_ctrl_end((uint16_t)USB_CTRL_END); /* End control transfer. */
-    }
+    usb_pstd_ctrl_end((uint16_t)USB_CTRL_END); /* End control transfer. */
 
 #else /* defined(USB_CFG_PMSC_USE) */
 

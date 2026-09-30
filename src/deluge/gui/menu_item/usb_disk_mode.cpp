@@ -40,9 +40,12 @@ ActionResult UsbDiskMode::buttonAction(deluge::hid::Button b, bool on, bool inCa
 		if (deluge::storage::UsbDiskModeManager::getInstance().isActive()) {
 			deluge::storage::UsbDiskModeManager::getInstance().exitUsbDiskMode();
 		}
-		return ActionResult::NOT_DEALT_WITH;
+		if (soundEditor.getCurrentMenuItem() == this) {
+			soundEditor.goUpOneLevel();
+		}
+		return ActionResult::DEALT_WITH;
 	}
-	return ActionResult::NOT_DEALT_WITH;
+	return ActionResult::DEALT_WITH;
 }
 
 ActionResult UsbDiskMode::timerCallback() {

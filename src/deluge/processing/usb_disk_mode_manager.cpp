@@ -32,9 +32,8 @@ void UsbDiskModeManager::enterUsbDiskMode() {
 	playbackHandler.endPlayback();
 	AudioEngine::unassignAllVoices(true);
 
-	// 2. Mark card ejected in audioFileManager and lock SD routine access
-	audioFileManager.cardEjected = true;
-	sdRoutineLock = true;
+	// 2. Mark card disabled in audioFileManager so background routines don't touch SD
+	audioFileManager.cardDisabled = true;
 
 	// 3. Unmount FatFs filesystem safely to hand block-level control to host PC
 	f_mount(NULL, "", 0);
@@ -73,9 +72,8 @@ void UsbDiskModeManager::exitUsbDiskMode() {
 	// 2. Remount FatFs filesystem
 	f_mount(&g_diskModeFatFs, "", 1);
 
-	// 3. Restore SD routine lock and card status
-	sdRoutineLock = false;
-	audioFileManager.cardEjected = false;
+	// 3. Restore SD card status
+	audioFileManager.cardDisabled = false;
 
 	active_ = false;
 

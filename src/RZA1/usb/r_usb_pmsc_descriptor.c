@@ -69,7 +69,7 @@ uint8_t g_pmsc_configuration[PMSC_CONFIG_LENGTH + (PMSC_CONFIG_LENGTH % 2)] = {
 
 static uint8_t g_pmsc_string_langid[] = { 4, 3, 0x09, 0x04 };
 static uint8_t g_pmsc_string_vendor[] = { 22, 3, 'S', 0, 'y', 0, 'n', 0, 't', 0, 'h', 0, 's', 0, 't', 0, 'r', 0, 'o', 0, 'm', 0 };
-static uint8_t g_pmsc_string_product[] = { 32, 3, 'D', 0, 'e', 0, 'l', 0, 'u', 0, 'g', 0, 'e', 0, ' ', 0, 'S', 0, 'D', 0, ' ', 0, 'C', 0, 'a', 0, 'r', 0, 'd', 0 };
+static uint8_t g_pmsc_string_product[] = { 30, 3, 'D', 0, 'e', 0, 'l', 0, 'u', 0, 'g', 0, 'e', 0, ' ', 0, 'S', 0, 'D', 0, ' ', 0, 'C', 0, 'a', 0, 'r', 0, 'd', 0 };
 static uint8_t g_pmsc_string_serial[] = { 18, 3, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '0', 0, '1', 0 };
 
 uint8_t* g_pmsc_string_table[] = {

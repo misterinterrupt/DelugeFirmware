@@ -43,6 +43,7 @@
 #include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
 #include "model/voice/voice_vector.h"
+#include "processing/usb_disk_mode_manager.h"
 #include "modulation/params/param_set.h"
 #include "modulation/patch/patch_cable_set.h"
 #include "playback/mode/playback_mode.h"
@@ -1135,6 +1136,10 @@ void SoundEditor::enterOrUpdateSoundEditor(bool on) {
 extern uint16_t batteryMV;
 
 ActionResult SoundEditor::padAction(int32_t x, int32_t y, int32_t on) {
+	if (deluge::storage::UsbDiskModeManager::getInstance().isActive()) {
+		return ActionResult::DEALT_WITH;
+	}
+
 	if (sdRoutineLock) {
 		return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 	}

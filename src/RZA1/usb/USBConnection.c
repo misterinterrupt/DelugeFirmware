@@ -124,7 +124,13 @@ void openUSBPeripheral(void)
 void closeUSBPeripheral(void)
 {
     hw_usb_pclear_dprpu();
-    usb_cpu_delay_xms(50);
+    usb_cpu_delay_xms(100);
+
+    usb_ctrl_t ctrl;
+    ctrl.module = WHICH_USB_MODULE;
+    ctrl.type   = USB_PVND;
+    R_USB_Close(&ctrl);
+
     usbCurrentlyInitialized = false;
 }
 
@@ -132,9 +138,6 @@ void openUSBPeripheralPMSC(void)
 {
     hw_usb_pclear_dprpu();
     usb_cpu_delay_xms(100);
-
-    usb_pstd_clr_mem();
-    usb_pstd_clr_eptbl_index();
 
     usb_ctrl_t ctrl;
     usb_cfg_t cfg;
@@ -147,7 +150,7 @@ void openUSBPeripheralPMSC(void)
 
     g_usb_open_class |= (1 << USB_PMSC);
 
-    usb_pdriver_init(&ctrl, &cfg);
+    R_USB_Open(&ctrl, &cfg);
 
     hw_usb_pset_dprpu();
 
@@ -159,23 +162,10 @@ void closeUSBPeripheralPMSC(void)
     hw_usb_pclear_dprpu();
     usb_cpu_delay_xms(100);
 
-    usb_pstd_clr_mem();
-    usb_pstd_clr_eptbl_index();
-
-    g_usb_open_class &= ~(1 << USB_PMSC);
-
     usb_ctrl_t ctrl;
-    usb_cfg_t cfg;
+    ctrl.module = WHICH_USB_MODULE;
+    ctrl.type   = USB_PMSC;
+    R_USB_Close(&ctrl);
 
-    ctrl.module   = WHICH_USB_MODULE;
-    ctrl.type     = USB_PVND;
-    cfg.usb_speed = USB_FS;
-    cfg.usb_mode  = USB_PERI;
-    cfg.p_usb_reg = &usb_descriptor;
-
-    usb_pdriver_init(&ctrl, &cfg);
-
-    hw_usb_pset_dprpu();
-
-    usbCurrentlyInitialized = true;
+    usbCurrentlyInitialized = false;
 }

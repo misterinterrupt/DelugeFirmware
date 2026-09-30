@@ -335,7 +335,7 @@ static void usb_pstd_interrupt(uint16_t type, uint16_t status)
  ***********************************************************************************************************************/
 void usb_pstd_pcd_task(void)
 {
-    if (g_usb_pstd_usb_int.wp != g_usb_pstd_usb_int.rp)
+    while (g_usb_pstd_usb_int.wp != g_usb_pstd_usb_int.rp)
     {
         /* Pop Interrupt info */
         usb_pstd_interrupt(

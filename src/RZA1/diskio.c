@@ -304,6 +304,23 @@ DRESULT disk_ioctl(BYTE pdrv, /* Physical drive nmuber (0..) */
         case CTRL_SYNC:    /* Flush write-back cache, Wait for end of internal process */
             return RES_OK; // I think this just means "yes, you can do some writing now", which you always can. Rohan
 
+        case GET_SECTOR_COUNT: {
+            unsigned long user_size = 0;
+            if (sd_get_size(SD_PORT, &user_size, NULL) == SD_OK && user_size > 0) {
+                *(DWORD*)buff = (DWORD)user_size;
+                return RES_OK;
+            }
+            return RES_ERROR;
+        }
+
+        case GET_SECTOR_SIZE:
+            *(WORD*)buff = 512;
+            return RES_OK;
+
+        case GET_BLOCK_SIZE:
+            *(DWORD*)buff = 1;
+            return RES_OK;
+
         default:
             return RES_PARERR;
     }
