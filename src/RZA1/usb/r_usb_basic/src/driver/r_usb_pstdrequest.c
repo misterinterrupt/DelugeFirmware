@@ -35,7 +35,8 @@
 #include "RZA1/usb/r_usb_basic/src/hw/inc/r_usb_reg_access.h"
 
 #if defined(USB_CFG_PMSC_USE)
-#include "drivers/usb/r_usb_pmsc/r_usb_pmsc_if.h"
+#include "RZA1/usb/r_usb_pmsc/r_usb_pmsc_if.h"
+#include "RZA1/usb/r_usb_pmsc/inc/r_usb_pmsc.h"
 #endif /* defined(USB_CFG_PMSC_USE) */
 
 #if ((USB_CFG_MODE & USB_CFG_PERI) == USB_CFG_PERI)
@@ -1150,10 +1151,13 @@ static void usb_pstd_set_configuration3(void)
                 usb_pstd_set_pipe_register((uint16_t)USB_PERIPIPE, p_table);
 
 #if defined(USB_CFG_PMSC_USE)
-                extern void usb_pmsc_receive_cbw(void);
-                extern void pmsc_bot_reset(void);
-                pmsc_bot_reset(); /* A (re)configuration invalidates any in-flight command */
-                usb_pmsc_receive_cbw();
+                extern void usb_pmsc_init(void);
+                extern void usb_pmsc_receive_cbw(usb_utr_t* p_utr);
+                /* A (re)configuration invalidates any in-flight command */
+                usb_pmsc_init();
+                usb_utr_t utr;
+                utr.ip = USB_CFG_USE_USBIP;
+                usb_pmsc_receive_cbw(&utr);
 #endif
             }
         }

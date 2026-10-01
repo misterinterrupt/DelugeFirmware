@@ -2,7 +2,6 @@
 #define __R_USB_PMSC_IF_H__
 
 #include "RZA1/usb/r_usb_basic/r_usb_basic_if.h"
-#include "RZA1/usb/r_usb_pmsc_scsi.h"
 
 #define USB_GET_MAX_LUN          (0xFE00u)
 #define USB_MASS_STORAGE_RESET   (0xFF00u)
@@ -15,6 +14,7 @@ extern "C" {
 #endif
 
 void R_USB_PmscTask(void);
+void usb_pmsc_task(void);
 
 #ifdef __cplusplus
 }

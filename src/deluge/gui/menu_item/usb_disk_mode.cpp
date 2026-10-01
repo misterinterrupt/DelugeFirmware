@@ -5,7 +5,7 @@
  */
 
 #include "usb_disk_mode.h"
-#include "RZA1/usb/r_usb_pmsc_scsi.h"
+#include "RZA1/usb/r_usb_pmsc/inc/r_usb_pmsc.h"
 #include "gui/ui/sound_editor.h"
 #include "hid/display/display.h"
 #include "hid/display/oled.h"

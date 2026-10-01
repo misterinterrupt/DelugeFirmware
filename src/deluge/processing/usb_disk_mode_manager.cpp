@@ -1,6 +1,6 @@
 #include "usb_disk_mode_manager.h"
 #include "ff.h"
-#include "RZA1/usb/r_usb_pmsc_scsi.h"
+#include "RZA1/usb/r_usb_pmsc/inc/r_usb_pmsc.h"
 #include "hid/display/display.h"
 #include "io/debug/log.h"
 #include "processing/engines/audio_engine.h"
@@ -62,7 +62,7 @@ void UsbDiskModeManager::enterUsbDiskMode() {
 	// 4. Lock USB stack and switch USB Peripheral mode to Mass Storage Class (PMSC)
 	usbLock = 1;
 	closeUSBPeripheral();
-	pmsc_scsi_init();
+	usb_pmsc_init(); // canonical PMSC driver state reset; the task self-inits ATAPI on first pump
 	openUSBPeripheralPMSC();
 	usbLock = 0;
 

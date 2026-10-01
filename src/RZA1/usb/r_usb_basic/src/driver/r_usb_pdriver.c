@@ -86,6 +86,7 @@ usb_setup_t g_usb_pstd_req_reg; /* Device Request - Request structure */
 #include "RZA1/usb/r_usb_basic/r_usb_basic_if.h"
 #include "definitions.h"
 #include "deluge/drivers/usb/userdef/r_usb_pmidi_config.h"
+#include "RZA1/usb/r_usb_pmsc/inc/r_usb_pmsc.h"
 
 /***********************************************************************************************************************
  Exported global variables
@@ -1445,7 +1446,9 @@ void usb_peri_configured(usb_utr_t* ptr, uint16_t data1, uint16_t data2)
 #endif /* defined(USB_CFG_PCDC_USE) | defined(USB_CFG_PHID_USE) */
 
 #if defined(USB_CFG_PMSC_USE)
-    usb_pmsc_receive_cbw();
+    usb_utr_t utr;
+    utr.ip = USB_CFG_USE_USBIP;
+    usb_pmsc_receive_cbw(&utr);
 #endif /* defined(USB_CFG_PMSC_USE) */
 } /* End of function usb_configured() */
 
@@ -1518,7 +1521,7 @@ void usb_peri_resume(usb_utr_t* ptr, uint16_t data1, uint16_t data2)
 void usb_peri_interface(usb_utr_t* ptr, uint16_t data1, uint16_t data2)
 {
 #if defined(USB_CFG_PMSC_USE)
-    usb_pmsc_receive_cbw();
+    usb_pmsc_receive_cbw(ptr);
 #else  /* defined(USB_CFG_PMSC_USE) */
     /* Non processing */
 #endif /* defined(USB_CFG_PMSC_USE) */

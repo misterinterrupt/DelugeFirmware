@@ -144,7 +144,7 @@ void (*g_usb_callback[])(usb_utr_t*, uint16_t, uint16_t) = {
 
     /* PMSC */
 #if defined(USB_CFG_PMSC_USE)
-    usb_pmsc_read_complete, usb_pmsc_write_complete, /* USB_PMSC  (9) */
+    usb_pmsc_trans_result, usb_pmsc_trans_result, /* USB_PMSC  (9) */
 #else
     USB_NULL, USB_NULL, /* USB_PMSC  (9) */
 #endif
