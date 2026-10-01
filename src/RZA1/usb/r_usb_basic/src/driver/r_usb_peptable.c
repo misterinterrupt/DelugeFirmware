@@ -55,21 +55,24 @@
 uint16_t g_usb_pmsc_eptbl[] = {
     USB_CFG_PMSC_BULK_IN, /* Pipe No. */
     /* TYPE    / BFRE        / DBLB         / CNTMD         / SHTNAK         / DIR      / EPNUM */
-    USB_NULL | USB_BFREOFF | USB_CFG_DBLB | USB_CFG_CNTMD | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
-    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(8u),                                              /* PIPEBUF */
-    USB_NULL,                                                                                     /* PIPEMAXP */
-    USB_NULL,                                                                                     /* PIPEPERI */
-    USB_NULL,                                                                                     /* reserve */
+    /* CNTMD on: the 512-byte buffer is used as one continuous area, so a whole
+     * sector goes out in a single FIFO write with one BEMP completion instead
+     * of a fragile 64-byte refill chain. */
+    USB_NULL | USB_BFREOFF | USB_CFG_DBLB | USB_CFG_CNTMDON | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
+    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(8u),                                                /* PIPEBUF */
+    USB_NULL,                                                                                       /* PIPEMAXP */
+    USB_NULL,                                                                                       /* PIPEPERI */
+    USB_NULL,                                                                                       /* reserve */
 
     USB_CFG_PMSC_BULK_OUT, /* Pipe No. */
     /* TYPE    / BFRE        / DBLB         / CNTMD         / SHTNAK         / DIR      / EPNUM */
-    USB_NULL | USB_BFREOFF | USB_CFG_DBLB | USB_CFG_CNTMD | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
-    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(72u),                                             /* PIPEBUF */
-    USB_NULL,                                                                                     /* PIPEMAXP */
-    USB_NULL,                                                                                     /* PIPEPERI */
-    USB_NULL,                                                                                     /* reserve */
+    USB_NULL | USB_BFREOFF | USB_CFG_DBLB | USB_CFG_CNTMDON | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
+    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(72u),                                               /* PIPEBUF */
+    USB_NULL,                                                                                       /* PIPEMAXP */
+    USB_NULL,                                                                                       /* PIPEPERI */
+    USB_NULL,                                                                                       /* reserve */
 
-    USB_PDTBLEND,                                                                                 /* Table End */
+    USB_PDTBLEND,                                                                                   /* Table End */
 };
 #endif
 

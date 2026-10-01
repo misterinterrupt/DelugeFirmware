@@ -29,6 +29,7 @@ typedef struct __attribute__((packed)) {
 
 void pmsc_scsi_init(void);
 void pmsc_process_cbw(const uint8_t* cbw_bytes, uint32_t len);
+void pmsc_bot_reset(void);
 bool pmsc_is_ejected(void);
 void pmsc_clear_eject(void);
 

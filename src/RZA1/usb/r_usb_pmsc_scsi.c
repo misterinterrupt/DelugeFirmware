@@ -85,8 +85,23 @@ void usb_pmsc_task(void) {
 }
 
 void usb_pmsc_mass_strage_reset(uint16_t value, uint16_t index, uint16_t length) {
-    g_pmsc_state = PMSC_STATE_IDLE;
+    pmsc_bot_reset();
     usb_pmsc_receive_cbw();
+}
+
+/* Resync the Bulk-Only Transport layer after a USB-level abort (bus reset,
+ * SET_CONFIGURATION, or host Mass Storage Reset). Without this, a data phase
+ * killed mid-transfer leaves g_pmsc_state stranded (e.g. DATA_IN); every
+ * subsequent CBW completion is then dropped by the state machine and the host
+ * retries in an endless reset loop. */
+void pmsc_bot_reset(void) {
+    g_pmsc_state = PMSC_STATE_IDLE;
+    g_scsi_sector_index = 0;
+    g_scsi_sector_count = 0;
+    g_scsi_status = 0;
+    g_sense_key = 0;
+    g_sense_asc = 0;
+    g_sense_ascq = 0;
 }
 
 void usb_pmsc_get_max_lun(uint16_t value, uint16_t index, uint16_t length) {
@@ -107,7 +122,13 @@ void usb_pmsc_receive_cbw(void) {
 void usb_pmsc_read_complete(usb_utr_t* mess, uint16_t data1, uint16_t data2) {
     if (!g_pmsc_active) return;
 
-    if (g_pmsc_state == PMSC_STATE_WAIT_CBW) {
+    if (g_pmsc_state == PMSC_STATE_WAIT_CBW || g_pmsc_state == PMSC_STATE_DATA_IN
+        || g_pmsc_state == PMSC_STATE_SEND_CSW || g_pmsc_state == PMSC_STATE_IDLE) {
+        /* A CBW on an IN-direction pipe is always the start of a new command.
+         * In states other than WAIT_CBW this is a desync (a previous command
+         * died mid-data-phase and the host reset the interface), so drop the
+         * stale state and process the fresh CBW instead of ignoring it. */
+        g_pmsc_state = PMSC_STATE_WAIT_CBW;
         pmsc_process_cbw(g_cbw_buffer, sizeof(usb_cbw_t));
     } else if (g_pmsc_state == PMSC_STATE_DATA_OUT) {
         if (disk_write(0, g_sec_buf, g_scsi_lba + g_scsi_sector_index, 1) != RES_OK) {

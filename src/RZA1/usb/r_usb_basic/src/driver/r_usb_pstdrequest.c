@@ -1151,6 +1151,8 @@ static void usb_pstd_set_configuration3(void)
 
 #if defined(USB_CFG_PMSC_USE)
                 extern void usb_pmsc_receive_cbw(void);
+                extern void pmsc_bot_reset(void);
+                pmsc_bot_reset(); /* A (re)configuration invalidates any in-flight command */
                 usb_pmsc_receive_cbw();
 #endif
             }
