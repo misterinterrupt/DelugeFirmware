@@ -6,6 +6,7 @@
 #include "processing/engines/audio_engine.h"
 #include "storage/audio/audio_file_manager.h"
 #include "playback/playback_handler.h"
+#include "OSLikeStuff/task_scheduler.h"
 
 extern "C" void openUSBPeripheral();
 extern "C" void closeUSBPeripheral();
@@ -20,6 +21,16 @@ extern volatile uint32_t usbLock;
 namespace deluge::storage {
 
 static FATFS g_diskModeFatFs;
+
+// Watches for the host ejecting the medium (START STOP UNIT via the PMSC
+// driver) and exits disk mode automatically, wherever the UI happens to be.
+static uint8_t g_ejectWatchTaskId = 0;
+
+static void ejectWatchRoutine() {
+	if (pmsc_is_ejected()) {
+		UsbDiskModeManager::getInstance().exitUsbDiskMode();
+	}
+}
 
 void UsbDiskModeManager::enterUsbDiskMode() {
 	if (active_) {
@@ -46,6 +57,8 @@ void UsbDiskModeManager::enterUsbDiskMode() {
 	usbLock = 0;
 
 	active_ = true;
+
+	g_ejectWatchTaskId = addRepeatingTask(&ejectWatchRoutine, 32, 0.1, 0.25, 0.5, "usbdisk eject watch");
 
 	if (display->haveOLED()) {
 		display->popupText("USB DISK MODE\nSD Card on PC");
@@ -74,6 +87,11 @@ void UsbDiskModeManager::exitUsbDiskMode() {
 
 	// 3. Restore SD card status
 	audioFileManager.cardDisabled = false;
+
+	if (g_ejectWatchTaskId) {
+		removeTask(g_ejectWatchTaskId);
+		g_ejectWatchTaskId = 0;
+	}
 
 	active_ = false;
 

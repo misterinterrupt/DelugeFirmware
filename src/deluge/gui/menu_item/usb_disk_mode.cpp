@@ -49,12 +49,8 @@ ActionResult UsbDiskMode::buttonAction(deluge::hid::Button b, bool on, bool inCa
 }
 
 ActionResult UsbDiskMode::timerCallback() {
-	if (deluge::storage::UsbDiskModeManager::getInstance().isActive() && pmsc_is_ejected()) {
-		deluge::storage::UsbDiskModeManager::getInstance().exitUsbDiskMode();
-		if (soundEditor.getCurrentMenuItem() == this) {
-			soundEditor.goUpOneLevel();
-		}
-	}
+	// Host-eject detection lives in the disk mode manager's eject-watch task so
+	// it works no matter where the UI is; nothing to do here.
 	return ActionResult::DEALT_WITH;
 }
 
