@@ -43,8 +43,6 @@
 /***********************************************************************************************************************
  Private global variables and functions
  ***********************************************************************************************************************/
-extern volatile uint32_t g_usb_dbg_gdesc; /* Temporary disk-mode diagnostics */
-
 static void usb_pstd_get_status1(void);
 static void usb_pstd_get_descriptor1(void);
 static void usb_pstd_get_configuration1();
@@ -459,7 +457,6 @@ static void usb_pstd_get_descriptor1(void)
         {
             /*---- Device descriptor ----*/
             case USB_DT_DEVICE:
-                g_usb_dbg_gdesc++;
 
                 if (((uint16_t)0 == g_usb_pstd_req_index) && ((uint16_t)0 == idx))
                 {

@@ -484,12 +484,6 @@ void usb_pstd_set_stall(uint16_t pipe)
  ***********************************************************************************************************************/
 void usb_pstd_set_stall_pipe0(void)
 {
-    /* Temporary disk-mode diagnostics */
-    {
-        extern volatile uint32_t g_usb_dbg_stall0;
-        g_usb_dbg_stall0++;
-    }
-
     /* PIPE control reg set */
     hw_usb_set_pid(USB_NULL, USB_PIPE0, USB_PID_STALL);
 } /* End of function usb_pstd_set_stall_pipe0() */

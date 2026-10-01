@@ -39,17 +39,6 @@
  Renesas Abstracted Peripheral Control RW API functions
  ***********************************************************************************************************************/
 
-/* Temporary disk-mode diagnostics, inspected via J-Link */
-volatile uint32_t g_usb_dbg_cr_shrt = 0;
-volatile uint32_t g_usb_dbg_cr_end = 0;
-volatile uint32_t g_usb_dbg_cr_writing = 0;
-volatile uint32_t g_usb_dbg_cr_fifoerr = 0;
-volatile uint32_t g_usb_dbg_cr_dcpctr = 0; /* DCPCTR sampled at end of usb_pstd_ctrl_read */
-volatile uint32_t g_usb_dbg_cr_fifosel = 0;
-volatile uint32_t g_usb_dbg_cr_fifoctr = 0;
-volatile uint32_t g_usb_dbg_bemp0 = 0; /* EP0 buffer-empty (transmit-done) interrupts */
-volatile uint32_t g_usb_dbg_stall0 = 0;
-
 
 /***********************************************************************************************************************
  Function Name   : usb_pstd_ctrl_read
@@ -76,18 +65,6 @@ uint16_t usb_pstd_ctrl_read(uint32_t bsize, uint8_t* table)
 
     /* Peripheral Control sequence */
     end_flag = usb_pstd_write_data(USB_PIPE0, USB_CUSE);
-
-    /* Temporary diagnostics */
-    switch (end_flag)
-    {
-        case USB_WRITESHRT: g_usb_dbg_cr_shrt++; break;
-        case USB_WRITEEND:  g_usb_dbg_cr_end++; break;
-        case USB_WRITING:   g_usb_dbg_cr_writing++; break;
-        default:            g_usb_dbg_cr_fifoerr++; break;
-    }
-    g_usb_dbg_cr_dcpctr  = hw_usb_read_pipectr(USB_NULL, USB_PIPE0);
-    g_usb_dbg_cr_fifosel = USB200.CFIFOSEL;
-    g_usb_dbg_cr_fifoctr = USB200.CFIFOCTR;
 
     /* Peripheral control sequence */
     switch (end_flag)

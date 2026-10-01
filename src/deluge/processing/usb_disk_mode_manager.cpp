@@ -6,20 +6,11 @@
 #include "processing/engines/audio_engine.h"
 #include "storage/audio/audio_file_manager.h"
 #include "playback/playback_handler.h"
-#include <cstdio>
-#include "OSLikeStuff/task_scheduler.h"
 
 extern "C" void openUSBPeripheral();
 extern "C" void closeUSBPeripheral();
 extern "C" void openUSBPeripheralPMSC();
 extern "C" void closeUSBPeripheralPMSC();
-
-// Temporary disk-mode bring-up diagnostics from the USB driver
-extern "C" volatile uint32_t g_usb_dbg_reset;
-extern "C" volatile uint32_t g_usb_dbg_ctrt;
-extern "C" volatile uint32_t g_usb_dbg_brdy0;
-extern "C" volatile uint32_t g_usb_dbg_pump;
-extern "C" volatile uint32_t g_usb_dbg_gdesc;
 
 extern PlaybackHandler playbackHandler;
 extern AudioFileManager audioFileManager;
@@ -29,18 +20,6 @@ extern volatile uint32_t usbLock;
 namespace deluge::storage {
 
 static FATFS g_diskModeFatFs;
-
-// TEMPORARY: render USB event counters on the display while disk mode is active,
-// so enumeration failures can be triaged from the device itself.
-// R = bus resets, C = SETUP interrupts, D = GET_DESCRIPTOR handled, P = PCD events.
-static uint8_t g_usbDebugTaskId = 0;
-
-static void renderUsbDebugCounters() {
-	char buf[64];
-	snprintf(buf, sizeof(buf), "R%lu C%lu D%lu P%lu", (unsigned long)g_usb_dbg_reset,
-	         (unsigned long)g_usb_dbg_ctrt, (unsigned long)g_usb_dbg_gdesc, (unsigned long)g_usb_dbg_pump);
-	display->setText(buf);
-}
 
 void UsbDiskModeManager::enterUsbDiskMode() {
 	if (active_) {
@@ -68,8 +47,12 @@ void UsbDiskModeManager::enterUsbDiskMode() {
 
 	active_ = true;
 
-	// Temporary diagnostics readout (see renderUsbDebugCounters)
-	g_usbDebugTaskId = addRepeatingTask([]() { renderUsbDebugCounters(); }, 35, 0.05, 0.2, 0.5, "usb dbg");
+	if (display->haveOLED()) {
+		display->popupText("USB DISK MODE\nSD Card on PC");
+	}
+	else {
+		display->displayPopup("USb.d");
+	}
 }
 
 void UsbDiskModeManager::exitUsbDiskMode() {
@@ -94,9 +77,11 @@ void UsbDiskModeManager::exitUsbDiskMode() {
 
 	active_ = false;
 
-	if (g_usbDebugTaskId) {
-		removeTask(g_usbDebugTaskId);
-		g_usbDebugTaskId = 0;
+	if (display->haveOLED()) {
+		display->popupText("Disk Ejected\nEngine Resumed");
+	}
+	else {
+		display->displayPopup("READY");
 	}
 }
 
