@@ -20,6 +20,9 @@ public:
 		    l10n::getView(STRING_FOR_FREEVERB),
 		    l10n::getView(STRING_FOR_MUTABLE),
 		    l10n::getView(STRING_FOR_KDFX_REVERB),
+		    l10n::getView(STRING_FOR_KDFX_DELAY),
+		    l10n::getView(STRING_FOR_KDFX_CHORUS),
+		    l10n::getView(STRING_FOR_KDFX_TONE),
 		};
 	}
 };

@@ -29,11 +29,17 @@ struct Base {
 	virtual void setRoomSize(float value) {}
 	[[nodiscard]] virtual float getRoomSize() const { return 0; };
 
+	virtual void setDecay(float value) {}
+	[[nodiscard]] virtual float getDecay() const { return 0; }
+
 	virtual void setHPF(float f) {}
 	[[nodiscard]] virtual float getHPF() const { return 0; }
 
 	virtual void setDamping(float value) {}
 	[[nodiscard]] virtual float getDamping() const { return 0; }
+
+	virtual void setDiffusion(float value) {}
+	[[nodiscard]] virtual float getDiffusion() const { return 0; }
 
 	virtual void setWidth(float value) {}
 	[[nodiscard]] virtual float getWidth() const { return 0; };

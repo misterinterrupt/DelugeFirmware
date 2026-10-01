@@ -119,6 +119,8 @@
 #include "gui/menu_item/record/countin.h"
 #include "gui/menu_item/record/quantize.h"
 #include "gui/menu_item/reverb/damping.h"
+#include "gui/menu_item/reverb/decay.h"
+#include "gui/menu_item/reverb/diffusion.h"
 #include "gui/menu_item/reverb/hpf.h"
 #include "gui/menu_item/reverb/model.h"
 #include "gui/menu_item/reverb/pan.h"
@@ -400,7 +402,9 @@ submenu::Sidechain reverbSidechainMenu{
 // Reverb ----------------------------------------------------------------------------------
 patched_param::Integer reverbAmountMenu{STRING_FOR_AMOUNT, STRING_FOR_REVERB_AMOUNT, params::GLOBAL_REVERB_AMOUNT};
 reverb::RoomSize reverbRoomSizeMenu{STRING_FOR_ROOM_SIZE};
+reverb::Decay reverbDecayMenu{STRING_FOR_DECAY};
 reverb::Damping reverbDampingMenu{STRING_FOR_DAMPING};
+reverb::Diffusion reverbDiffusionMenu{STRING_FOR_DIFFUSION};
 reverb::Width reverbWidthMenu{STRING_FOR_WIDTH, STRING_FOR_REVERB_WIDTH};
 reverb::Pan reverbPanMenu{STRING_FOR_PAN, STRING_FOR_REVERB_PAN};
 reverb::Model reverbModelMenu{STRING_FOR_MODEL};
@@ -412,7 +416,9 @@ Submenu reverbMenu{
         &reverbAmountMenu,
         &reverbModelMenu,
         &reverbRoomSizeMenu,
+        &reverbDecayMenu,
         &reverbDampingMenu,
+        &reverbDiffusionMenu,
         &reverbWidthMenu,
         &reverbHPFMenu,
         &reverbPanMenu,
@@ -558,7 +564,9 @@ Submenu globalReverbMenu{
         &globalReverbSendAmountMenu,
         &reverbModelMenu,
         &reverbRoomSizeMenu,
+        &reverbDecayMenu,
         &reverbDampingMenu,
+        &reverbDiffusionMenu,
         &reverbWidthMenu,
         &reverbHPFMenu,
         &reverbPanMenu,

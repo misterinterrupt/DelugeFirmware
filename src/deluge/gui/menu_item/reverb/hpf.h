@@ -21,19 +21,80 @@
 #include "gui/l10n/strings.h"
 #include "gui/menu_item/integer.h"
 #include "processing/engines/audio_engine.h"
+#include <algorithm>
 #include <cmath>
 
 namespace deluge::gui::menu_item::reverb {
 class HPF final : public Integer {
 public:
 	using Integer::Integer;
-	void readCurrentValue() override { this->setValue(AudioEngine::reverb.getHPF() * kMaxMenuValue); }
-	void writeCurrentValue() override { AudioEngine::reverb.setHPF((float)this->getValue() / kMaxMenuValue); }
 
-	[[nodiscard]] int32_t getMaxValue() const override { return kMaxMenuValue; }
+	[[nodiscard]] int32_t getMinValue() const override {
+		switch (AudioEngine::reverb.getModel()) {
+		case dsp::Reverb::Model::KDFX_REVERB:
+		case dsp::Reverb::Model::KDFX_DELAY:
+		case dsp::Reverb::Model::KDFX_CHORUS:
+			return 20;
+		default:
+			return 0;
+		}
+	}
+
+	[[nodiscard]] int32_t getMaxValue() const override {
+		switch (AudioEngine::reverb.getModel()) {
+		case dsp::Reverb::Model::KDFX_REVERB:
+		case dsp::Reverb::Model::KDFX_DELAY:
+		case dsp::Reverb::Model::KDFX_CHORUS:
+			return 1000;
+		default:
+			return kMaxMenuValue;
+		}
+	}
+
+	const char* getUnit() override {
+		switch (AudioEngine::reverb.getModel()) {
+		case dsp::Reverb::Model::KDFX_REVERB:
+		case dsp::Reverb::Model::KDFX_DELAY:
+		case dsp::Reverb::Model::KDFX_CHORUS:
+			return " HZ";
+		default:
+			return "";
+		}
+	}
+
+	void readCurrentValue() override {
+		float norm = AudioEngine::reverb.getHPF();
+		int32_t minV = getMinValue();
+		int32_t maxV = getMaxValue();
+		this->setValue(minV + static_cast<int32_t>(std::round(norm * (maxV - minV))));
+	}
+
+	void writeCurrentValue() override {
+		int32_t minV = getMinValue();
+		int32_t maxV = getMaxValue();
+		float norm = (maxV > minV) ? (float)(this->getValue() - minV) / (float)(maxV - minV) : 0.0f;
+		AudioEngine::reverb.setHPF(std::clamp(norm, 0.0f, 1.0f));
+	}
+
+	void selectEncoderAction(int32_t offset) override {
+		if (AudioEngine::reverb.getModel() != dsp::Reverb::Model::MUTABLE) {
+			int32_t step = (this->getValue() > 100) ? 10 : 5;
+			this->setValue(this->getValue() + offset * step);
+			this->setValue(std::clamp(this->getValue(), getMinValue(), getMaxValue()));
+			Number::selectEncoderAction(offset);
+		}
+		else {
+			Integer::selectEncoderAction(offset);
+		}
+	}
+
+	[[nodiscard]] std::string_view getName() const override { return l10n::getView(this->name); }
+	[[nodiscard]] std::string_view getTitle() const override { return getName(); }
 
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
-		return (AudioEngine::reverb.getModel() == dsp::Reverb::Model::MUTABLE);
+		auto model = AudioEngine::reverb.getModel();
+		return model == dsp::Reverb::Model::MUTABLE || model == dsp::Reverb::Model::KDFX_REVERB
+		       || model == dsp::Reverb::Model::KDFX_DELAY || model == dsp::Reverb::Model::KDFX_CHORUS;
 	}
 };
 } // namespace deluge::gui::menu_item::reverb
