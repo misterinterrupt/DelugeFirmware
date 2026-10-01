@@ -19,6 +19,7 @@ public:
 		return {
 		    l10n::getView(STRING_FOR_FREEVERB),
 		    l10n::getView(STRING_FOR_MUTABLE),
+		    l10n::getView(STRING_FOR_KDFX_REVERB),
 		};
 	}
 };

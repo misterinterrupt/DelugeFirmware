@@ -1,6 +1,7 @@
 #pragma once
 #include "base.hpp"
 #include "freeverb/freeverb.hpp"
+#include "kdfx/reverb.hpp"
 #include "mutable/reverb.hpp"
 #include <algorithm>
 #include <cstdint>
@@ -13,6 +14,7 @@ public:
 	enum class Model {
 		FREEVERB = 0, // Freeverb is the original
 		MUTABLE,
+		KDFX_REVERB, // KDFX-style 4-line FDN tank (Q31)
 	};
 
 	Reverb()
@@ -29,6 +31,9 @@ public:
 			break;
 		case Model::MUTABLE:
 			reverb_.emplace<reverb::Mutable>();
+			break;
+		case Model::KDFX_REVERB:
+			reverb_.emplace<reverb::KdfxReverb>();
 			break;
 		}
 		base_->setRoomSize(room_size_);
@@ -48,6 +53,9 @@ public:
 			break;
 		case Model::MUTABLE:
 			reverb_as<Mutable>().process(input, output);
+			break;
+		case Model::KDFX_REVERB:
+			reverb_as<KdfxReverb>().process(input, output);
 			break;
 		}
 	}
@@ -91,8 +99,8 @@ public:
 private:
 	std::variant<         //<
 	    reverb::Freeverb, //<
-	    reverb::Mutable   //<
-	    >
+	    reverb::Mutable,  //<
+	    reverb::KdfxReverb>
 	    reverb_{};
 
 	Model model_ = Model::FREEVERB;
