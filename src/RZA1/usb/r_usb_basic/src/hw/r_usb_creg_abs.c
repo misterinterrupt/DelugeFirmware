@@ -84,7 +84,7 @@ uint16_t usb_cstd_get_buf_size(usb_utr_t* ptr, uint16_t pipe)
     else
     {
         /* Read CNTMD */
-        if (pipeCfgs[pipe] & USB_CNTMDFIELD == USB_CFG_CNTMDON)
+        if ((pipeCfgs[pipe] & USB_CNTMDFIELD) == USB_CFG_CNTMDON)
         {
             /* Buffer Size */
             size = (uint16_t)((uint16_t)((pipeBufs[pipe] >> USB_BUFSIZE_BIT) + 1) * USB_PIPEXBUF);
