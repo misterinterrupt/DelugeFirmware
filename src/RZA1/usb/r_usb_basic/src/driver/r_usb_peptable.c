@@ -55,24 +55,25 @@
 uint16_t g_usb_pmsc_eptbl[] = {
     USB_CFG_PMSC_BULK_IN, /* Pipe No. */
     /* TYPE    / BFRE        / DBLB         / CNTMD         / SHTNAK         / DIR      / EPNUM */
-    /* CNTMD on: the 512-byte buffer is used as one continuous area, so a whole
-     * sector goes out in a single FIFO write with one BEMP completion instead
-     * of a fragile 64-byte refill chain. */
-    USB_NULL | USB_BFREOFF | USB_CFG_DBLB | USB_CFG_CNTMDON | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
-    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(8u),                                                /* PIPEBUF */
-    USB_NULL,                                                                                       /* PIPEMAXP */
-    USB_NULL,                                                                                       /* PIPEPERI */
-    USB_NULL,                                                                                       /* reserve */
+    /* Single (non-DBLB) 512-byte bank with CNTMD on: a whole sector is
+     * written to the FIFO in one call and drained by hardware with a single
+     * BEMP completion - no 64-byte refill chain to lose an event from.
+     * (DBLB together with CNTMD does not transfer on this SIE.) */
+    USB_NULL | USB_BFREOFF | USB_CFG_DBLBOFF | USB_CFG_CNTMDON | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
+    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(8u),                                                   /* PIPEBUF */
+    USB_NULL,                                                                                          /* PIPEMAXP */
+    USB_NULL,                                                                                          /* PIPEPERI */
+    USB_NULL,                                                                                          /* reserve */
 
     USB_CFG_PMSC_BULK_OUT, /* Pipe No. */
     /* TYPE    / BFRE        / DBLB         / CNTMD         / SHTNAK         / DIR      / EPNUM */
-    USB_NULL | USB_BFREOFF | USB_CFG_DBLB | USB_CFG_CNTMDON | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
-    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(72u),                                               /* PIPEBUF */
-    USB_NULL,                                                                                       /* PIPEMAXP */
-    USB_NULL,                                                                                       /* PIPEPERI */
-    USB_NULL,                                                                                       /* reserve */
+    USB_NULL | USB_BFREOFF | USB_CFG_DBLBOFF | USB_CFG_CNTMDON | USB_CFG_SHTNAK | USB_NULL | USB_NULL, /* PIPECFG */
+    (uint16_t)USB_BUF_SIZE(512u) | USB_BUF_NUMB(72u),                                                  /* PIPEBUF */
+    USB_NULL,                                                                                          /* PIPEMAXP */
+    USB_NULL,                                                                                          /* PIPEPERI */
+    USB_NULL,                                                                                          /* reserve */
 
-    USB_PDTBLEND,                                                                                   /* Table End */
+    USB_PDTBLEND,                                                                                      /* Table End */
 };
 #endif
 
