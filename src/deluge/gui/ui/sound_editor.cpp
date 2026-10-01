@@ -8,6 +8,7 @@
 #include "gui/menu_item/menu_item.h"
 #include "gui/menu_item/mpe/zone_num_member_channels.h"
 #include "gui/menu_item/multi_range.h"
+#include "gui/menu_item/usb_disk_mode.h"
 #include "gui/ui/audio_recorder.h"
 #include "gui/ui/browser/sample_browser.h"
 #include "gui/ui/keyboard/keyboard_screen.h"
@@ -312,6 +313,17 @@ ActionResult SoundEditor::buttonAction(deluge::hid::Button b, bool on, bool inCa
 				}
 
 				MenuItem* currentMenuItem = getCurrentMenuItem();
+
+				// Special case: leaving the USB disk mode menu must first eject
+				// and restore the card - navigating away alone would leave the
+				// card owned by the host PC.
+				if (currentMenuItem == &menu_item::usbDiskModeMenuItem) {
+					if (inCardRoutine) {
+						return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
+					}
+					currentMenuItem->buttonAction(b, on, inCardRoutine);
+					return ActionResult::DEALT_WITH;
+				}
 
 				// Special case if we're editing a range
 				if (currentMenuItem == &menu_item::multiRangeMenu && menu_item::multiRangeMenu.cancelEditingIfItsOn()) {
