@@ -35,9 +35,10 @@ typedef enum {
 
 /* Sectors transferred per PCD request. 1..127; each unit costs
  * USB_CFG_PMSC_ATAPI_BLOCK_UNIT bytes of RAM for the staging buffer.
- * Larger values reduce the number of USB task round-trips per host command. */
+ * Larger values reduce the number of USB task round-trips per host command.
+ * 16 sectors (8 KB) keeps the SD card busy while the USB pipe drains. */
 #ifndef USB_CFG_PMSC_TRANS_COUNT
-#define USB_CFG_PMSC_TRANS_COUNT (8)
+#define USB_CFG_PMSC_TRANS_COUNT (16)
 #endif
 
 /* Bytes per logical block. The RZ/A1 PMSC driver supports 512 only. */

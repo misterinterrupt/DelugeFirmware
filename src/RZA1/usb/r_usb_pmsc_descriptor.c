@@ -79,3 +79,61 @@ uint8_t* g_pmsc_string_table[] = {
     g_pmsc_string_serial,
     0
 };
+
+/* Device Qualifier: describes the device's capabilities at the "other" speed.
+ * Required by hosts negotiating High-Speed. */
+uint8_t g_pmsc_qualifier[USB_QD_BLENGTH] = {
+    USB_QD_BLENGTH,        /*  0: bLength */
+    USB_DT_DEVICE_QUALIFIER, /*  1: bDescriptorType */
+    0x00, 0x02,            /*  2-3: bcdUSB 2.0 */
+    0x00,                  /*  4: bDeviceClass */
+    0x00,                  /*  5: bDeviceSubClass */
+    0x00,                  /*  6: bDeviceProtocol */
+    64,                    /*  7: bMaxPacketSize0 */
+    1,                     /*  8: bNumConfigurations */
+    0                      /*  9: bReserved */
+};
+
+/* Configuration for High-Speed operation: identical layout to the FS
+ * configuration, but the bulk endpoints use 512-byte packets.
+ * (The driver swaps the bDescriptorType bytes of this and the FS
+ * configuration when reporting at the respective speed - see
+ * usb_peri_devdefault().) */
+uint8_t g_pmsc_configuration_hs[PMSC_CONFIG_LENGTH + (PMSC_CONFIG_LENGTH % 2)] = {
+    // Configuration Descriptor
+    9,                      /*  0: bLength */
+    USB_DT_OTHER_SPEED_CONF,/*  1: bDescriptorType (swapped at runtime) */
+    PMSC_CONFIG_LENGTH, 0,  /*  2-3: wTotalLength */
+    1,                      /*  4: bNumInterfaces */
+    1,                      /*  5: bConfigurationValue */
+    0,                      /*  6: iConfiguration */
+    0xC0,                   /*  7: bmAttributes (Self Powered) */
+    250,                    /*  8: bMaxPower (500mA) */
+
+    // Interface Descriptor (Mass Storage Class)
+    9,                      /*  0: bLength */
+    USB_DT_INTERFACE,       /*  1: bDescriptorType */
+    0,                      /*  2: bInterfaceNumber */
+    0,                      /*  3: bAlternateSetting */
+    2,                      /*  4: bNumEndpoints */
+    0x08,                   /*  5: bInterfaceClass (Mass Storage) */
+    0x06,                   /*  6: bInterfaceSubClass (SCSI Transparent) */
+    0x50,                   /*  7: bInterfaceProtocol (Bulk-Only Transport) */
+    0,                      /*  8: iInterface */
+
+    // Endpoint Descriptor (Bulk IN)
+    7,                      /*  0: bLength */
+    USB_DT_ENDPOINT,        /*  1: bDescriptorType */
+    0x81,                   /*  2: bEndpointAddress (EP1 IN) */
+    0x02,                   /*  3: bmAttributes (Bulk) */
+    0x00, 0x02,             /*  4-5: wMaxPacketSize (512 bytes HS) */
+    0,                      /*  6: bInterval */
+
+    // Endpoint Descriptor (Bulk OUT)
+    7,                      /*  0: bLength */
+    USB_DT_ENDPOINT,        /*  1: bDescriptorType */
+    0x02,                   /*  2: bEndpointAddress (EP2 OUT) */
+    0x02,                   /*  3: bmAttributes (Bulk) */
+    0x00, 0x02,             /*  4-5: wMaxPacketSize (512 bytes HS) */
+    0                       /*  6: bInterval */
+};

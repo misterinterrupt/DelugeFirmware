@@ -44,6 +44,8 @@ extern uint8_t* g_midi_string_table[];
 
 extern uint8_t g_pmsc_device[];
 extern uint8_t g_pmsc_configuration[];
+extern uint8_t g_pmsc_configuration_hs[];
+extern uint8_t g_pmsc_qualifier[];
 extern uint8_t* g_pmsc_string_table[];
 
 static usb_descriptor_t usb_descriptor = {
@@ -54,11 +56,13 @@ static usb_descriptor_t usb_descriptor = {
     (uint8_t**)g_midi_string_table
 };
 
+/* High-Speed capable descriptor set: the FS configuration doubles as the
+ * "other speed" configuration while operating at 480 Mbit/s. */
 static usb_descriptor_t usb_pmsc_descriptor = {
     (uint8_t*)g_pmsc_device,
     (uint8_t*)g_pmsc_configuration,
-    (uint8_t*)0,
-    (uint8_t*)0,
+    (uint8_t*)g_pmsc_qualifier,
+    (uint8_t*)g_pmsc_configuration_hs,
     (uint8_t**)g_pmsc_string_table
 };
 
@@ -144,7 +148,7 @@ void openUSBPeripheralPMSC(void)
 
     ctrl.module   = WHICH_USB_MODULE;
     ctrl.type     = USB_PMSC;
-    cfg.usb_speed = USB_FS;
+    cfg.usb_speed = USB_HS;
     cfg.usb_mode  = USB_PERI;
     cfg.p_usb_reg = &usb_pmsc_descriptor;
 
