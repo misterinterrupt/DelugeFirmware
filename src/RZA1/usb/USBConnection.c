@@ -148,7 +148,12 @@ void openUSBPeripheralPMSC(void)
 
     ctrl.module   = WHICH_USB_MODULE;
     ctrl.type     = USB_PMSC;
-    cfg.usb_speed = USB_HS;
+    /* Full-Speed only: the HS handshake is detected by hosts (qualifier +
+     * HS configuration descriptors are wired below) but EP0 then fails with
+     * signaling errors on this board (dmesg: "device descriptor read/64,
+     * error -110/-71" after a successful high-speed chirp), so HS is not
+     * usable on Deluge hardware. Revisit only with a hardware scope. */
+    cfg.usb_speed = USB_FS;
     cfg.usb_mode  = USB_PERI;
     cfg.p_usb_reg = &usb_pmsc_descriptor;
 
