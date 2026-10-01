@@ -44,7 +44,7 @@ void           usb_pmsc_trans_result(usb_utr_t * mess, uint16_t data1, uint16_t 
 static void    usb_pmsc_err_csw_ok(usb_utr_t * ptr, uint16_t data1, uint16_t data2);
 static void    usb_pmsc_err_csw_ng(usb_utr_t * ptr, uint16_t data1, uint16_t data2);
 static void    usb_pmsc_err_phase_err(usb_utr_t * ptr, uint16_t data1, uint16_t data2);
-static void    usb_pmsc_csw_transfer(usb_utr_t * p_utr, uint8_t csw_status);
+static void    usb_pmsc_csw_transfer(uint8_t csw_status);
 
 /* Mass Storage Device Class CBW */
 static usb_msc_cbw_t g_usb_pmsc_cbw;
@@ -578,7 +578,7 @@ static void usb_pmsc_check_cbw (uint8_t module_number)
 
             if (0UL == g_usb_pmsc_dtl)
             {
-                usb_pmsc_csw_transfer(&utr, USB_MSC_CSW_NG);
+                usb_pmsc_csw_transfer(USB_MSC_CSW_NG);
             }
             else
             {
@@ -648,7 +648,7 @@ static void usb_pmsc_check_cbw (uint8_t module_number)
             USB_PRINTF0("### ERROR5 \n");
 
             /* CSW(NG) transfer */
-            usb_pmsc_csw_transfer(&utr, USB_MSC_CSW_NG);
+            usb_pmsc_csw_transfer(USB_MSC_CSW_NG);
 
             break;
         }
@@ -876,13 +876,17 @@ static uint8_t usb_pmsc_transfer_matrix (uint8_t uc_case)
  * Arguments       : uint8_t      csw_status      : status(USB_MSC_CSW_OK/USB_MSC_CSW_NG/USB_MSC_CSW_PHASE_ERR)
  * Return value    : none
  ***********************************************************************************************************************/
-static void usb_pmsc_csw_transfer (usb_utr_t * p_utr, uint8_t csw_status) {
+/* Deluge port: the RZ/A1 vendor stack invokes stall callbacks with a NULL
+ * usb_utr_t (usb_pstd_clr_feature3), so the CSW transfer must not depend on
+ * a caller-provided utr. Always use the driver's own transfer block. */
+static void usb_pmsc_csw_transfer (uint8_t csw_status) {
     usb_pmsc_setcsw(csw_status);
 
-    p_utr->keyword   = g_usb_pmsc_bulk_in_pipe[p_utr->ip];
-    p_utr->p_tranadr = (uint8_t *) &g_usb_pmsc_csw;
-    p_utr->tranlen   = USB_MSC_CSW_LENGTH;
-    usb_pmsc_transfer_start(p_utr);
+    g_usb_pmsc_utr.keyword   = g_usb_pmsc_bulk_in_pipe[g_usb_pmsc_usbip];
+    g_usb_pmsc_utr.p_tranadr = (uint8_t *) &g_usb_pmsc_csw;
+    g_usb_pmsc_utr.tranlen   = USB_MSC_CSW_LENGTH;
+    g_usb_pmsc_utr.ip        = g_usb_pmsc_usbip;
+    usb_pmsc_transfer_start(&g_usb_pmsc_utr);
     g_usb_pmsc_seq = USB_PMSC_CSWSND;
 }                                      /* End of function usb_pmsc_csw_transfer() */
 
@@ -922,7 +926,7 @@ static void usb_pmsc_data_transfer (usb_utr_t * mess, uint16_t data1, uint16_t d
         case USB_PMSC_CMD_COMPLETE:    /* Command Execute -> Pass! */
         {
             /* CSW(OK) transfer */
-            usb_pmsc_csw_transfer(mess, USB_MSC_CSW_OK);
+            usb_pmsc_csw_transfer(USB_MSC_CSW_OK);
 
             break;
         }
@@ -945,7 +949,7 @@ static void usb_pmsc_data_transfer (usb_utr_t * mess, uint16_t data1, uint16_t d
             else
             {
                 /* CSW(NG) transfer */
-                usb_pmsc_csw_transfer(mess, USB_MSC_CSW_NG);
+                usb_pmsc_csw_transfer(USB_MSC_CSW_NG);
             }
 
             break;
@@ -1019,8 +1023,9 @@ static void usb_pmsc_err_csw_ok (usb_utr_t * ptr, uint16_t data1, uint16_t data2
     FSP_PARAMETER_NOT_USED(data1);
     FSP_PARAMETER_NOT_USED(data2);
 
-    /* CSW(NG) transfer */
-    usb_pmsc_csw_transfer(ptr, USB_MSC_CSW_OK);
+    FSP_PARAMETER_NOT_USED(ptr);
+    /* CSW(OK) transfer */
+    usb_pmsc_csw_transfer(USB_MSC_CSW_OK);
 }                                      /* End of function usb_pmsc_err_csw_ok() */
 
 /***********************************************************************************************************************
@@ -1036,8 +1041,9 @@ static void usb_pmsc_err_csw_ng (usb_utr_t * ptr, uint16_t data1, uint16_t data2
     FSP_PARAMETER_NOT_USED(data1);
     FSP_PARAMETER_NOT_USED(data2);
 
+    FSP_PARAMETER_NOT_USED(ptr);
     /* CSW(NG) transfer */
-    usb_pmsc_csw_transfer(ptr, USB_MSC_CSW_NG);
+    usb_pmsc_csw_transfer(USB_MSC_CSW_NG);
 }                                      /* End of function usb_pmsc_err_csw_ng() */
 
 /***********************************************************************************************************************
@@ -1053,8 +1059,9 @@ static void usb_pmsc_err_phase_err (usb_utr_t * ptr, uint16_t data1, uint16_t da
     FSP_PARAMETER_NOT_USED(data1);
     FSP_PARAMETER_NOT_USED(data2);
 
+    FSP_PARAMETER_NOT_USED(ptr);
     /* CSW(ERROR) transfer */
-    usb_pmsc_csw_transfer(ptr, USB_MSC_CSW_PHASE_ERR);
+    usb_pmsc_csw_transfer(USB_MSC_CSW_PHASE_ERR);
 }                                      /* End of function usb_pmsc_err_phase_err() */
 
 /***********************************************************************************************************************
