@@ -140,10 +140,10 @@ void ModControllableAudio::initParams(ParamManager* paramManager) {
 
 	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_SHAPE].setCurrentValueBasicForSetup(-601295438);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_THRESHOLD].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RATIO].setCurrentValueBasicForSetup(0);
+	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RATIO].setCurrentValueBasicForSetup(1073741824);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_ATTACK].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RELEASE].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_BLEND].setCurrentValueBasicForSetup(2147483647);
+	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_BLEND].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_INPUT_GAIN].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN].setCurrentValueBasicForSetup(1073741824);
 }
@@ -843,6 +843,14 @@ void ModControllableAudio::writeParamAttributesToFile(Serializer& writer, ParamM
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
 	unpatchedParams->writeParamAsAttribute(writer, "compressorThreshold", params::UNPATCHED_COMPRESSOR_THRESHOLD,
 	                                       writeAutomation, false, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "compressorRatio", params::UNPATCHED_COMPRESSOR_RATIO,
+	                                       writeAutomation, false, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "compressorAttack", params::UNPATCHED_COMPRESSOR_ATTACK,
+	                                       writeAutomation, false, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "compressorRelease", params::UNPATCHED_COMPRESSOR_RELEASE,
+	                                       writeAutomation, false, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "compressorBlend", params::UNPATCHED_COMPRESSOR_BLEND,
+	                                       writeAutomation, false, valuesForOverride);
 	unpatchedParams->writeParamAsAttribute(writer, "compressorInputGain", params::UNPATCHED_COMPRESSOR_INPUT_GAIN,
 	                                       writeAutomation, false, valuesForOverride);
 	unpatchedParams->writeParamAsAttribute(writer, "compressorMakeupGain", params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN,
@@ -929,6 +937,26 @@ bool ModControllableAudio::readParamTagFromFile(Deserializer& reader, char const
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_THRESHOLD,
 		                           readAutomationUpToPos);
 		reader.exitTag("compressorThreshold");
+	}
+	else if (!strcmp(tagName, "compressorRatio")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_RATIO,
+		                           readAutomationUpToPos);
+		reader.exitTag("compressorRatio");
+	}
+	else if (!strcmp(tagName, "compressorAttack")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_ATTACK,
+		                           readAutomationUpToPos);
+		reader.exitTag("compressorAttack");
+	}
+	else if (!strcmp(tagName, "compressorRelease")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_RELEASE,
+		                           readAutomationUpToPos);
+		reader.exitTag("compressorRelease");
+	}
+	else if (!strcmp(tagName, "compressorBlend")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_BLEND,
+		                           readAutomationUpToPos);
+		reader.exitTag("compressorBlend");
 	}
 	else if (!strcmp(tagName, "compressorInputGain")) {
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_INPUT_GAIN,
@@ -1030,25 +1058,43 @@ doReadPatchedParam:
 	}
 
 	else if (!strcmp(tagName, "audioCompressor")) {
+		UnpatchedParamSet* unpatchedParams =
+		    paramManager ? (UnpatchedParamSet*)paramManager->getUnpatchedParamSetSummary()->paramCollection : nullptr;
 		while (*(tagName = reader.readNextTagOrAttributeName())) {
 			if (!strcmp(tagName, "attack")) {
 				q31_t masterCompressorAttack = reader.readTagOrAttributeValueInt();
 				compressor.setAttack(masterCompressorAttack);
+				if (unpatchedParams) {
+					unpatchedParams->params[params::UNPATCHED_COMPRESSOR_ATTACK].setCurrentValueBasicForSetup(
+					    masterCompressorAttack);
+				}
 				reader.exitTag("attack");
 			}
 			else if (!strcmp(tagName, "release")) {
 				q31_t masterCompressorRelease = reader.readTagOrAttributeValueInt();
 				compressor.setRelease(masterCompressorRelease);
+				if (unpatchedParams) {
+					unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RELEASE].setCurrentValueBasicForSetup(
+					    masterCompressorRelease);
+				}
 				reader.exitTag("release");
 			}
 			else if (!strcmp(tagName, "thresh")) {
 				q31_t masterCompressorThresh = reader.readTagOrAttributeValueInt();
 				compressor.setThreshold(masterCompressorThresh);
+				if (unpatchedParams) {
+					unpatchedParams->params[params::UNPATCHED_COMPRESSOR_THRESHOLD].setCurrentValueBasicForSetup(
+					    masterCompressorThresh);
+				}
 				reader.exitTag("thresh");
 			}
 			else if (!strcmp(tagName, "ratio")) {
 				q31_t masterCompressorRatio = reader.readTagOrAttributeValueInt();
 				compressor.setRatio(masterCompressorRatio);
+				if (unpatchedParams) {
+					unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RATIO].setCurrentValueBasicForSetup(
+					    masterCompressorRatio);
+				}
 				reader.exitTag("ratio");
 			}
 			else if (!strcmp(tagName, "compHPF")) {
@@ -1059,6 +1105,10 @@ doReadPatchedParam:
 			else if (!strcmp(tagName, "compBlend")) {
 				q31_t masterCompressorBlend = reader.readTagOrAttributeValueInt();
 				compressor.setBlend(masterCompressorBlend);
+				if (unpatchedParams) {
+					unpatchedParams->params[params::UNPATCHED_COMPRESSOR_BLEND].setCurrentValueBasicForSetup(
+					    masterCompressorBlend);
+				}
 				reader.exitTag("compBlend");
 			}
 			else {

@@ -111,11 +111,12 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 		                              // returning 134217728
 	}
 	q31_t compThreshold = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
+	q31_t compBlend = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_BLEND);
 	compressor.setThreshold(compThreshold);
 	compressor.setRatio(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RATIO));
 	compressor.setAttack(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_ATTACK));
 	compressor.setRelease(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RELEASE));
-	compressor.setBlend(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_BLEND));
+	compressor.setBlend(compBlend);
 	compressor.setInputGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_INPUT_GAIN));
 	compressor.setMakeupGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN));
 	StereoSample globalEffectableBuffer[SSI_TX_BUFFER_NUM_SAMPLES] __attribute__((aligned(CACHE_LINE_SIZE)));
@@ -154,7 +155,7 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 
 	processReverbSendAndVolume(globalEffectableBuffer, numSamples, reverbBuffer, volumePostFX, postReverbVolume,
 	                           reverbSendAmount, pan, true);
-	if (compThreshold > 0) {
+	if (compBlend > 0) {
 		compressor.renderVolNeutral(globalEffectableBuffer, numSamples, volumePostFX);
 	}
 	else {

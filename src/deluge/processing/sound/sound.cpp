@@ -2440,14 +2440,15 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 	                           reverbSendAmount, 0, true);
 
 	q31_t compThreshold = paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
+	q31_t compBlend = paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_BLEND);
 	compressor.setThreshold(compThreshold);
 	compressor.setRatio(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_RATIO));
 	compressor.setAttack(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_ATTACK));
 	compressor.setRelease(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_RELEASE));
-	compressor.setBlend(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_BLEND));
+	compressor.setBlend(compBlend);
 	compressor.setInputGain(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_INPUT_GAIN));
 	compressor.setMakeupGain(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN));
-	if (compThreshold > 0) {
+	if (compBlend > 0) {
 		compressor.renderVolNeutral((StereoSample*)soundBuffer, numSamples, postFXVolume);
 	}
 	else {

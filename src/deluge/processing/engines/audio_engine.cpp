@@ -914,11 +914,12 @@ void renderSongFX(size_t numSamples) { // LPF and stutter for song (must happen 
 
 		UnpatchedParamSet* unpatchedParams = currentSong->paramManager.getUnpatchedParamSet();
 		q31_t compThreshold = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
+		q31_t compBlend = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_BLEND);
 		currentSong->globalEffectable.compressor.setThreshold(compThreshold);
 		currentSong->globalEffectable.compressor.setRatio(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RATIO));
 		currentSong->globalEffectable.compressor.setAttack(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_ATTACK));
 		currentSong->globalEffectable.compressor.setRelease(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RELEASE));
-		currentSong->globalEffectable.compressor.setBlend(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_BLEND));
+		currentSong->globalEffectable.compressor.setBlend(compBlend);
 		currentSong->globalEffectable.compressor.setInputGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_INPUT_GAIN));
 		currentSong->globalEffectable.compressor.setMakeupGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN));
 
@@ -927,15 +928,13 @@ void renderSongFX(size_t numSamples) { // LPF and stutter for song (must happen 
 		        134217728, cableToLinearParamShortcut(unpatchedParams->getValue(params::UNPATCHED_VOLUME)))
 		    >> 1;
 
-		masterVolumeAdjustmentL = multiply_32x32_rshift32(masterVolumeAdjustmentL, songVolume) << 6;
-		masterVolumeAdjustmentR = multiply_32x32_rshift32(masterVolumeAdjustmentR, songVolume) << 6;
+		int64_t adjL = ((int64_t)multiply_32x32_rshift32(masterVolumeAdjustmentL, songVolume)) << 8;
+		masterVolumeAdjustmentL = (int32_t)std::min<int64_t>(adjL, 2147483647LL);
+		int64_t adjR = ((int64_t)multiply_32x32_rshift32(masterVolumeAdjustmentR, songVolume)) << 8;
+		masterVolumeAdjustmentR = (int32_t)std::min<int64_t>(adjR, 2147483647LL);
 
-		if (compThreshold > 0) {
-			currentSong->globalEffectable.compressor.render(renderingBuffer.data(), numSamples,
-			                                                masterVolumeAdjustmentL >> 1, masterVolumeAdjustmentR >> 1,
-			                                                0);
-			masterVolumeAdjustmentL = ONE_Q31;
-			masterVolumeAdjustmentR = ONE_Q31;
+		if (compBlend > 0) {
+			currentSong->globalEffectable.compressor.renderVolNeutral(renderingBuffer.data(), numSamples, 0);
 		}
 		else {
 			currentSong->globalEffectable.compressor.reset();

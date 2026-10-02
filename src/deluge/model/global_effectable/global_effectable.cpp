@@ -600,10 +600,11 @@ ActionResult GlobalEffectable::modEncoderActionForNonExistentParam(int32_t offse
 			current += offset;
 			current = std::clamp(current, -64, 64);
 			ledLevel = (64 + current);
-			displayLevel = ((ledLevel)*kMaxMenuValue) / 128;
-			compressor.setThreshold(lshiftAndSaturate<24>(current + 64));
+			q31_t level = current == 64 ? ONE_Q31 : lshiftAndSaturate<24>(current + 64);
+			compressor.setThreshold(level);
+			displayLevel = compressor.getThresholdForDisplay();
 			indicator_leds::setKnobIndicatorLevel(1, ledLevel);
-			unit = "";
+			unit = " dB";
 		}
 		else if (whichModEncoder == 0) {
 			switch (currentCompParam) {
@@ -614,11 +615,14 @@ ActionResult GlobalEffectable::modEncoderActionForNonExistentParam(int32_t offse
 				}
 				current = (compressor.getRatio() >> 24) - 64;
 				current += offset;
-				// this range is ratio of 2 to 20
 				current = std::clamp(current, -64, 64);
 				ledLevel = (64 + current);
-				displayLevel = compressor.setRatio(lshiftAndSaturate<24>(current + 64));
-				unit = " : 1";
+				{
+					q31_t ratLevel = current == 64 ? ONE_Q31 : lshiftAndSaturate<24>(current + 64);
+					compressor.setRatio(ratLevel);
+				}
+				displayLevel = compressor.getRatioForDisplay();
+				unit = "";
 				break;
 
 			case CompParam::ATTACK:
@@ -678,11 +682,25 @@ ActionResult GlobalEffectable::modEncoderActionForNonExistentParam(int32_t offse
 
 		if (display->haveOLED()) {
 			popupMsg.append(": ");
-			popupMsg.appendInt(displayLevel);
-			popupMsg.append(unit);
+			if (whichModEncoder == 0 && currentCompParam == CompParam::RATIO) {
+				char ratioBuffer[16];
+				compressor.getRatioString(ratioBuffer, sizeof(ratioBuffer));
+				popupMsg.append(ratioBuffer);
+			}
+			else {
+				popupMsg.appendInt(displayLevel);
+				popupMsg.append(unit);
+			}
 		}
 		else {
-			popupMsg.appendInt(displayLevel);
+			if (whichModEncoder == 0 && currentCompParam == CompParam::RATIO) {
+				char ratioBuffer[16];
+				compressor.getRatioString(ratioBuffer, sizeof(ratioBuffer));
+				popupMsg.append(ratioBuffer);
+			}
+			else {
+				popupMsg.appendInt(displayLevel);
+			}
 		}
 		display->displayPopup(popupMsg.c_str());
 

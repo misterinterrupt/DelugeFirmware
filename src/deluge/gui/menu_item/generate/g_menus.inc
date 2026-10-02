@@ -28,16 +28,22 @@ std::array<MenuItem*, 3> child2 = {
     &filterRoutingMenu,
 };
 Submenu soundFiltersMenu{STRING_FOR_FILTERS, child2};
-audio_compressor::CompParam threshold{STRING_FOR_THRESHOLD, STRING_FOR_THRESHOLD, params::UNPATCHED_COMPRESSOR_THRESHOLD};
+audio_compressor::Threshold compThreshold{STRING_FOR_THRESHOLD, STRING_FOR_THRESHOLD};
 audio_compressor::Ratio compRatio{STRING_FOR_RATIO, STRING_FOR_RATIO};
 audio_compressor::Attack compAttack{STRING_FOR_ATTACK, STRING_FOR_ATTACK};
 audio_compressor::Release compRelease{STRING_FOR_RELEASE, STRING_FOR_RELEASE};
+audio_compressor::InputGain compInputGain{STRING_FOR_INPUT_GAIN, STRING_FOR_INPUT_GAIN};
+audio_compressor::MakeupGain compMakeupGain{STRING_FOR_MAKEUP_GAIN, STRING_FOR_MAKEUP_GAIN};
+audio_compressor::SideHPF compHPF{STRING_FOR_HPF, STRING_FOR_HPF};
 audio_compressor::Blend compBlend{STRING_FOR_BLEND, STRING_FOR_BLEND};
-std::array<MenuItem*, 5> child3 = {
-    &threshold,
+std::array<MenuItem*, 8> child3 = {
+    &compThreshold,
     &compRatio,
     &compAttack,
     &compRelease,
+    &compInputGain,
+    &compMakeupGain,
+    &compHPF,
     &compBlend,
 };
 Submenu audioCompMenu{STRING_FOR_COMMUNITY_FEATURE_MASTER_COMPRESSOR, child3};

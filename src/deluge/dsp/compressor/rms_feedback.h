@@ -20,7 +20,9 @@
 #include "definitions_cxx.hpp"
 #include "dsp/filter/ladder_components.h"
 #include "dsp/stereo_sample.h"
+#include "util/cfunctions.h"
 #include <cmath>
+#include <cstring>
 
 class RMSFeedbackCompressor {
 public:
@@ -42,9 +44,11 @@ public:
 		state = 0;
 		er = 0;
 		mean = 0;
+		rms = 0;
 		onLastTime = false;
 		currentVolumeL = 0;
 		currentVolumeR = 0;
+		currentCompGain = 1 << 24;
 		lastDampValue[0] = 0;
 		lastDampValue[1] = 0;
 	}
@@ -73,91 +77,192 @@ public:
 	[[nodiscard]] inline constexpr q31_t getAttack() const { return attackKnobPos; }
 
 	/// Get the current attack time constant in MS for a 3db change
-	///
-	/// @todo This currently rounds (down) to the nearest millisecond, it would probably be nice to expose at least a
-	/// little more of the underlying precsision.
-	[[nodiscard]] inline constexpr int32_t getAttackMS() const { return attackMS; }
+	[[nodiscard]] inline constexpr float getAttackMSFloat() const { return attackMS; }
+	[[nodiscard]] inline constexpr int32_t getAttackMS() const { return (int32_t)std::round(attackMS); }
 
 	/// Set the attack time constant from a full-scale (0 to 2^31) number.
 	///
-	/// The parameter is exponentially mapped to a number between 0.5 and 70-ish ms
+	/// The parameter is quadratically mapped between 0.5 ms and 100.0 ms.
 	constexpr int32_t setAttack(q31_t attack) {
 		attackKnobPos = attack;
 		float normA = float(attack) / ONE_Q31f;
 		attackMS = 0.5f + normA * normA * 99.5f;
 		a_ = (-1000.0f / kSampleRate) / attackMS;
-		return (int32_t)attackMS;
+		return (int32_t)std::round(attackMS);
 	};
 
 	/// Get the current release time constant in terms of the full knob range (0 to 2^31)
 	[[nodiscard]] inline constexpr q31_t getRelease() const { return releaseKnobPos; }
+
 	/// Get the current release time constant in MS for a 3db change
-	///
-	/// @todo This currently rounds (down) to the nearest millisecond, it would probably be nice to expose at least a
-	/// little more of the underlying precsision.
-	[[nodiscard]] inline constexpr int32_t getReleaseMS() const { return releaseMS; }
+	[[nodiscard]] inline constexpr float getReleaseMSFloat() const { return releaseMS; }
+	[[nodiscard]] inline constexpr int32_t getReleaseMS() const { return (int32_t)std::round(releaseMS); }
 
 	/// Set the release time constant from a full-scale (0 to 2^31) number.
 	///
-	/// Inverted release knob param with smooth quadratic mapping between 10ms and 500ms
+	/// Smooth quadratic mapping between 10 ms (fast) and 1000 ms (slow).
 	constexpr int32_t setRelease(q31_t release) {
 		releaseKnobPos = release;
-		q31_t effRelease = ONE_Q31 - release;
-		float normR = float(effRelease) / ONE_Q31f;
-		releaseMS = 10.0f + normR * normR * 490.0f;
+		float normR = float(release) / ONE_Q31f;
+		releaseMS = 10.0f + normR * normR * 990.0f;
 		r_ = (-1000.0f / kSampleRate) / releaseMS;
-		return (int32_t)releaseMS;
+		return (int32_t)std::round(releaseMS);
 	};
+
+	/// Format attack time string (e.g. "0.5 MS", "12 MS", "100 MS")
+	void getAttackString(char* buffer, size_t maxLen) const {
+		if (maxLen < 10) return;
+		if (attackMS < 9.95f) {
+			int32_t aTenths = (int32_t)std::round(attackMS * 10.0f);
+			intToString(aTenths / 10, buffer, 1);
+			size_t len = strlen(buffer);
+			buffer[len] = '.';
+			intToString(aTenths % 10, buffer + len + 1, 1);
+		}
+		else {
+			int32_t aInt = (int32_t)std::round(attackMS);
+			intToString(aInt, buffer, 1);
+		}
+		size_t len = strlen(buffer);
+		buffer[len] = ' ';
+		buffer[len + 1] = 'M';
+		buffer[len + 2] = 'S';
+		buffer[len + 3] = '\0';
+	}
+
+	/// Format release time string (e.g. "50 MS", "500 MS", "1.0 S")
+	void getReleaseString(char* buffer, size_t maxLen) const {
+		if (maxLen < 10) return;
+		if (releaseMS >= 999.5f) {
+			int32_t rTenths = (int32_t)std::round(releaseMS / 100.0f);
+			intToString(rTenths / 10, buffer, 1);
+			size_t len = strlen(buffer);
+			buffer[len] = '.';
+			intToString(rTenths % 10, buffer + len + 1, 1);
+			len = strlen(buffer);
+			buffer[len] = ' ';
+			buffer[len + 1] = 'S';
+			buffer[len + 2] = '\0';
+		}
+		else {
+			int32_t rInt = (int32_t)std::round(releaseMS);
+			intToString(rInt, buffer, 1);
+			size_t len = strlen(buffer);
+			buffer[len] = ' ';
+			buffer[len + 1] = 'M';
+			buffer[len + 2] = 'S';
+			buffer[len + 3] = '\0';
+		}
+	}
 
 	/// Get the current theshold as a full-scale (0 to 2^31) number.
 	[[nodiscard]] inline constexpr q31_t getThreshold() const { return thresholdKnobPos; }
 
+	/// Returns threshold in dB (0 dBFS down to -48 dBFS)
+	[[nodiscard]] inline constexpr float getThresholdDB() const {
+		float pos = float(thresholdKnobPos) / ONE_Q31f;
+		return -pos * 48.0f;
+	}
+
+	[[nodiscard]] inline constexpr int32_t getThresholdForDisplay() const {
+		return (int32_t)std::round(getThresholdDB());
+	}
+
 	/// Set the threshold based on a full-scale (0 to 2^31) number.
 	///
-	/// 0 corresponds to 0 dBFS (21.5f log-RMS), 2^31 corresponds to -60 dBFS (3.5f log-RMS).
+	/// 0 corresponds to 0 dBFS (21.5f log-RMS), 2^31 corresponds to -48 dBFS (15.974f log-RMS).
 	constexpr void setThreshold(q31_t t) {
 		thresholdKnobPos = t;
 		float pos = float(thresholdKnobPos) / ONE_Q31f;
-		threshdb = 21.5f - pos * 18.0f;
+		threshdb = 21.5f - pos * 5.526f;
 	}
 
-	/// Get/set Input Gain
+	/// Get/set Input Gain (0 dB to +12 dB)
 	[[nodiscard]] inline constexpr q31_t getInputGain() const { return inputGainKnobPos; }
+	[[nodiscard]] inline constexpr float getInputGainDB() const {
+		float pos = float(inputGainKnobPos) / ONE_Q31f;
+		return pos * 12.0f;
+	}
+	[[nodiscard]] inline constexpr int32_t getInputGainForDisplay() const {
+		return (int32_t)std::round(getInputGainDB());
+	}
 	constexpr void setInputGain(q31_t gain) {
 		inputGainKnobPos = gain;
-		// Map 0 to 2^31 -> 0 dB to +24 dB gain (0.0 to 2.76 log-RMS offset)
-		inputGaindB = (float(inputGainKnobPos) / ONE_Q31f) * 2.76f;
+		// Map 0 to 2^31 -> 0 dB to +12 dB gain (0.0 to 1.3815 log-RMS offset)
+		inputGaindB = (float(inputGainKnobPos) / ONE_Q31f) * 1.3815f;
 	}
 
-	/// Get/set Makeup Gain
+	/// Get/set Makeup Gain (-12 dB to +12 dB, 0 dB at center)
 	[[nodiscard]] inline constexpr q31_t getMakeupGain() const { return makeupGainKnobPos; }
+	[[nodiscard]] inline constexpr float getMakeupGainDB() const {
+		float pos = float(makeupGainKnobPos) / ONE_Q31f;
+		return (pos - 0.5f) * 24.0f;
+	}
+	[[nodiscard]] inline constexpr int32_t getMakeupGainForDisplay() const {
+		return (int32_t)std::round(getMakeupGainDB());
+	}
 	constexpr void setMakeupGain(q31_t gain) {
 		makeupGainKnobPos = gain;
-		// Map 0 to 2^31 -> -24 dB to +24 dB makeup gain (-2.76 to +2.76 neppers, 0 dB at default 50% / pos 0.5)
+		// Map 0 to 2^31 -> -12 dB to +12 dB makeup gain (-1.3815 to +1.3815 nepers, 0 dB at center 50% / pos 0.5)
 		float pos = float(makeupGainKnobPos) / ONE_Q31f;
-		makeupGaindB = (pos - 0.5f) * 5.52f;
+		makeupGaindB = (pos - 0.5f) * 2.763f;
 	}
 
 	/// Get the current ratio as a full-scale (0 to 2^31) number
 	[[nodiscard]] inline constexpr q31_t getRatio() const { return ratioKnobPos; }
 
-	/// Get the current ratio as an integer
-	[[nodiscard]] inline constexpr int32_t getRatioForDisplay() const { return ratio; }
+	/// Get the current ratio as a float (e.g. 1.0, 2.0, 128.0, 0.5, 0.1)
+	[[nodiscard]] inline constexpr float getRatioFloat() const { return ratio; }
+
+	/// Get the current ratio as an integer for basic display
+	[[nodiscard]] inline constexpr int32_t getRatioForDisplay() const { return (int32_t)std::round(ratio); }
+
+	/// Format ratio string (e.g. "1:1.0", "1:2.0", "1:16", "1:0.50")
+	void getRatioString(char* buffer, size_t maxLen) const {
+		if (maxLen < 8) return;
+		buffer[0] = '1';
+		buffer[1] = ':';
+		if (ratio >= 9.95f) {
+			int32_t rInt = (int32_t)(ratio + 0.5f);
+			intToString(rInt, buffer + 2, 1);
+		}
+		else if (ratio >= 0.995f) {
+			int32_t rTenths = (int32_t)std::round(ratio * 10.0f);
+			intToString(rTenths / 10, buffer + 2, 1);
+			size_t len = strlen(buffer);
+			buffer[len] = '.';
+			intToString(rTenths % 10, buffer + len + 1, 1);
+		}
+		else {
+			int32_t rHundredths = (int32_t)std::round(ratio * 100.0f);
+			if (rHundredths < 0) rHundredths = 0;
+			if (rHundredths > 99) rHundredths = 99;
+			buffer[2] = '0';
+			buffer[3] = '.';
+			buffer[4] = (char)('0' + (rHundredths / 10));
+			buffer[5] = (char)('0' + (rHundredths % 10));
+			buffer[6] = '\0';
+		}
+	}
 
 	/// Set the ratio based on a full-scale (0 to 2^31) number.
 	///
-	/// 0 corresponds to a ratio of 1:1, 2^31 corresponds to a ratio of 256:1 limiting.
-	constexpr int32_t setRatio(q31_t rat) {
+	/// Center (1<<30) corresponds to 1:1.
+	/// Positive (1<<30 to 2^31) corresponds to 1:1 up to 1:128 in powers of two.
+	/// Negative (0 to 1<<30) corresponds to expander ratios 1:0.1 up to 1:1.
+	constexpr void setRatio(q31_t rat) {
 		ratioKnobPos = rat;
 		float pos = float(ratioKnobPos) / ONE_Q31f;
-		fraction = pos;
-		if (fraction < 0.9961f) {
-			ratio = 1.0f / (1.0f - fraction);
+		if (pos >= 0.5f) {
+			float t = (pos - 0.5f) / 0.5f; // 0.0 to 1.0
+			ratio = std::exp(4.85203026f * t); // 1.0 to 128.0 (2^(7*t))
+			fraction = 1.0f - (1.0f / ratio);
 		}
 		else {
-			ratio = 256.0f;
+			float t = (0.5f - pos) / 0.5f; // 0.0 to 1.0
+			ratio = 1.0f / (1.0f + 9.0f * t); // 1.0 down to 0.1
+			fraction = 1.0f - (1.0f / ratio); // 0.0 down to -9.0
 		}
-		return (int32_t)ratio;
 	}
 
 	/// Get the current sidechain cutoff frequency as a full-scale (0 to 2^31) integer
@@ -236,6 +341,8 @@ private:
 	q31_t currentVolumeL = 0;
 	/// Current right channel volume as a 5.26 signed fixed-point number
 	q31_t currentVolumeR = 0;
+	/// Current compressor gain multiplier as a 1.24 signed fixed-point number
+	q31_t currentCompGain = 1 << 24;
 	/// Log-RMS value of the last render.
 	float rms = 0;
 	/// Mean value of the last render.
@@ -268,6 +375,6 @@ private:
 	q31_t makeupGainKnobPos = 1073741824;
 	float inputGaindB = 0.0f;
 	float makeupGaindB = 0.0f;
-	q31_t dry;
-	q31_t wet;
+	q31_t dry = ONE_Q31;
+	q31_t wet = 0;
 };

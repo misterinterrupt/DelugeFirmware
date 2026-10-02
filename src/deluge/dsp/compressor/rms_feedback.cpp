@@ -20,15 +20,16 @@
 StereoSample dryBuffer[SSI_TX_BUFFER_NUM_SAMPLES]{0};
 
 RMSFeedbackCompressor::RMSFeedbackCompressor() {
-	setAttack(5 << 24);
-	setRelease(5 << 24);
+	setAttack(536870912);
+	setRelease(1073741824);
 	setThreshold(0);
-	setRatio(0);
+	setRatio(1073741824);
 	setSidechain(0);
-	setBlend(ONE_Q31);
+	setBlend(0);
 	setInputGain(0);
 	setMakeupGain(1073741824);
 	baseGain_ = 0.0f;
+	currentCompGain = 1 << 24;
 }
 
 void RMSFeedbackCompressor::updateER(float numSamples, q31_t finalVolume) {
@@ -58,8 +59,8 @@ constexpr uint8_t saturationAmount = 3;
 		inputForTanH = (scaledInput < 0) ? (int32_t)(-compressedAbs) : (int32_t)compressedAbs;
 	}
 
-	// 2. Continuous anti-aliased soft saturation (saturationAmount = 3 preserves exact native volume level)
-	int32_t sat = getTanHAntialiased(inputForTanH, lastWorkingValue, saturationAmount);
+	// 2. Continuous anti-aliased soft saturation (shifted << 1 to preserve exact 1.0x unity gain)
+	int32_t sat = getTanHAntialiased(inputForTanH, lastWorkingValue, saturationAmount) << 1;
 
 	// 3. Add subtle 2nd-order asymmetric bias for analog tube warmth and bulbous bass response
 	int64_t mag = (sat < 0) ? -(int64_t)sat : (int64_t)sat;
@@ -79,7 +80,7 @@ constexpr uint8_t saturationAmount = 3;
 
 void RMSFeedbackCompressor::render(StereoSample* buffer, uint16_t numSamples, q31_t volAdjustL, q31_t volAdjustR,
                                    q31_t finalVolume) {
-	// make a copy for blending if we need to
+	// Copy clean dry signal conceptually pre-input-gain for blending
 	if (wet != ONE_Q31) {
 		memcpy(dryBuffer, buffer, numSamples * sizeof(StereoSample));
 	}
@@ -92,65 +93,102 @@ void RMSFeedbackCompressor::render(StereoSample* buffer, uint16_t numSamples, q3
 		    (uint32_t)lshiftAndSaturateUnknown(buffer->r, saturationAmount) + 2147483648u;
 		lastDampValue[0] = 0;
 		lastDampValue[1] = 0;
+		currentVolumeL = volAdjustL >> 6;
+		currentVolumeR = volAdjustR >> 6;
+		currentCompGain = 1 << 24;
 		onLastTime = true;
 	}
-	// we update this every time since we won't know if the song volume changed
+
 	updateER(numSamples, finalVolume);
 
-	float effectiveRMS = rms + inputGaindB;
+	float effectiveRMS = rms;
 	float over = std::max<float>(0.0f, (effectiveRMS - threshdb));
 
 	state = runEnvelope(state, over, numSamples);
 
 	float reduction = -state * fraction;
 
-	float dbGain = baseGain_ + er + reduction + makeupGaindB + inputGaindB;
+	// Compressor gain reduction + makeup gain
+	float compGaindB = baseGain_ + er + reduction + makeupGaindB;
+	float compGainLinear = std::exp(compGaindB);
+	compGainLinear = std::min<float>(compGainLinear, 31.0f);
 
-	float gain = std::exp(dbGain);
-	gain = std::min<float>(gain, 31.0f);
+	// Target compressor gain in 1.24 fixed point
+	float targetCompGain = compGainLinear * 16777216.0f;
+	int32_t compGainIncrement = (int32_t)((targetCompGain - float(currentCompGain)) / float(numSamples));
 
-	// Compute target gain multiplier with 1.0 = (1 << 24)
-	// volAdjustL is 1.30 signed fixed-point where 1 << 30 is 0.5 (neutral)
-	float finalVolumeL = gain * float(volAdjustL >> 6);
-	float finalVolumeR = gain * float(volAdjustR >> 6);
+	// Linear input gain in 1.24 fixed point to drive the saturation stage
+	float inputGainLinear = std::exp(inputGaindB);
+	int32_t inputGainMult = (int32_t)(inputGainLinear * 16777216.0f);
 
-	// The amount we need to step currentVolume per sample
-	int32_t amplitudeIncrementL = (int32_t)((finalVolumeL - float(currentVolumeL)) / float(numSamples));
-	int32_t amplitudeIncrementR = (int32_t)((finalVolumeR - float(currentVolumeR)) / float(numSamples));
+	// Volume adjustments in 1.24 fixed point applied to final blended output
+	float targetVolL = float(volAdjustL >> 6);
+	float targetVolR = float(volAdjustR >> 6);
+	int32_t amplitudeIncrementL = (int32_t)((targetVolL - float(currentVolumeL)) / float(numSamples));
+	int32_t amplitudeIncrementR = (int32_t)((targetVolR - float(currentVolumeR)) / float(numSamples));
 
 	StereoSample* thisSample = buffer;
 	StereoSample* drySample = dryBuffer;
 	StereoSample* bufferEnd = buffer + numSamples;
+	int64_t sum = 0;
 
 	do {
-		currentVolumeL += amplitudeIncrementL;
-		currentVolumeR += amplitudeIncrementR;
+		int32_t rawL = thisSample->l;
+		int32_t rawR = thisSample->r;
 
-		// 64-bit multiplication without 32-bit integer overflow or bit-wrapping
-		int64_t scaledL = (int64_t(thisSample->l) * currentVolumeL) >> 24;
-		thisSample->l = applyWarmCompressorSaturation(scaledL, &lastSaturationTanHWorkingValue[0], &lastDampValue[0]);
+		// 1. Input Gain stage
+		int64_t drivenL = (int64_t(rawL) * inputGainMult) >> 24;
+		int64_t drivenR = (int64_t(rawR) * inputGainMult) >> 24;
 
-		int64_t scaledR = (int64_t(thisSample->r) * currentVolumeR) >> 24;
-		thisSample->r = applyWarmCompressorSaturation(scaledR, &lastSaturationTanHWorkingValue[1], &lastDampValue[1]);
+		// 2. Saturation stage (between input gain and compressor)
+		int32_t satL = applyWarmCompressorSaturation(drivenL, &lastSaturationTanHWorkingValue[0], &lastDampValue[0]);
+		int32_t satR = applyWarmCompressorSaturation(drivenR, &lastSaturationTanHWorkingValue[1], &lastDampValue[1]);
 
-		// wet/dry blend
+		// 3. Compressor Gain Reduction & Makeup Gain stage
+		currentCompGain += compGainIncrement;
+		int32_t wetL = (int64_t(satL) * currentCompGain) >> 24;
+		int32_t wetR = (int64_t(satR) * currentCompGain) >> 24;
+
+		// 4. Sidechain RMS tracking on wet compressed signal
+		q31_t hpfOutL = wetL - hpfL.doFilter(wetL, hpfA_);
+		q31_t hpfOutR = wetR - hpfR.doFilter(wetR, hpfA_);
+		q31_t s = std::max(std::abs(hpfOutL), std::abs(hpfOutR));
+		sum += multiply_32x32_rshift32(s, s);
+
+		// 5. Wet/Dry Blend (dry is raw signal pre-input gain)
+		int32_t blendedL, blendedR;
 		if (wet != ONE_Q31) {
-			thisSample->l = multiply_32x32_rshift32(thisSample->l, wet);
-			thisSample->l = multiply_accumulate_32x32_rshift32_rounded(thisSample->l, drySample->l, dry);
-			thisSample->l <<= 1; // correct for the two multiplications
-			// same for r because StereoSample is a dumb class
-			thisSample->r = multiply_32x32_rshift32(thisSample->r, wet);
-			thisSample->r = multiply_accumulate_32x32_rshift32_rounded(thisSample->r, drySample->r, dry);
-			thisSample->r <<= 1;
-			++drySample; // this is a little gross but it's fine
+			int32_t dryL = drySample->l;
+			int32_t dryR = drySample->r;
+			blendedL = multiply_32x32_rshift32(wetL, wet);
+			blendedL = multiply_accumulate_32x32_rshift32_rounded(blendedL, dryL, dry) << 1;
+			blendedR = multiply_32x32_rshift32(wetR, wet);
+			blendedR = multiply_accumulate_32x32_rshift32_rounded(blendedR, dryR, dry) << 1;
+			++drySample;
+		}
+		else {
+			blendedL = wetL;
+			blendedR = wetR;
 		}
 
+		// 6. Output volume adjustment applied to blended signal
+		currentVolumeL += amplitudeIncrementL;
+		currentVolumeR += amplitudeIncrementR;
+		thisSample->l = (int64_t(blendedL) * currentVolumeL) >> 24;
+		thisSample->r = (int64_t(blendedR) * currentVolumeR) >> 24;
+
 	} while (++thisSample != bufferEnd);
-	// for LEDs
-	// 4 converts to dB, then quadrupled for display range since a 30db reduction is basically killing the signal
+
+	// Update gain reduction display for LEDs
 	gainReduction = std::clamp<int32_t>(-(reduction) * 4 * 4, 0, 127);
-	// calc compression for next round (feedback compressor)
-	rms = calcRMS(buffer, numSamples);
+
+	// Update feedback RMS calculation for next render window
+	float lastMean = mean;
+	float ns = float(numSamples * 2);
+	mean = (float(sum) / ONE_Q31f) / ns;
+	mean = (mean * ns + lastMean) / (1.0f + ns);
+	float rmsLinear = ONE_Q31 * std::sqrt(mean);
+	rms = std::log(std::max(rmsLinear, 1.0f));
 }
 
 float RMSFeedbackCompressor::runEnvelope(float current, float desired, float numSamples) const {
@@ -169,12 +207,11 @@ float RMSFeedbackCompressor::runEnvelope(float current, float desired, float num
 float RMSFeedbackCompressor::calcRMS(StereoSample* buffer, uint16_t numSamples) {
 	StereoSample* thisSample = buffer;
 	StereoSample* bufferEnd = buffer + numSamples;
-	q31_t sum = 0;
-	q31_t offset = 0; // to remove dc offset
+	int64_t sum = 0;
 	float lastMean = mean;
 	do {
 		q31_t l = thisSample->l - hpfL.doFilter(thisSample->l, hpfA_);
-		q31_t r = thisSample->r - hpfL.doFilter(thisSample->r, hpfA_);
+		q31_t r = thisSample->r - hpfR.doFilter(thisSample->r, hpfA_);
 		q31_t s = std::max(std::abs(l), std::abs(r));
 		sum += multiply_32x32_rshift32(s, s);
 
@@ -182,14 +219,10 @@ float RMSFeedbackCompressor::calcRMS(StereoSample* buffer, uint16_t numSamples) 
 
 	float ns = float(numSamples * 2);
 	mean = (float(sum) / ONE_Q31f) / ns;
-	// warning this is not good math but it's pretty close and way cheaper than doing it properly
-	// good math would use a long FIR, this is a one pole IIR instead
-	// the more samples we have, the more weight we put on the current mean to avoid response slowing down
-	// at high cpu loads
-	mean = (mean * ns + lastMean) / (1 + ns);
-	float rms = ONE_Q31 * std::sqrt(mean);
+	mean = (mean * ns + lastMean) / (1.0f + ns);
+	float rmsLinear = ONE_Q31 * std::sqrt(mean);
 
-	float logmean = std::log(std::max(rms, 1.0f));
+	float logmean = std::log(std::max(rmsLinear, 1.0f));
 
 	return logmean;
 }
