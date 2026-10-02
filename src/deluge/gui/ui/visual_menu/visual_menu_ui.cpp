@@ -130,10 +130,10 @@ int8_t VisualMenuUI::getActiveHeldSlot() const {
 }
 
 ActionResult VisualMenuUI::padAction(int32_t x, int32_t y, int32_t velocity) {
-	// Only forward audition presses to the view underneath while it's in a clean state. Presses during
-	// other modes (e.g. a stale clip-creation context) must not leak into the underlying view, and
-	// releases are always consumed here so the underlying view never sees an orphaned release.
-	if (velocity && getRootUI() != nullptr && currentUIMode == UI_MODE_NONE) {
+	// Auditioning only makes sense over a clip-minder view. Over session/arranger roots a pad
+	// press selects clips and can transition the root UI underneath this menu (and strand
+	// UI_MODE_CLIP_PRESSED_IN_SONG_VIEW, which blocks slot buttons) — so consume pads there.
+	if (rootUIIsClipMinderScreen() && (currentUIMode == UI_MODE_NONE || currentUIMode == UI_MODE_AUDITIONING)) {
 		return getRootUI()->padAction(x, y, velocity);
 	}
 	return ActionResult::DEALT_WITH;
@@ -141,6 +141,7 @@ ActionResult VisualMenuUI::padAction(int32_t x, int32_t y, int32_t velocity) {
 
 bool VisualMenuUI::openForClip(Clip* clip, const MenuItem* targetItem) {
 	currentClip_ = clip;
+	contextIsClipMinder_ = rootUIIsClipMinderScreen();
 
 	// A kit clip with no (sound) drum row selected cannot resolve a per-drum editing context; fall back to
 	// the kit's affect-entire (global FX) context instead of silently failing.
@@ -156,6 +157,7 @@ bool VisualMenuUI::openForClip(Clip* clip, const MenuItem* targetItem) {
 				return false;
 			}
 			kitGlobalFX = true;
+			soundEditor.setupKitGlobalFXMenu = false; // don't let the flag poison later setups
 		}
 		else {
 			return false;
@@ -408,13 +410,21 @@ void VisualMenuUI::selectEncoderAction(int8_t offset) {
 
 	int8_t activeSlot = getActiveHeldSlot();
 
+	// If the root UI changed kind under us (e.g. clip selection transitioned session -> clip
+	// view), the captured soundEditor context is invalid — writing through it would mix the
+	// song's param manager with a clip model stack and corrupt the node trees. Close cleanly.
+	if (rootUIIsClipMinderScreen() != contextIsClipMinder_) {
+		closeVisualMenu();
+		return;
+	}
+
 	// If the current clip changed since the menu opened (e.g. a clip was selected from the
-	// session grid while the menu stayed open), soundEditor's captured param manager no longer
-	// matches getCurrentClip() — writing through that mismatch corrupts the param node trees.
-	// Re-setup before editing in that case.
-	if (rootUIIsClipMinderScreen() && currentClip_ != nullptr && getCurrentClip() != currentClip_) {
+	// session grid while the menu stayed open), re-setup so edits target the new clip.
+	if (contextIsClipMinder_ && currentClip_ != nullptr && getCurrentClip() != currentClip_) {
 		currentClip_ = getCurrentClip();
+		soundEditor.setupKitGlobalFXMenu = false; // don't inherit the kit fallback's flag
 		if (!soundEditor.setup(currentClip_, nullptr)) {
+			// Context invalid; keep the UI alive for navigation but skip this edit
 			return;
 		}
 	}

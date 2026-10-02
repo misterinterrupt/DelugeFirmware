@@ -72,6 +72,7 @@ private:
 	std::array<bool, 4> wasAlreadySelected_{false, false, false, false};
 
 	Clip* currentClip_ = nullptr;
+	bool contextIsClipMinder_ = false;
 
 	void applySourceIndexForCurrentPage();
 };
