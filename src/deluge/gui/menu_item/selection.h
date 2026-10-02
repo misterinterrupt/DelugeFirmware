@@ -34,6 +34,8 @@ public:
 	void drawPixelsForOled() override;
 	size_t size() override { return this->getOptions().size(); }
 
+	void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) override;
+
 	virtual bool isToggle() { return false; }
 
 	void displayToggleValue();

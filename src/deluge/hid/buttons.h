@@ -27,6 +27,9 @@ ActionResult buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine);
 bool isButtonPressed(deluge::hid::Button b);
 bool isShiftButtonPressed();
 void noPressesHappening(bool inCardRoutine);
+/// True while noPressesHappening() is dispatching synthetic button releases. The PIC sends that message
+/// based on pad state only, so it can fire while a button is still physically held down.
+extern bool noPressesSweepActive;
 void ignoreCurrentShiftForSticky();
 const char* getButtonName(deluge::hid::Button b);
 

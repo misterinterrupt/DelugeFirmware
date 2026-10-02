@@ -34,10 +34,12 @@
 #include "gui/ui/sound_editor.h"
 #include "gui/ui/ui.h"
 #include "gui/ui_timer_manager.h"
+#include "gui/ui/visual_menu/visual_menu_ui.h"
 #include "gui/views/arranger_view.h"
 #include "gui/views/audio_clip_view.h"
 #include "gui/views/automation_view.h"
 #include "gui/views/instrument_clip_view.h"
+#include "model/settings/runtime_feature_settings.h"
 #include "gui/views/performance_session_view.h"
 #include "gui/views/view.h"
 #include "gui/waveform/waveform_renderer.h"
@@ -525,6 +527,12 @@ moveAfterClipInstance:
 						}
 						requestRendering(this, 0, 0xFFFFFFFF);
 					}
+				}
+				if (display->haveOLED()
+				    && runtimeFeatureSettings.get(RuntimeFeatureSettingType::VisualMenuStyle)
+				           == RuntimeFeatureStateVisualMenuStyle::Visual4Param) {
+					deluge::gui::ui::visual_menu::visualMenuUI.openForClip(nullptr);
+					return ActionResult::DEALT_WITH;
 				}
 				// open Song FX menu
 				display->setNextTransitionDirection(1);

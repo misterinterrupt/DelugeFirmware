@@ -214,6 +214,7 @@ enum class UIType : uint8_t {
 	SOUND_EDITOR,
 	TIMELINE,
 	RENAME_CLIPNAME,
+	VISUAL_MENU,
 	NONE = 255,
 };
 

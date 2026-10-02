@@ -201,4 +201,28 @@ void Decimal::drawActualValue(bool justDidHorizontalScroll) {
 	                 false); // blinkImmediately
 }
 
+void Decimal::formatValueForVisualMenu(char* outBuffer, size_t bufferSize) {
+	if (outBuffer && bufferSize > 0) {
+		int32_t numDecimalPlaces = getNumDecimalPlaces();
+		char buffer[16];
+		intToString(this->getValue(), buffer, numDecimalPlaces + 1);
+		int32_t length = strlen(buffer);
+		if (numDecimalPlaces > 0 && length > numDecimalPlaces) {
+			int32_t intPartLen = length - numDecimalPlaces;
+			if (intPartLen + 1 + numDecimalPlaces < static_cast<int32_t>(bufferSize)) {
+				char temp[16];
+				memcpy(temp, buffer, intPartLen);
+				temp[intPartLen] = '.';
+				memcpy(temp + intPartLen + 1, buffer + intPartLen, numDecimalPlaces);
+				temp[intPartLen + 1 + numDecimalPlaces] = '\0';
+				strncpy(outBuffer, temp, bufferSize - 1);
+				outBuffer[bufferSize - 1] = '\0';
+				return;
+			}
+		}
+		strncpy(outBuffer, buffer, bufferSize - 1);
+		outBuffer[bufferSize - 1] = '\0';
+	}
+}
+
 } // namespace deluge::gui::menu_item

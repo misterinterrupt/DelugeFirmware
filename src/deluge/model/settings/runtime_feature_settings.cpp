@@ -101,6 +101,24 @@ static void SetupEmulatedDisplaySetting(RuntimeFeatureSetting& setting, deluge::
 	};
 }
 
+static void SetupVisualMenuStyleSetting(RuntimeFeatureSetting& setting, deluge::l10n::String displayName,
+                                        std::string_view xmlName, RuntimeFeatureStateVisualMenuStyle def) {
+	setting.displayName = displayName;
+	setting.xmlName = xmlName;
+	setting.value = static_cast<uint32_t>(def);
+
+	setting.options = {
+	    {
+	        .displayName = display->haveOLED() ? "Classic" : "CLAS",
+	        .value = RuntimeFeatureStateVisualMenuStyle::ClassicList,
+	    },
+	    {
+	        .displayName = display->haveOLED() ? "Visual 4-Param" : "4PRM",
+	        .value = RuntimeFeatureStateVisualMenuStyle::Visual4Param,
+	    },
+	};
+}
+
 void RuntimeFeatureSettings::init() {
 	using enum deluge::l10n::String;
 	// Drum randomizer
@@ -195,6 +213,11 @@ void RuntimeFeatureSettings::init() {
 	SetupOnOffSetting(settings[RuntimeFeatureSettingType::EnableGridViewLoopPads],
 	                  STRING_FOR_COMMUNITY_FEATURE_GRID_VIEW_LOOP_PADS, "enableGridViewLoopPads",
 	                  RuntimeFeatureStateToggle::Off);
+
+	// VisualMenuStyle
+	SetupVisualMenuStyleSetting(settings[RuntimeFeatureSettingType::VisualMenuStyle],
+	                            STRING_FOR_COMMUNITY_FEATURE_VISUAL_MENU_STYLE, "visualMenuStyle",
+	                            RuntimeFeatureStateVisualMenuStyle::ClassicList);
 }
 
 void RuntimeFeatureSettings::readSettingsFromFile(StorageManager& bdsm) {

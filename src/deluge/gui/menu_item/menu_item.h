@@ -190,6 +190,16 @@ public:
 	/// @brief Paints the pixels below the standard title block.
 	virtual void drawPixelsForOled() {}
 
+	/// @brief Format the current value into a string for the visual 4-slot menu.
+	virtual void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) {
+		if (outBuffer && bufferSize > 0) {
+			outBuffer[0] = '\0';
+		}
+	}
+
+	/// @brief Synchronize value for visual menu without triggering display side-effects.
+	virtual void syncValueForVisualMenu() {}
+
 	/// @}
 	///
 	/// @name Submenu entry support

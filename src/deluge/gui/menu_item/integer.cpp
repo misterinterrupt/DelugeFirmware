@@ -82,4 +82,25 @@ void IntegerContinuous::drawPixelsForOled() {
 
 	drawBar(35, 10);
 }
+
+void Integer::formatValueForVisualMenu(char* outBuffer, size_t bufferSize) {
+	if (outBuffer && bufferSize > 0) {
+		intToString(getDisplayValue(), outBuffer);
+		const char* unit = getUnit();
+		if (unit && unit[0] != '\0') {
+			strncat(outBuffer, unit, bufferSize - strlen(outBuffer) - 1);
+		}
+	}
+}
+
+void IntegerWithOff::formatValueForVisualMenu(char* outBuffer, size_t bufferSize) {
+	if (this->getValue() == 0) {
+		strncpy(outBuffer, "OFF", bufferSize - 1);
+		outBuffer[bufferSize - 1] = '\0';
+	}
+	else {
+		Integer::formatValueForVisualMenu(outBuffer, bufferSize);
+	}
+}
+
 } // namespace deluge::gui::menu_item

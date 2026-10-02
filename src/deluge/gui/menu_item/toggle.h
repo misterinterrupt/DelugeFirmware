@@ -10,6 +10,7 @@ public:
 	using Value::Value;
 	void beginSession(MenuItem* navigatedBackwardFrom) override;
 	void selectEncoderAction(int32_t offset) override;
+	void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) override;
 
 	virtual void drawValue();
 	void drawPixelsForOled();

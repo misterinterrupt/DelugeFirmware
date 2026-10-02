@@ -25,6 +25,7 @@ class Integer : public Number {
 public:
 	using Number::Number;
 	void selectEncoderAction(int32_t offset) override;
+	void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) override;
 
 protected:
 	virtual int32_t getDisplayValue() { return this->getValue(); }
@@ -41,6 +42,7 @@ class IntegerWithOff : public Integer {
 public:
 	using Integer::Integer;
 	void drawPixelsForOled() override;
+	void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) override;
 
 	// 7Seg Only
 	void drawValue() override;

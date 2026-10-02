@@ -77,4 +77,18 @@ void Toggle::renderSubmenuItemTypeForOled(int32_t yPixel) {
 	}
 }
 
+void Toggle::formatValueForVisualMenu(char* outBuffer, size_t bufferSize) {
+	if (outBuffer && bufferSize > 0) {
+		const char* name = getNameFor(getValue());
+		if (name) {
+			strncpy(outBuffer, name, bufferSize - 1);
+			outBuffer[bufferSize - 1] = '\0';
+		}
+		else {
+			strncpy(outBuffer, getValue() ? "ON" : "OFF", bufferSize - 1);
+			outBuffer[bufferSize - 1] = '\0';
+		}
+	}
+}
+
 } // namespace deluge::gui::menu_item

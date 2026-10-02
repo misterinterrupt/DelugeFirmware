@@ -812,6 +812,10 @@ startAgain:
 	}
 }
 void renderReverb(size_t numSamples) {
+	// Safe point to apply UI-requested reverb model/param changes: before any access to the
+	// reverb object this block, so the underlying DSP is never mutated mid-process().
+	reverb.applyPending();
+
 	if (currentSong && mustUpdateReverbParamsBeforeNextRender) {
 		updateReverbParams();
 		mustUpdateReverbParamsBeforeNextRender = false;

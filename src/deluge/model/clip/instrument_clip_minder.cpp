@@ -25,12 +25,14 @@
 #include "gui/ui/save/save_instrument_preset_ui.h"
 #include "gui/ui/save/save_kit_row_ui.h"
 #include "gui/ui/sound_editor.h"
+#include "gui/ui/visual_menu/visual_menu_ui.h"
 #include "gui/views/arranger_view.h"
 #include "gui/views/automation_view.h"
 #include "gui/views/instrument_clip_view.h"
 #include "gui/views/view.h"
 #include "model/instrument/melodic_instrument.h"
 #include "model/note/note.h"
+#include "model/settings/runtime_feature_settings.h"
 #include <algorithm>
 #include <vector>
 #include "hid/buttons.h"
@@ -302,6 +304,11 @@ void InstrumentClipMinder::displayOrLanguageChanged() {
 }
 
 void InstrumentClipMinder::setLedStates() {
+	if (getCurrentUI() == &deluge::gui::ui::visual_menu::visualMenuUI) {
+		deluge::gui::ui::visual_menu::visualMenuUI.updateButtonLEDs();
+		return;
+	}
+
 	OutputType outputType = getCurrentOutputType();
 
 	indicator_leds::setLedState(IndicatorLED::SYNTH, outputType == OutputType::SYNTH);
@@ -387,6 +394,13 @@ ActionResult InstrumentClipMinder::buttonAction(deluge::hid::Button b, bool on, 
 	// Select button, without shift
 	else if (b == SELECT_ENC && !Buttons::isShiftButtonPressed()) {
 		if (on && currentUIMode == UI_MODE_NONE) {
+			if (display->haveOLED()
+			    && runtimeFeatureSettings.get(RuntimeFeatureSettingType::VisualMenuStyle)
+			           == RuntimeFeatureStateVisualMenuStyle::Visual4Param) {
+				deluge::gui::ui::visual_menu::visualMenuUI.openForClip(getCurrentClip());
+				return ActionResult::DEALT_WITH;
+			}
+
 			if ((getCurrentOutputType() == OutputType::KIT) && (getCurrentInstrumentClip()->affectEntire)) {
 				soundEditor.setupKitGlobalFXMenu = true;
 			}

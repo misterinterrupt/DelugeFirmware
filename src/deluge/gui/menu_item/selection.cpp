@@ -70,4 +70,20 @@ void Selection::renderSubmenuItemTypeForOled(int32_t yPixel) {
 	}
 }
 
+void Selection::formatValueForVisualMenu(char* outBuffer, size_t bufferSize) {
+	if (outBuffer && bufferSize > 0) {
+		auto opts = this->getOptions();
+		int32_t val = this->getValue();
+		if (val >= 0 && val < static_cast<int32_t>(opts.size())) {
+			std::string_view optStr = opts[val];
+			size_t len = std::min(optStr.length(), bufferSize - 1);
+			memcpy(outBuffer, optStr.data(), len);
+			outBuffer[len] = '\0';
+		}
+		else {
+			intToString(val, outBuffer);
+		}
+	}
+}
+
 } // namespace deluge::gui::menu_item

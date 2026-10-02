@@ -17,6 +17,7 @@
 #include "gui/ui/rename/rename_output_ui.h"
 #include "gui/ui/sample_marker_editor.h"
 #include "gui/ui/save/save_instrument_preset_ui.h"
+#include "gui/ui/visual_menu/visual_menu_ui.h"
 #include "gui/ui_timer_manager.h"
 #include "gui/views/arranger_view.h"
 #include "gui/views/automation_view.h"
@@ -264,6 +265,15 @@ ActionResult SoundEditor::buttonAction(deluge::hid::Button b, bool on, bool inCa
 				}
 
 				MenuItem* currentMenuItem = getCurrentMenuItem();
+				if (display->haveOLED()
+				    && runtimeFeatureSettings.get(RuntimeFeatureSettingType::VisualMenuStyle)
+				           == RuntimeFeatureStateVisualMenuStyle::Visual4Param
+				    && !inSettingsMenu()) {
+					if (deluge::gui::ui::visual_menu::visualMenuUI.openForClip(getCurrentClip(), currentMenuItem)) {
+						return ActionResult::DEALT_WITH;
+					}
+				}
+
 				MenuItem* newItem = currentMenuItem->selectButtonPress();
 				if (newItem) {
 					if (newItem != NO_NAVIGATION) {
@@ -829,6 +839,11 @@ ActionResult SoundEditor::timerCallback() {
 
 void SoundEditor::markInstrumentAsEdited() {
 	if (!inSettingsMenu()) {
+		// getCurrentInstrument() derefs the current clip's output; skip when there's no valid
+		// clip context (e.g. song-level FX editing with an audio clip current)
+		if (!currentSong || !getCurrentClip() || !getCurrentClip()->output) {
+			return;
+		}
 		Instrument* inst = getCurrentInstrument();
 		if (inst) {
 			getCurrentInstrument()->beenEdited();
@@ -1537,7 +1552,7 @@ doMIDIOrCV:
 			}
 		}
 	}
-	else if (clip->type == ClipType::AUDIO) {
+	else if (clip && clip->type == ClipType::AUDIO) {
 		AudioClip* audioClip = (AudioClip*)clip;
 		currentSampleControls = &audioClip->sampleControls;
 		currentPriority = &audioClip->voicePriority;
@@ -1636,15 +1651,15 @@ ModelStackWithThreeMainThings* SoundEditor::getCurrentModelStack(void* memory) {
 	if (!rootUIIsClipMinderScreen()) {
 		return currentSong->setupModelStackWithSongAsTimelineCounter(memory);
 	}
-	else if (instrument->type == OutputType::KIT && clip->affectEntire) {
+	else if (instrument && instrument->type == OutputType::KIT && clip && clip->affectEntire) {
 		ModelStackWithTimelineCounter* modelStack = currentSong->setupModelStackWithCurrentClip(memory);
 
 		return modelStack->addOtherTwoThingsButNoNoteRow(currentModControllable, currentParamManager);
 	}
 	else {
 		NoteRow* noteRow = nullptr;
-		int32_t noteRowIndex;
-		if (instrument->type == OutputType::KIT) {
+		int32_t noteRowIndex = 0;
+		if (instrument && instrument->type == OutputType::KIT && clip) {
 			Drum* selectedDrum = ((Kit*)instrument)->selectedDrum;
 			if (selectedDrum) {
 				noteRow = clip->getNoteRowForDrum(selectedDrum, &noteRowIndex);

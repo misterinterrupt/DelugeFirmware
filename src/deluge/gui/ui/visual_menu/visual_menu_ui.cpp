@@ -1,0 +1,499 @@
+/*
+ * Copyright © 2024 Synthstrom Audible Limited
+ *
+ * This file is part of The Synthstrom Audible Deluge Firmware.
+ *
+ * The Synthstrom Audible Deluge Firmware is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU General Public License as published by the GNU General Public License as published by the Free Software Foundation,
+ * either version 3 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+ * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with this program.
+ * If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#include "visual_menu_ui.h"
+#include "gui/ui/sound_editor.h"
+#include "gui/ui/visual_menu/visual_menu_renderer.h"
+#include "hid/buttons.h"
+#include "hid/display/display.h"
+#include "hid/display/oled.h"
+#include "hid/led/indicator_leds.h"
+#include "model/clip/instrument_clip.h"
+#include "model/song/song.h"
+#include "processing/sound/sound.h"
+
+namespace deluge::gui::ui::visual_menu {
+
+VisualMenuUI visualMenuUI;
+
+void VisualMenuUI::pushSlotContext(const VisualSlot& slot, SlotSourceContext& ctx) {
+	ctx.index = soundEditor.currentSourceIndex;
+	ctx.source = soundEditor.currentSource;
+	ctx.sampleControls = soundEditor.currentSampleControls;
+	if (slot.sourceIndexOverride >= 0 && soundEditor.currentSound) {
+		soundEditor.currentSourceIndex = slot.sourceIndexOverride;
+		soundEditor.currentSource = &soundEditor.currentSound->sources[slot.sourceIndexOverride];
+		soundEditor.currentSampleControls = &soundEditor.currentSource->sampleControls;
+	}
+}
+
+void VisualMenuUI::popSlotContext(const SlotSourceContext& ctx) {
+	soundEditor.currentSourceIndex = ctx.index;
+	soundEditor.currentSource = ctx.source;
+	soundEditor.currentSampleControls = ctx.sampleControls;
+}
+
+VisualMenuUI::VisualMenuUI() {
+	categories_ = getSynthCategories();
+}
+
+void VisualMenuUI::updateButtonLEDs() {
+	int8_t active = getActiveHeldSlot();
+	indicator_leds::setLedState(IndicatorLED::SYNTH, active == 0);
+	indicator_leds::setLedState(IndicatorLED::KIT, active == 1);
+	indicator_leds::setLedState(IndicatorLED::MIDI, active == 2);
+	indicator_leds::setLedState(IndicatorLED::CV, active == 3);
+}
+
+bool VisualMenuUI::opened() {
+	selectedSlot_ = -1;
+	decimalCursorSlot_ = -1;
+	decimalEditPos_ = 0;
+	soundEditor.numberEditPos = 0;
+	soundEditor.numberEditSize = 1;
+	for (size_t i = 0; i < 4; ++i) {
+		slotHeld_[i] = false;
+		turnedWhileHeld_[i] = false;
+		wasAlreadySelected_[i] = false;
+	}
+	applySourceIndexForCurrentPage();
+	updateButtonLEDs();
+	renderUIsForOled();
+	return true;
+}
+
+void VisualMenuUI::focusRegained() {
+	selectedSlot_ = -1;
+	decimalCursorSlot_ = -1;
+	decimalEditPos_ = 0;
+	soundEditor.numberEditPos = 0;
+	soundEditor.numberEditSize = 1;
+	for (size_t i = 0; i < 4; ++i) {
+		slotHeld_[i] = false;
+		turnedWhileHeld_[i] = false;
+		wasAlreadySelected_[i] = false;
+	}
+	applySourceIndexForCurrentPage();
+	updateButtonLEDs();
+	renderUIsForOled();
+}
+
+bool VisualMenuUI::exitUI() {
+	closeVisualMenu();
+	return true;
+}
+
+void VisualMenuUI::closeVisualMenu() {
+	// BACK's long-press timer can fire exitUI() after the menu has already closed; make this a no-op
+	// then so we never close a UI that's beneath us in the stack.
+	if (getCurrentUI() != this) {
+		return;
+	}
+	selectedSlot_ = -1;
+	decimalCursorSlot_ = -1;
+	for (size_t i = 0; i < 4; ++i) {
+		slotHeld_[i] = false;
+		turnedWhileHeld_[i] = false;
+		wasAlreadySelected_[i] = false;
+	}
+	indicator_leds::setLedState(IndicatorLED::SYNTH, false);
+	indicator_leds::setLedState(IndicatorLED::KIT, false);
+	indicator_leds::setLedState(IndicatorLED::MIDI, false);
+	indicator_leds::setLedState(IndicatorLED::CV, false);
+	close();
+}
+
+int8_t VisualMenuUI::getActiveHeldSlot() const {
+	// Only consult our own event-driven hold state here. Buttons::isButtonPressed can disagree with it
+	// (e.g. after a forced release from the PIC's NO_PRESSES_HAPPENING sweep) and the hold tracker is
+	// what the whole state machine runs on.
+	for (size_t i = 0; i < 4; ++i) {
+		if (slotHeld_[i]) {
+			return static_cast<int8_t>(i);
+		}
+	}
+	return selectedSlot_;
+}
+
+ActionResult VisualMenuUI::padAction(int32_t x, int32_t y, int32_t velocity) {
+	// Only forward audition presses to the view underneath while it's in a clean state. Presses during
+	// other modes (e.g. a stale clip-creation context) must not leak into the underlying view, and
+	// releases are always consumed here so the underlying view never sees an orphaned release.
+	if (velocity && getRootUI() != nullptr && currentUIMode == UI_MODE_NONE) {
+		return getRootUI()->padAction(x, y, velocity);
+	}
+	return ActionResult::DEALT_WITH;
+}
+
+bool VisualMenuUI::openForClip(Clip* clip, const MenuItem* targetItem) {
+	currentClip_ = clip;
+
+	// A kit clip with no (sound) drum row selected cannot resolve a per-drum editing context; fall back to
+	// the kit's affect-entire (global FX) context instead of silently failing.
+	bool kitGlobalFX = false;
+	if (!soundEditor.setup(clip, targetItem)) {
+		InstrumentClip* kitClip = nullptr;
+		if (rootUIIsClipMinderScreen() && clip && clip->type == ClipType::INSTRUMENT) {
+			kitClip = static_cast<InstrumentClip*>(clip);
+		}
+		if (kitClip && kitClip->output && kitClip->output->type == OutputType::KIT) {
+			soundEditor.setupKitGlobalFXMenu = true;
+			if (!soundEditor.setup(clip, targetItem)) {
+				return false;
+			}
+			kitGlobalFX = true;
+		}
+		else {
+			return false;
+		}
+	}
+
+	if (!rootUIIsClipMinderScreen() || clip == nullptr) {
+		categories_ = getGlobalFxCategories();
+	}
+	else if (clip->type == ClipType::INSTRUMENT) {
+		auto* instClip = static_cast<InstrumentClip*>(clip);
+		if (instClip->output != nullptr) {
+			switch (instClip->output->type) {
+			case OutputType::SYNTH:
+				categories_ = getSynthCategories();
+				break;
+			case OutputType::KIT:
+				categories_ = kitGlobalFX ? getGlobalFxCategories() : getKitCategories();
+				break;
+			case OutputType::MIDI_OUT:
+			case OutputType::CV:
+				categories_ = getMidiCvCategories();
+				break;
+			default:
+				categories_ = getSynthCategories();
+				break;
+			}
+		}
+		else {
+			categories_ = getSynthCategories();
+		}
+	}
+	else if (clip->type == ClipType::AUDIO) {
+		categories_ = getAudioClipCategories();
+	}
+	else {
+		categories_ = getSynthCategories();
+	}
+
+	currentCategoryIndex_ = 0;
+	currentPageIndex_ = 0;
+	selectedSlot_ = -1;
+	decimalCursorSlot_ = -1;
+	decimalEditPos_ = 0;
+	for (size_t i = 0; i < 4; ++i) {
+		slotHeld_[i] = false;
+		turnedWhileHeld_[i] = false;
+		wasAlreadySelected_[i] = false;
+	}
+
+	if (targetItem != nullptr) {
+		int32_t catIdx = 0, pageIdx = 0, slotIdx = 0;
+		if (findMenuItemLocation(categories_, targetItem, &catIdx, &pageIdx, &slotIdx)) {
+			currentCategoryIndex_ = catIdx;
+			currentPageIndex_ = pageIdx;
+			selectedSlot_ = slotIdx;
+			decimalCursorSlot_ = slotIdx;
+		}
+	}
+
+	return openUI(this);
+}
+
+void VisualMenuUI::applySourceIndexForCurrentPage() {
+	if (categories_.empty() || currentCategoryIndex_ >= static_cast<int32_t>(categories_.size())) {
+		return;
+	}
+	const auto& cat = categories_[currentCategoryIndex_];
+	if (cat.pages.empty() || currentPageIndex_ >= static_cast<int32_t>(cat.pages.size())) {
+		return;
+	}
+	const auto& page = cat.pages[currentPageIndex_];
+	for (const auto& slot : page.slots) {
+		if (slot.item != nullptr) {
+			SlotSourceContext ctx;
+			pushSlotContext(slot, ctx);
+			slot.item->syncValueForVisualMenu();
+			popSlotContext(ctx);
+		}
+	}
+}
+
+ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
+	using namespace deluge::hid::button;
+
+	// The PIC's NO_PRESSES_HAPPENING message is derived from pad state only and can arrive while a slot
+	// button is still physically held; those synthetic releases must not disturb our hold tracking.
+	if (!on && Buttons::noPressesSweepActive && (b == SYNTH || b == KIT || b == MIDI || b == CV)) {
+		return ActionResult::DEALT_WITH;
+	}
+
+	// Ignore new presses while a special mode owns the UI, but always let releases through so hold
+	// state can't get stranded by an intervening mode change.
+	if (on && currentUIMode != UI_MODE_NONE && currentUIMode != UI_MODE_AUDITIONING) {
+		return ActionResult::DEALT_WITH;
+	}
+
+	int8_t slotPressed = -1;
+	if (b == SYNTH) {
+		slotPressed = 0;
+	}
+	else if (b == KIT) {
+		slotPressed = 1;
+	}
+	else if (b == MIDI) {
+		slotPressed = 2;
+	}
+	else if (b == CV) {
+		slotPressed = 3;
+	}
+
+	if (slotPressed >= 0) {
+		if (on) {
+			bool switchingSlot = (selectedSlot_ != slotPressed);
+			slotHeld_[slotPressed] = true;
+			turnedWhileHeld_[slotPressed] = false;
+			wasAlreadySelected_[slotPressed] = (selectedSlot_ == slotPressed);
+			selectedSlot_ = slotPressed;
+			decimalCursorSlot_ = slotPressed;
+			if (switchingSlot) {
+				// Don't leak the previous slot's digit scaling into this one
+				decimalEditPos_ = 0;
+				soundEditor.numberEditPos = 0;
+				soundEditor.numberEditSize = 1;
+				// Re-sync this slot's cached value so the first encoder turn edits the real current
+				// value even if the underlying param changed since the page was rendered
+				if (currentCategoryIndex_ < static_cast<int32_t>(categories_.size())) {
+					const auto& cat = categories_[currentCategoryIndex_];
+					if (!cat.pages.empty() && currentPageIndex_ < static_cast<int32_t>(cat.pages.size())) {
+						const auto& slot = cat.pages[currentPageIndex_].slots[slotPressed];
+						if (slot.item != nullptr) {
+							SlotSourceContext ctx;
+							pushSlotContext(slot, ctx);
+							slot.item->syncValueForVisualMenu();
+							popSlotContext(ctx);
+						}
+					}
+				}
+			}
+		}
+		else {
+			slotHeld_[slotPressed] = false;
+			if (turnedWhileHeld_[slotPressed]) {
+				turnedWhileHeld_[slotPressed] = false;
+				// Held down and turned -> release immediately on button up, unless another slot is still
+				// physically held, in which case hand selection over to that slot
+				if (selectedSlot_ == slotPressed) {
+					int8_t nextSlot = -1;
+					for (size_t i = 0; i < 4; ++i) {
+						if (slotHeld_[i]) {
+							nextSlot = static_cast<int8_t>(i);
+							break;
+						}
+					}
+					selectedSlot_ = nextSlot;
+					decimalCursorSlot_ = nextSlot;
+				}
+			}
+			else if (selectedSlot_ == slotPressed) {
+				// Only the slot that currently owns the selection may end it. Releases of superseded slots
+				// (e.g. a previously latched slot, or a hold that another press took over from) must not
+				// re-latch or clear the selection.
+				if (wasAlreadySelected_[slotPressed]) {
+					// Tapped without turning -> toggle latch off
+					selectedSlot_ = -1;
+					decimalCursorSlot_ = -1;
+				}
+				// else: remain latched
+			}
+		}
+		updateButtonLEDs();
+		renderUIsForOled();
+		return ActionResult::DEALT_WITH;
+	}
+	else if (b == BACK) {
+		if (on) {
+			if (selectedSlot_ >= 0) {
+				// Back unselects the active slot first
+				selectedSlot_ = -1;
+				decimalCursorSlot_ = -1;
+				for (size_t i = 0; i < 4; ++i) {
+					slotHeld_[i] = false;
+					turnedWhileHeld_[i] = false;
+				}
+				updateButtonLEDs();
+				renderUIsForOled();
+			}
+			else {
+				closeVisualMenu();
+			}
+		}
+		return ActionResult::DEALT_WITH;
+	}
+	else if (b == SELECT_ENC) {
+		if (on) {
+			if (selectedSlot_ >= 0 && currentCategoryIndex_ < static_cast<int32_t>(categories_.size())) {
+				const auto& page = categories_[currentCategoryIndex_].pages[currentPageIndex_];
+				if (selectedSlot_ < static_cast<int32_t>(page.slots.size())) {
+					const auto& slot = page.slots[selectedSlot_];
+					if (slot.item != nullptr) {
+						// Cycle decimal edit cursor if on decimal slot
+						decimalCursorSlot_ = selectedSlot_;
+						decimalEditPos_ = (decimalEditPos_ + 1) % 3;
+						soundEditor.numberEditPos = decimalEditPos_;
+						soundEditor.numberEditSize = 1;
+						for (int32_t i = 0; i < decimalEditPos_; i++) {
+							soundEditor.numberEditSize *= 10;
+						}
+					}
+				}
+			}
+			else {
+				selectedSlot_ = 0;
+				decimalCursorSlot_ = 0;
+				updateButtonLEDs();
+			}
+			renderUIsForOled();
+		}
+		return ActionResult::DEALT_WITH;
+	}
+
+	return ActionResult::NOT_DEALT_WITH;
+}
+
+void VisualMenuUI::selectEncoderAction(int8_t offset) {
+	if (categories_.empty()) {
+		return;
+	}
+
+	if (currentUIMode != UI_MODE_NONE && currentUIMode != UI_MODE_AUDITIONING) {
+		return;
+	}
+
+	// 1. Shift + Select Knob always navigates categories directly
+	if (Buttons::isShiftButtonPressed()) {
+		int32_t numCats = static_cast<int32_t>(categories_.size());
+		currentCategoryIndex_ = (currentCategoryIndex_ + (offset % numCats) + numCats) % numCats;
+		currentPageIndex_ = 0;
+		selectedSlot_ = -1;
+		decimalCursorSlot_ = -1;
+		for (size_t i = 0; i < 4; ++i) {
+			slotHeld_[i] = false;
+			turnedWhileHeld_[i] = false;
+		}
+		updateButtonLEDs();
+		applySourceIndexForCurrentPage();
+		renderUIsForOled();
+		return;
+	}
+
+	int8_t activeSlot = getActiveHeldSlot();
+
+	// If the current clip changed since the menu opened (e.g. a clip was selected from the
+	// session grid while the menu stayed open), soundEditor's captured param manager no longer
+	// matches getCurrentClip() — writing through that mismatch corrupts the param node trees.
+	// Re-setup before editing in that case.
+	if (rootUIIsClipMinderScreen() && currentClip_ != nullptr && getCurrentClip() != currentClip_) {
+		currentClip_ = getCurrentClip();
+		if (!soundEditor.setup(currentClip_, nullptr)) {
+			return;
+		}
+	}
+
+	// 2. If a slot is active, edit its parameter value smoothly
+	if (activeSlot >= 0 && currentCategoryIndex_ < static_cast<int32_t>(categories_.size())) {
+		const auto& page = categories_[currentCategoryIndex_].pages[currentPageIndex_];
+		if (activeSlot < static_cast<int32_t>(page.slots.size())) {
+			const auto& slot = page.slots[activeSlot];
+			if (slot.item != nullptr) {
+				if (decimalCursorSlot_ != activeSlot) {
+					decimalEditPos_ = 0;
+					soundEditor.numberEditPos = 0;
+					soundEditor.numberEditSize = 1;
+				}
+				turnedWhileHeld_[activeSlot] = true;
+				selectedSlot_ = activeSlot;
+				decimalCursorSlot_ = activeSlot;
+
+				SlotSourceContext ctx;
+				pushSlotContext(slot, ctx);
+				slot.item->selectEncoderAction(offset);
+				popSlotContext(ctx);
+				if (!soundEditor.inSettingsMenu()) {
+					soundEditor.markInstrumentAsEdited();
+				}
+
+				updateButtonLEDs();
+				renderUIsForOled();
+				return;
+			}
+		}
+	}
+
+	// 3. Otherwise (no slot selected), navigate pages across categories
+	int32_t numPages = static_cast<int32_t>(categories_[currentCategoryIndex_].pages.size());
+	int32_t newPageIndex = currentPageIndex_ + offset;
+
+	while (newPageIndex >= numPages && numPages > 0) {
+		newPageIndex -= numPages;
+		currentCategoryIndex_ = (currentCategoryIndex_ + 1) % static_cast<int32_t>(categories_.size());
+		numPages = static_cast<int32_t>(categories_[currentCategoryIndex_].pages.size());
+	}
+	while (newPageIndex < 0) {
+		currentCategoryIndex_ = (currentCategoryIndex_ + static_cast<int32_t>(categories_.size()) - 1) %
+		                        static_cast<int32_t>(categories_.size());
+		numPages = static_cast<int32_t>(categories_[currentCategoryIndex_].pages.size());
+		if (numPages > 0) {
+			newPageIndex += numPages;
+		}
+		else {
+			newPageIndex = 0;
+			break;
+		}
+	}
+	currentPageIndex_ = newPageIndex;
+
+	applySourceIndexForCurrentPage();
+	renderUIsForOled();
+}
+
+void VisualMenuUI::renderOLED(deluge::hid::display::oled_canvas::Canvas& canvas) {
+	if (categories_.empty()) {
+		canvas.clear();
+		return;
+	}
+
+	const auto& cat = categories_[currentCategoryIndex_];
+	if (cat.pages.empty() || currentPageIndex_ >= static_cast<int32_t>(cat.pages.size())) {
+		canvas.clear();
+		return;
+	}
+
+	const auto& page = cat.pages[currentPageIndex_];
+	int8_t heldSlot = getActiveHeldSlot();
+
+	VisualMenuRenderer::renderPage(canvas, cat, currentCategoryIndex_, static_cast<int32_t>(categories_.size()), page,
+	                               currentPageIndex_, static_cast<int32_t>(cat.pages.size()), heldSlot,
+	                               decimalCursorSlot_, decimalEditPos_);
+}
+
+} // namespace deluge::gui::ui::visual_menu

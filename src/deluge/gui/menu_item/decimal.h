@@ -27,6 +27,7 @@ public:
 	void beginSession(MenuItem* navigatedBackwardFrom = nullptr) override;
 	void selectEncoderAction(int32_t offset) final;
 	void horizontalEncoderAction(int32_t offset) override;
+	void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) override;
 
 protected:
 	void drawValue() override;

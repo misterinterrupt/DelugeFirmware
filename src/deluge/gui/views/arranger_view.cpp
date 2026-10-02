@@ -29,11 +29,13 @@
 #include "gui/ui/sound_editor.h"
 #include "gui/ui/ui.h"
 #include "gui/ui_timer_manager.h"
+#include "gui/ui/visual_menu/visual_menu_ui.h"
 #include "gui/views/audio_clip_view.h"
 #include "gui/views/automation_view.h"
 #include "gui/views/instrument_clip_view.h"
 #include "gui/views/session_view.h"
 #include "gui/views/view.h"
+#include "model/settings/runtime_feature_settings.h"
 #include "gui/waveform/waveform_renderer.h"
 #include "hid/buttons.h"
 #include "hid/display/display.h"
@@ -304,6 +306,13 @@ ActionResult ArrangerView::buttonAction(deluge::hid::Button b, bool on, bool inC
 		}
 		// open Song FX menu
 		else if (on && currentUIMode == UI_MODE_NONE) {
+			if (display->haveOLED()
+			    && runtimeFeatureSettings.get(RuntimeFeatureSettingType::VisualMenuStyle)
+			           == RuntimeFeatureStateVisualMenuStyle::Visual4Param) {
+				deluge::gui::ui::visual_menu::visualMenuUI.openForClip(nullptr);
+				return ActionResult::DEALT_WITH;
+			}
+
 			display->setNextTransitionDirection(1);
 			soundEditor.setup();
 			openUI(&soundEditor);

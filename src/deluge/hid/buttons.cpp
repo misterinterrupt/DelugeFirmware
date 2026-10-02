@@ -70,6 +70,8 @@ bool considerCrossScreenReleaseForCrossScreenMode;
 
 bool buttonStates[NUM_BUTTON_COLS + 1][NUM_BUTTON_ROWS]; // The extra col is for "fake" buttons
 
+bool noPressesSweepActive = false;
+
 ActionResult buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
 	using namespace deluge::hid::button;
 
@@ -314,6 +316,10 @@ bool shiftHasChanged() {
 
 // Correct any misunderstandings
 void noPressesHappening(bool inCardRoutine) {
+	// The PIC only reports pad presses for this "nothing happening" message, so it can arrive while a
+	// button is still physically held. UIs that track button holds (e.g. the visual menu) must ignore
+	// these synthetic releases and wait for the button's own explicit release event.
+	noPressesSweepActive = true;
 	for (int32_t x = 0; x < NUM_BUTTON_COLS; x++) {
 		for (int32_t y = 0; y < NUM_BUTTON_ROWS; y++) {
 			if (buttonStates[x][y]) {
@@ -321,6 +327,7 @@ void noPressesHappening(bool inCardRoutine) {
 			}
 		}
 	}
+	noPressesSweepActive = false;
 }
 void ignoreCurrentShiftForSticky() {
 	considerShiftReleaseForSticky = false;

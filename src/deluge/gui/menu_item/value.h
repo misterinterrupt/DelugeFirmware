@@ -46,6 +46,10 @@ public:
 		return static_cast<E>(value_);
 	}
 
+	void syncValueForVisualMenu() override {
+		readCurrentValue();
+	}
+
 protected:
 	virtual void readCurrentValue() {}
 	virtual void writeCurrentValue() {}
