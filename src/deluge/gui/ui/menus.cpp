@@ -118,15 +118,20 @@
 #include "gui/menu_item/performance_session_view/editing_mode.h"
 #include "gui/menu_item/record/countin.h"
 #include "gui/menu_item/record/quantize.h"
+#include "gui/menu_item/reverb/chorus_extended.h"
 #include "gui/menu_item/reverb/damping.h"
 #include "gui/menu_item/reverb/decay.h"
+#include "gui/menu_item/reverb/delay_extended.h"
 #include "gui/menu_item/reverb/diffusion.h"
 #include "gui/menu_item/reverb/hpf.h"
 #include "gui/menu_item/reverb/model.h"
 #include "gui/menu_item/reverb/pan.h"
+#include "gui/menu_item/reverb/pre_delay.h"
+#include "gui/menu_item/reverb/reverb_extended.h"
 #include "gui/menu_item/reverb/room_size.h"
 #include "gui/menu_item/reverb/sidechain/shape.h"
 #include "gui/menu_item/reverb/sidechain/volume.h"
+#include "gui/menu_item/reverb/tone_extended.h"
 #include "gui/menu_item/reverb/width.h"
 #include "gui/menu_item/runtime_feature/setting.h"
 #include "gui/menu_item/runtime_feature/settings.h"
@@ -401,14 +406,46 @@ submenu::Sidechain reverbSidechainMenu{
 
 // Reverb ----------------------------------------------------------------------------------
 patched_param::Integer reverbAmountMenu{STRING_FOR_AMOUNT, STRING_FOR_REVERB_AMOUNT, params::GLOBAL_REVERB_AMOUNT};
+reverb::Model reverbModelMenu{STRING_FOR_MODEL};
 reverb::RoomSize reverbRoomSizeMenu{STRING_FOR_ROOM_SIZE};
 reverb::Decay reverbDecayMenu{STRING_FOR_DECAY};
-reverb::Damping reverbDampingMenu{STRING_FOR_DAMPING};
+reverb::PreDelay reverbPreDelayMenu{STRING_FOR_PREDELAY};
+reverb::EarlyReflections reverbERLevelMenu{STRING_FOR_EARLY_REFLECTIONS};
+reverb::BassDecay reverbBassDecayMenu{STRING_FOR_BASS_DECAY};
+reverb::AirShelf reverbAirShelfMenu{STRING_FOR_AIR};
 reverb::Diffusion reverbDiffusionMenu{STRING_FOR_DIFFUSION};
+
+// Delay extended items
+reverb::DelayTimeL reverbDelayTimeLMenu{STRING_FOR_DELAY_TIME_LEFT};
+reverb::DelayTimeR reverbDelayTimeRMenu{STRING_FOR_DELAY_TIME_RIGHT};
+reverb::DelayFeedback reverbDelayFeedbackMenu{STRING_FOR_FEEDBACK};
+reverb::DelayDrive reverbDelayDriveMenu{STRING_FOR_TAPE_DRIVE};
+reverb::Crossfeed reverbCrossfeedMenu{STRING_FOR_CROSSFEED};
+reverb::PhaseInvert reverbPhaseInvertMenu{STRING_FOR_PHASE_INVERT};
+
+// Chorus extended items
+reverb::ChorusDelay reverbChorusDelayMenu{STRING_FOR_BASE_DELAY};
+reverb::ChorusRate reverbChorusRateMenu{STRING_FOR_RATE};
+reverb::ChorusDepth reverbChorusDepthMenu{STRING_FOR_DEPTH};
+reverb::ChorusFeedback reverbChorusFeedbackMenu{STRING_FOR_FEEDBACK};
+reverb::ChorusVoices reverbChorusVoicesMenu{STRING_FOR_VOICES};
+reverb::ChorusShape reverbChorusShapeMenu{STRING_FOR_SHAPE};
+
+// Tone extended items
+reverb::ToneDrive reverbToneDriveMenu{STRING_FOR_DRIVE};
+reverb::ToneShaperMode reverbToneShaperModeMenu{STRING_FOR_SHAPER_MODE};
+reverb::ToneBassGain reverbToneBassGainMenu{STRING_FOR_BASS};
+reverb::ToneBassFreq reverbToneBassFreqMenu{STRING_FOR_BASS_FREQUENCY};
+reverb::ToneMidGain reverbToneMidGainMenu{STRING_FOR_MID_GAIN};
+reverb::ToneMidFreq reverbToneMidFreqMenu{STRING_FOR_MID_FREQUENCY};
+reverb::ToneTrebleGain reverbToneTrebleGainMenu{STRING_FOR_TREBLE};
+reverb::ToneTrebleFreq reverbToneTrebleFreqMenu{STRING_FOR_TREBLE_FREQUENCY};
+reverb::ToneLevel reverbToneLevelMenu{STRING_FOR_VOLUME_LEVEL};
+
+reverb::Damping reverbDampingMenu{STRING_FOR_DAMPING};
+reverb::HPF reverbHPFMenu{STRING_FOR_HPF};
 reverb::Width reverbWidthMenu{STRING_FOR_WIDTH, STRING_FOR_REVERB_WIDTH};
 reverb::Pan reverbPanMenu{STRING_FOR_PAN, STRING_FOR_REVERB_PAN};
-reverb::Model reverbModelMenu{STRING_FOR_MODEL};
-reverb::HPF reverbHPFMenu{STRING_FOR_HPF};
 
 Submenu reverbMenu{
     STRING_FOR_REVERB,
@@ -417,10 +454,35 @@ Submenu reverbMenu{
         &reverbModelMenu,
         &reverbRoomSizeMenu,
         &reverbDecayMenu,
-        &reverbDampingMenu,
+        &reverbPreDelayMenu,
+        &reverbERLevelMenu,
+        &reverbBassDecayMenu,
+        &reverbAirShelfMenu,
         &reverbDiffusionMenu,
-        &reverbWidthMenu,
+        &reverbDelayTimeLMenu,
+        &reverbDelayTimeRMenu,
+        &reverbDelayFeedbackMenu,
+        &reverbDelayDriveMenu,
+        &reverbCrossfeedMenu,
+        &reverbPhaseInvertMenu,
+        &reverbChorusDelayMenu,
+        &reverbChorusRateMenu,
+        &reverbChorusDepthMenu,
+        &reverbChorusFeedbackMenu,
+        &reverbChorusVoicesMenu,
+        &reverbChorusShapeMenu,
+        &reverbToneDriveMenu,
+        &reverbToneShaperModeMenu,
+        &reverbToneBassGainMenu,
+        &reverbToneBassFreqMenu,
+        &reverbToneMidGainMenu,
+        &reverbToneMidFreqMenu,
+        &reverbToneTrebleGainMenu,
+        &reverbToneTrebleFreqMenu,
+        &reverbToneLevelMenu,
+        &reverbDampingMenu,
         &reverbHPFMenu,
+        &reverbWidthMenu,
         &reverbPanMenu,
         &reverbSidechainMenu,
     },

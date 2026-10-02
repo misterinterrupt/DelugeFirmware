@@ -33,10 +33,6 @@ public:
 		switch (AudioEngine::reverb.getModel()) {
 		case dsp::Reverb::Model::KDFX_REVERB:
 			return 1;
-		case dsp::Reverb::Model::KDFX_DELAY:
-			return 1;
-		case dsp::Reverb::Model::KDFX_CHORUS:
-			return 1;
 		default:
 			return 0;
 		}
@@ -46,12 +42,6 @@ public:
 		switch (AudioEngine::reverb.getModel()) {
 		case dsp::Reverb::Model::KDFX_REVERB:
 			return 16;
-		case dsp::Reverb::Model::KDFX_DELAY:
-			return 740;
-		case dsp::Reverb::Model::KDFX_CHORUS:
-			return 100;
-		case dsp::Reverb::Model::KDFX_TONE:
-			return 24;
 		default:
 			return kMaxMenuValue;
 		}
@@ -61,12 +51,6 @@ public:
 		switch (AudioEngine::reverb.getModel()) {
 		case dsp::Reverb::Model::KDFX_REVERB:
 			return " M";
-		case dsp::Reverb::Model::KDFX_DELAY:
-			return " MS";
-		case dsp::Reverb::Model::KDFX_CHORUS:
-			return " HZ";
-		case dsp::Reverb::Model::KDFX_TONE:
-			return " DB";
 		default:
 			return "";
 		}
@@ -86,57 +70,21 @@ public:
 		AudioEngine::reverb.setRoomSize(std::clamp(norm, 0.0f, 1.0f));
 	}
 
-	void selectEncoderAction(int32_t offset) override {
-		if (AudioEngine::reverb.getModel() == dsp::Reverb::Model::KDFX_DELAY) {
-			int32_t step = (this->getValue() > 50) ? 10 : 1;
-			this->setValue(this->getValue() + offset * step);
-			this->setValue(std::clamp(this->getValue(), getMinValue(), getMaxValue()));
-			Number::selectEncoderAction(offset);
-		}
-		else {
-			Integer::selectEncoderAction(offset);
-		}
-	}
-
-	void drawPixelsForOled() override {
-		if (AudioEngine::reverb.getModel() == dsp::Reverb::Model::KDFX_CHORUS) {
-			char buffer[16];
-			int32_t v = this->getValue();
-			snprintf(buffer, sizeof(buffer), "%d.%d HZ", v / 10, v % 10);
-			deluge::hid::display::OLED::main.drawStringCentred(buffer, 18 + OLED_MAIN_TOPMOST_PIXEL, kTextHugeSpacingX,
-			                                                   kTextHugeSizeY);
-		}
-		else {
-			Integer::drawPixelsForOled();
-		}
-	}
-
-	void drawValue() override {
-		if (AudioEngine::reverb.getModel() == dsp::Reverb::Model::KDFX_CHORUS) {
-			char buffer[8];
-			int32_t v = this->getValue();
-			snprintf(buffer, sizeof(buffer), "%d.%d", v / 10, v % 10);
-			display->setText(buffer, true);
-		}
-		else {
-			Integer::drawValue();
-		}
-	}
-
 	[[nodiscard]] std::string_view getName() const override {
 		using enum l10n::String;
 		switch (AudioEngine::reverb.getModel()) {
 		case dsp::Reverb::Model::MUTABLE:
-		case dsp::Reverb::Model::KDFX_DELAY:
 			return l10n::getView(STRING_FOR_TIME);
-		case dsp::Reverb::Model::KDFX_CHORUS:
-			return l10n::getView(STRING_FOR_RATE);
-		case dsp::Reverb::Model::KDFX_TONE:
-			return l10n::getView(STRING_FOR_DRIVE);
 		default:
 			return l10n::getView(this->name);
 		}
 	}
 	[[nodiscard]] std::string_view getTitle() const override { return getName(); }
+
+	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
+		auto model = AudioEngine::reverb.getModel();
+		return model == dsp::Reverb::Model::FREEVERB || model == dsp::Reverb::Model::MUTABLE
+		       || model == dsp::Reverb::Model::KDFX_REVERB;
+	}
 };
 } // namespace deluge::gui::menu_item::reverb

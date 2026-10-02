@@ -12,38 +12,9 @@ class Diffusion final : public Integer {
 public:
 	using Integer::Integer;
 
-	[[nodiscard]] int32_t getMinValue() const override {
-		if (AudioEngine::reverb.getModel() == dsp::Reverb::Model::KDFX_TONE) {
-			return -24;
-		}
-		return 0;
-	}
-
-	[[nodiscard]] int32_t getMaxValue() const override {
-		switch (AudioEngine::reverb.getModel()) {
-		case dsp::Reverb::Model::KDFX_REVERB:
-		case dsp::Reverb::Model::KDFX_DELAY:
-		case dsp::Reverb::Model::KDFX_CHORUS:
-			return 100;
-		case dsp::Reverb::Model::KDFX_TONE:
-			return 12;
-		default:
-			return kMaxMenuValue;
-		}
-	}
-
-	const char* getUnit() override {
-		switch (AudioEngine::reverb.getModel()) {
-		case dsp::Reverb::Model::KDFX_REVERB:
-		case dsp::Reverb::Model::KDFX_DELAY:
-		case dsp::Reverb::Model::KDFX_CHORUS:
-			return " %";
-		case dsp::Reverb::Model::KDFX_TONE:
-			return " DB";
-		default:
-			return "";
-		}
-	}
+	[[nodiscard]] int32_t getMinValue() const override { return 0; }
+	[[nodiscard]] int32_t getMaxValue() const override { return 100; }
+	const char* getUnit() override { return " %"; }
 
 	void readCurrentValue() override {
 		float norm = AudioEngine::reverb.getDiffusion();
@@ -61,21 +32,13 @@ public:
 
 	[[nodiscard]] std::string_view getName() const override {
 		using enum l10n::String;
-		switch (AudioEngine::reverb.getModel()) {
-		case dsp::Reverb::Model::KDFX_DELAY:
-			return l10n::getView(STRING_FOR_PINGPONG);
-		case dsp::Reverb::Model::KDFX_CHORUS:
-			return l10n::getView(STRING_FOR_WIDTH);
-		case dsp::Reverb::Model::KDFX_TONE:
-			return l10n::getView(STRING_FOR_VOLUME_LEVEL);
-		default:
-			return l10n::getView(STRING_FOR_DIFFUSION);
-		}
+		return l10n::getView(STRING_FOR_DIFFUSION);
 	}
 	[[nodiscard]] std::string_view getTitle() const override { return getName(); }
 
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
-		return AudioEngine::reverb.getModel() != dsp::Reverb::Model::FREEVERB;
+		auto model = AudioEngine::reverb.getModel();
+		return model == dsp::Reverb::Model::MUTABLE || model == dsp::Reverb::Model::KDFX_REVERB;
 	}
 };
 } // namespace deluge::gui::menu_item::reverb

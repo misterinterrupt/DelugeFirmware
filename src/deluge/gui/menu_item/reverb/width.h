@@ -71,7 +71,7 @@ public:
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
 		auto model = AudioEngine::reverb.getModel();
 		return model == dsp::Reverb::Model::FREEVERB || model == dsp::Reverb::Model::KDFX_REVERB
-		       || model == dsp::Reverb::Model::KDFX_DELAY;
+		       || model == dsp::Reverb::Model::KDFX_DELAY || model == dsp::Reverb::Model::KDFX_CHORUS;
 	}
 };
 } // namespace deluge::gui::menu_item::reverb

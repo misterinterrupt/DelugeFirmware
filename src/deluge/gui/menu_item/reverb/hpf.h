@@ -20,6 +20,7 @@
 #include "dsp/reverb/reverb.hpp"
 #include "gui/l10n/strings.h"
 #include "gui/menu_item/integer.h"
+#include "hid/buttons.h"
 #include "processing/engines/audio_engine.h"
 #include <algorithm>
 #include <cmath>
@@ -78,7 +79,8 @@ public:
 
 	void selectEncoderAction(int32_t offset) override {
 		if (AudioEngine::reverb.getModel() != dsp::Reverb::Model::MUTABLE) {
-			int32_t step = (this->getValue() > 100) ? 10 : 5;
+			bool shiftPressed = Buttons::isShiftButtonPressed();
+			int32_t step = shiftPressed ? 1 : ((this->getValue() > 100) ? 10 : 5);
 			this->setValue(this->getValue() + offset * step);
 			this->setValue(std::clamp(this->getValue(), getMinValue(), getMaxValue()));
 			Number::selectEncoderAction(offset);

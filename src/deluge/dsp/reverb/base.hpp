@@ -44,6 +44,73 @@ struct Base {
 	virtual void setWidth(float value) {}
 	[[nodiscard]] virtual float getWidth() const { return 0; };
 
+	// Extended KDFX Reverb parameters
+	virtual void setPreDelay(float value) {}
+	[[nodiscard]] virtual float getPreDelay() const { return 0.0f; }
+
+	virtual void setEarlyReflections(float value) {}
+	[[nodiscard]] virtual float getEarlyReflections() const { return 0.0f; }
+
+	virtual void setBassDecay(float value) {}
+	[[nodiscard]] virtual float getBassDecay() const { return 0.5f; }
+
+	virtual void setAirShelf(float value) {}
+	[[nodiscard]] virtual float getAirShelf() const { return 0.0f; }
+
+	// Extended KDFX Delay parameters
+	virtual void setDelayTimeL(float value) {}
+	[[nodiscard]] virtual float getDelayTimeL() const { return 0.5f; }
+
+	virtual void setDelayTimeR(float value) {}
+	[[nodiscard]] virtual float getDelayTimeR() const { return 0.5f; }
+
+	virtual void setDelayDrive(float value) {}
+	[[nodiscard]] virtual float getDelayDrive() const { return 0.0f; }
+
+	virtual void setPhaseInvert(bool value) {}
+	[[nodiscard]] virtual bool getPhaseInvert() const { return false; }
+
+	// Extended KDFX Chorus parameters
+	virtual void setBaseDelay(float value) {}
+	[[nodiscard]] virtual float getBaseDelay() const { return 0.2f; }
+
+	virtual void setChorusVoices(int32_t value) {}
+	[[nodiscard]] virtual int32_t getChorusVoices() const { return 2; }
+
+	virtual void setChorusWaveform(int32_t value) {}
+	[[nodiscard]] virtual int32_t getChorusWaveform() const { return 0; }
+
+	virtual void setChorusFeedback(float value) {}
+	[[nodiscard]] virtual float getChorusFeedback() const { return 0.0f; }
+
+	// Extended KDFX Tone parameters
+	virtual void setDrive(float value) {}
+	[[nodiscard]] virtual float getDrive() const { return 0.0f; }
+
+	virtual void setShaperMode(int32_t value) {}
+	[[nodiscard]] virtual int32_t getShaperMode() const { return 0; }
+
+	virtual void setBassGain(float value) {}
+	[[nodiscard]] virtual float getBassGain() const { return 0.5f; }
+
+	virtual void setBassFreq(float value) {}
+	[[nodiscard]] virtual float getBassFreq() const { return 0.5f; }
+
+	virtual void setMidGain(float value) {}
+	[[nodiscard]] virtual float getMidGain() const { return 0.5f; }
+
+	virtual void setMidFreq(float value) {}
+	[[nodiscard]] virtual float getMidFreq() const { return 0.5f; }
+
+	virtual void setTrebleGain(float value) {}
+	[[nodiscard]] virtual float getTrebleGain() const { return 0.5f; }
+
+	virtual void setTrebleFreq(float value) {}
+	[[nodiscard]] virtual float getTrebleFreq() const { return 0.5f; }
+
+	virtual void setOutLevel(float value) {}
+	[[nodiscard]] virtual float getOutLevel() const { return 0.5f; }
+
 	[[nodiscard]] constexpr int32_t getPanLeft() const { return amplitude_left_; }
 	[[nodiscard]] constexpr int32_t getPanRight() const { return amplitude_right_; }
 

@@ -26,37 +26,13 @@ class Damping final : public Integer {
 public:
 	using Integer::Integer;
 
-	[[nodiscard]] int32_t getMinValue() const override {
-		if (AudioEngine::reverb.getModel() == dsp::Reverb::Model::KDFX_TONE) {
-			return -15;
-		}
-		return 0;
-	}
-
+	[[nodiscard]] int32_t getMinValue() const override { return 0; }
 	[[nodiscard]] int32_t getMaxValue() const override {
-		switch (AudioEngine::reverb.getModel()) {
-		case dsp::Reverb::Model::KDFX_REVERB:
-		case dsp::Reverb::Model::KDFX_DELAY:
-		case dsp::Reverb::Model::KDFX_CHORUS:
-			return 100;
-		case dsp::Reverb::Model::KDFX_TONE:
-			return 15;
-		default:
-			return kMaxMenuValue;
-		}
+		return (AudioEngine::reverb.getModel() == dsp::Reverb::Model::FREEVERB) ? kMaxMenuValue : 100;
 	}
 
 	const char* getUnit() override {
-		switch (AudioEngine::reverb.getModel()) {
-		case dsp::Reverb::Model::KDFX_REVERB:
-		case dsp::Reverb::Model::KDFX_DELAY:
-		case dsp::Reverb::Model::KDFX_CHORUS:
-			return " %";
-		case dsp::Reverb::Model::KDFX_TONE:
-			return " DB";
-		default:
-			return "";
-		}
+		return (AudioEngine::reverb.getModel() == dsp::Reverb::Model::FREEVERB) ? "" : " %";
 	}
 
 	void readCurrentValue() override {
@@ -73,17 +49,14 @@ public:
 		AudioEngine::reverb.setDamping(std::clamp(norm, 0.0f, 1.0f));
 	}
 
-	[[nodiscard]] std::string_view getName() const override {
-		using enum l10n::String;
-		switch (AudioEngine::reverb.getModel()) {
-		case dsp::Reverb::Model::KDFX_CHORUS:
-			return l10n::getView(STRING_FOR_FEEDBACK);
-		case dsp::Reverb::Model::KDFX_TONE:
-			return l10n::getView(STRING_FOR_BASS);
-		default:
-			return l10n::getView(this->name);
-		}
-	}
+	[[nodiscard]] std::string_view getName() const override { return l10n::getView(this->name); }
 	[[nodiscard]] std::string_view getTitle() const override { return getName(); }
+
+	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
+		auto model = AudioEngine::reverb.getModel();
+		return model == dsp::Reverb::Model::FREEVERB || model == dsp::Reverb::Model::MUTABLE
+		       || model == dsp::Reverb::Model::KDFX_REVERB || model == dsp::Reverb::Model::KDFX_DELAY
+		       || model == dsp::Reverb::Model::KDFX_CHORUS;
+	}
 };
 } // namespace deluge::gui::menu_item::reverb
