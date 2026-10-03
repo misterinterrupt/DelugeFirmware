@@ -155,6 +155,9 @@ public:
 	static constexpr std::array<ParamDef, kMaxParamDefs> paramDefs(Model m) {
 		switch (m) {
 		case Model::FREEVERB:
+			// Freeverb implements size/damping/width only — no HPF, no decay: never
+			// list a param the engine doesn't have.
+			return {{{Param::RoomSize, "SIZE"}, {Param::Damping, "DAMP"}, {Param::Width, "WIDTH"}, LEVEL_DEF()}};
 		case Model::MUTABLE:
 			return {{{Param::RoomSize, "SIZE"},
 			         {Param::Damping, "DAMP"},
@@ -332,11 +335,12 @@ public:
 				}
 				if (static_cast<Param>(id) == Param::Level) {
 					// LEVEL on send engines is a wet-output scale, applied through the
-					// same pan-level input mixWet() already uses. Insert engines blend
+					// same pan-level input mixWet() already uses (unity = 2^27; the
+					// <<5 in mixWet makes wet x panLevel / 2^27). Insert engines blend
 					// in process() and need nothing here.
 					if (!engine_->isInsert()) {
 						float level = std::clamp(cache_[id], 0.0f, 1.0f);
-						int32_t pan = static_cast<int32_t>(level * 67108864.0f); // level × 2^26
+						int32_t pan = static_cast<int32_t>(level * 134217728.0f); // level × 2^27
 						engine_->setPanLevels(pan, pan);
 					}
 				}

@@ -143,10 +143,9 @@ public:
 
 	void setDecay(float value) override {
 		decay_val_ = value;
-		// Capped at 0.97: the low-band path also multiplies by the bass-boost
-		// factor, and the two together must stay below unity or the reverb builds
-		// up without bound (see updateBassClamp).
-		decayFloat_ = std::min(0.40f + value * 0.595f, 0.97f);
+		// 0.40..0.97, reaching the cap exactly at full travel (the low-band path
+		// also multiplies by the bass-boost factor; see updateBassClamp).
+		decayFloat_ = std::min(0.40f + value * 0.57f, 0.97f);
 		decay_ = static_cast<q31_t>(decayFloat_ * ONE_Q31f);
 		updateBassClamp();
 	}
@@ -168,7 +167,10 @@ public:
 
 	void setWidth(float value) override {
 		width_ = value;
-		tapSpread_ = 1u + static_cast<uint32_t>(value * 3u); // 1..4
+		// Continuous Q6 stereo tap-spread factor 1.0x..4.0x (the >>6 in safeTapOffset
+		// consumes the fraction). Was 1u + (int)(v*3u): four discrete steps, so the
+		// knob read as dead between them.
+		tapSpread_ = 64u + static_cast<uint32_t>(value * 192.0f);
 	}
 	[[nodiscard]] float getWidth() const override { return width_; }
 

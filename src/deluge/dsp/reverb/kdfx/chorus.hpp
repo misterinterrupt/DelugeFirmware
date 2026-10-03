@@ -163,7 +163,9 @@ public:
 	[[nodiscard]] float getBaseDelay() const override { return base_delay_val_; }
 
 	void setChorusVoices(int32_t value) override {
-		voices_ = (value <= 2) ? 2 : (value <= 4) ? 4 : 6;
+		// Any count 2..6 works (phase offsets divide the circle evenly); the old
+		// snap to 2/4/6 made the in-between menu values do nothing.
+		voices_ = std::clamp<int32_t>(value, 2, 6);
 	}
 	[[nodiscard]] int32_t getChorusVoices() const override { return voices_; }
 

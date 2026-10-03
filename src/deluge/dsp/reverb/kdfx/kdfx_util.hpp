@@ -143,9 +143,10 @@ constexpr inline void mixWet(int32_t& channel, q31_t wet, int32_t panLevel) {
 	channel = add_saturation(channel, scaled);
 }
 
-/// Pan level that makes mixWet() a unity wet-add (pan << 5 == 1.0).
+/// Pan level that makes mixWet() a unity wet-add: mixWet computes
+/// wet x panLevel / 2^27 ((wet x pan) >> 32, then << 5), so unity is 2^27.
 constexpr inline int32_t unityWetPan() {
-	return 0x04000000;
+	return 0x08000000;
 }
 
 /// Parabolic bipolar LFO over a full Q31 phase turn — the same approximation
