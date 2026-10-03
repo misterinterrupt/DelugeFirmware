@@ -366,8 +366,12 @@ public:
 		if (engine_ != nullptr && dirty_ != 0) {
 			uint32_t dirty = dirty_;
 			dirty_ = 0;
-			for (uint32_t id = 1; dirty != 0 && id < util::to_underlying(Param::kNumParams); id++, dirty >>= 1) {
-				if (!(dirty & 1u)) {
+			// Bit position == param id (setParam sets 1u << id) — test each bit
+			// explicitly. (A shift-first loop here tested bit id-1 at iteration id,
+			// so every edit flushed the NEXT param's cached value: edits seemed dead
+			// until a neighbour param's push dragged them in all at once.)
+			for (uint32_t id = 1; id < util::to_underlying(Param::kNumParams); id++) {
+				if (!(dirty & (1u << id))) {
 					continue;
 				}
 				if (static_cast<Param>(id) == Param::Level) {

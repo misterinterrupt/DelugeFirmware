@@ -1480,10 +1480,10 @@ void getReverbParamsFromSong(Song* song) {
 		                        util::to_underlying(dsp::FxBloc::Model::KDFX_AUTOPAN)));
 		if (bloc.setModel(wanted)) {
 			if (wanted != dsp::FxBloc::Model::EMPTY) {
+				// Bit position == param id (song.cpp sets 1u << pid); test explicitly.
 				uint32_t seen = song->masterFxParamSeen[s];
-				for (uint32_t pid = 1; seen != 0 && pid < static_cast<uint32_t>(Song::kMasterFxNumParams);
-				     pid++, seen >>= 1) {
-					if (seen & 1u) {
+				for (uint32_t pid = 1; pid < static_cast<uint32_t>(Song::kMasterFxNumParams); pid++) {
+					if (seen & (1u << pid)) {
 						bloc.setParam(static_cast<dsp::FxBloc::Param>(pid), song->masterFxParams[s][pid]);
 					}
 				}
