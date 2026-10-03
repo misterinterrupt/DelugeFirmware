@@ -24,14 +24,18 @@ Stock wrapping is a convenience; the manual's algorithms are the product.
 | be80a78a6 | loop-gain runaways fixed (delay tape drive ×11.9 in-loop; reverb bass ×1.74) |
 | d4fdc1e42 | param accuracy audit: wet read 50% low (unity pan 2^27), dead zones, dead params |
 | (this push) | COMPRESSOR bloc live: stock RMSFeedbackCompressor wrapped insert-style (rule 0 — wrap only), THRSH/RATIO/ATK/REL/SIDE/BLEND with faithful curves |
+| 785fd9096 | **param flush off-by-one fixed** — every edit had pushed the NEXT param id's cached value (the "edits do nothing, then snap" report); song-load apply had the same bug |
 
 **Not yet hardware-verified:** everything from ecd715ad9 onward. Flash
-`build/Release/deluge.bin` (11:50 or later).
+`build/Release/deluge.bin` (11:57 or later).
 
 ## Push order (KDFX first)
 
 ### 0. Verification gate (blocks everything below)
 Flash the latest build. In order:
+- **Params must respond per encoder detent** (the off-by-one made them deferred
+  until a neighbour edit); re-check the song reload too — loads applied staged
+  params shifted by one id before the fix.
 - LEVEL now reads ~2× louder at 100% — check overall gain staging still sane.
 - Delay: FDBK high + DRV high → tail must always decay (kill = FDBK).
 - Reverb: DECAY high + BASS high → no bass accumulation.
