@@ -431,10 +431,18 @@ static const VisualPage fxBlocPages[] = {
        {&masterSlotBlocMenu0, "BLOC 1"},
        {&masterSlotBlocMenu1, "BLOC 2"},
        {&masterSlotBlocMenu2, "BLOC 3"}}}},
+    // Full-width selector per slot: bloc names (FREEVERB, KDFX TONE...) need far more
+    // than one 32px column; spanning all four keeps them readable while scrolling.
+    {"Bloc 1", EMPTY_STRING,
+     {{{&masterSlotBlocMenu0, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
     {"Slot 1", EMPTY_STRING,
      {{{&masterParamSize0, "SIZE"}, {&masterParamDamp0, "DAMP"}, {&masterParamWidth0, "WIDTH"}, {nullptr, ""}}}},
+    {"Bloc 2", EMPTY_STRING,
+     {{{&masterSlotBlocMenu1, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
     {"Slot 2", EMPTY_STRING,
      {{{&masterParamSize1, "SIZE"}, {&masterParamDamp1, "DAMP"}, {&masterParamWidth1, "WIDTH"}, {nullptr, ""}}}},
+    {"Bloc 3", EMPTY_STRING,
+     {{{&masterSlotBlocMenu2, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
     {"Slot 3", EMPTY_STRING,
      {{{&masterParamSize2, "SIZE"}, {&masterParamDamp2, "DAMP"}, {&masterParamWidth2, "WIDTH"}, {nullptr, ""}}}},
 };

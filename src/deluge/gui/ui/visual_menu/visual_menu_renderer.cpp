@@ -97,15 +97,23 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 	// Header separator
 	canvas.drawHorizontalLine(top + 15, 0, 127);
 
-	// 2. Render 4 Columns (32 pixels each)
+	// 2. Render 4 Columns (32 pixels each). A slot may span several columns
+	// (VisualSlot::span) so long names stay readable — FX bloc names need more
+	// than 32px; spans on a page must sum to kSlotsPerPage.
+	int32_t colLeft = 0;
 	for (int32_t s = 0; s < kSlotsPerPage; ++s) {
 		const auto& slot = page.slots[s];
-		int32_t colLeft = s * 32;
-		int32_t colRight = colLeft + 31;
-		int32_t colCenter = colLeft + 16;
+		if (slot.span == 0) {
+			continue; // covered by a previous slot's span
+		}
+		if (colLeft >= OLED_MAIN_WIDTH_PIXELS) {
+			break; // page's spans overflow the width — never draw past the canvas
+		}
+		int32_t colRight = colLeft + slot.span * 32 - 1;
+		int32_t colCenter = colLeft + (slot.span * 32 >> 1);
 
 		// Vertical separator line
-		if (s > 0) {
+		if (colLeft > 0) {
 			canvas.drawVerticalLine(colLeft, top + 16, bottom);
 		}
 
@@ -146,6 +154,8 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 			// Empty slot indicator
 			canvas.drawString("--", colCenter - 6, top + 27, kTextSpacingX, kTextSizeYUpdated);
 		}
+
+		colLeft += slot.span * 32;
 	}
 }
 

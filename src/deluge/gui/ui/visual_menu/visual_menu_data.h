@@ -34,6 +34,7 @@ struct VisualSlot {
 	MenuItem* item = nullptr;
 	const char* shortName = nullptr;  // Optional custom short name (e.g., "CUT", "RES", "ATK")
 	int8_t sourceIndexOverride = -1;  // -1 = use soundEditor current source, >= 0 = specific source index (0=OSC1, 1=OSC2)
+	uint8_t span = 1;                 // 32px columns this slot occupies; 0 = slot skipped (covered by a previous span)
 
 	[[nodiscard]] std::string_view getDisplayName() const {
 		if (shortName != nullptr) {
