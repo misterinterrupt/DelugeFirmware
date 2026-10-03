@@ -415,36 +415,44 @@ MasterSlotBloc masterSlotBlocMenu0{0};
 MasterSlotBloc masterSlotBlocMenu1{1};
 MasterSlotBloc masterSlotBlocMenu2{2};
 MasterRouting masterRoutingMenu{};
-MasterSlotParam masterParamSize0{0, MasterSlotParam::Which::SIZE};
-MasterSlotParam masterParamDamp0{0, MasterSlotParam::Which::DAMP};
-MasterSlotParam masterParamWidth0{0, MasterSlotParam::Which::WIDTH};
-MasterSlotParam masterParamSize1{1, MasterSlotParam::Which::SIZE};
-MasterSlotParam masterParamDamp1{1, MasterSlotParam::Which::DAMP};
-MasterSlotParam masterParamWidth1{1, MasterSlotParam::Which::WIDTH};
-MasterSlotParam masterParamSize2{2, MasterSlotParam::Which::SIZE};
-MasterSlotParam masterParamDamp2{2, MasterSlotParam::Which::DAMP};
-MasterSlotParam masterParamWidth2{2, MasterSlotParam::Which::WIDTH};
+MasterSlotParam masterParam00{0, 0};
+MasterSlotParam masterParam01{0, 1};
+MasterSlotParam masterParam02{0, 2};
+MasterSlotParam masterParam10{1, 0};
+MasterSlotParam masterParam11{1, 1};
+MasterSlotParam masterParam12{1, 2};
+MasterSlotParam masterParam20{2, 0};
+MasterSlotParam masterParam21{2, 1};
+MasterSlotParam masterParam22{2, 2};
 
 static const VisualPage fxBlocPages[] = {
+    // Chain holds only the routing topology — each slot's bloc selector has its own
+    // full-width page (names need more than one 32px column to stay readable).
     {"Chain", EMPTY_STRING,
-     {{{&masterRoutingMenu, "ROUTE"},
-       {&masterSlotBlocMenu0, "BLOC 1"},
-       {&masterSlotBlocMenu1, "BLOC 2"},
-       {&masterSlotBlocMenu2, "BLOC 3"}}}},
-    // Full-width selector per slot: bloc names (FREEVERB, KDFX TONE...) need far more
-    // than one 32px column; spanning all four keeps them readable while scrolling.
+     {{{&masterRoutingMenu, "ROUTE", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
     {"Bloc 1", EMPTY_STRING,
      {{{&masterSlotBlocMenu0, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
+    // Param labels resolve through the slot's current model at render time
+    // (no shortName override → item's dynamic getName()).
     {"Slot 1", EMPTY_STRING,
-     {{{&masterParamSize0, "SIZE"}, {&masterParamDamp0, "DAMP"}, {&masterParamWidth0, "WIDTH"}, {nullptr, ""}}}},
+     {{{&masterParam00, nullptr, -1, 1},
+       {&masterParam01, nullptr, -1, 1},
+       {&masterParam02, nullptr, -1, 1},
+       {nullptr, "", -1, 0}}}},
     {"Bloc 2", EMPTY_STRING,
      {{{&masterSlotBlocMenu1, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
     {"Slot 2", EMPTY_STRING,
-     {{{&masterParamSize1, "SIZE"}, {&masterParamDamp1, "DAMP"}, {&masterParamWidth1, "WIDTH"}, {nullptr, ""}}}},
+     {{{&masterParam10, nullptr, -1, 1},
+       {&masterParam11, nullptr, -1, 1},
+       {&masterParam12, nullptr, -1, 1},
+       {nullptr, "", -1, 0}}}},
     {"Bloc 3", EMPTY_STRING,
      {{{&masterSlotBlocMenu2, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
     {"Slot 3", EMPTY_STRING,
-     {{{&masterParamSize2, "SIZE"}, {&masterParamDamp2, "DAMP"}, {&masterParamWidth2, "WIDTH"}, {nullptr, ""}}}},
+     {{{&masterParam20, nullptr, -1, 1},
+       {&masterParam21, nullptr, -1, 1},
+       {&masterParam22, nullptr, -1, 1},
+       {nullptr, "", -1, 0}}}},
 };
 
 // -------------------------------------------------------------------------------------------------

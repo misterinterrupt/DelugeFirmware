@@ -30,6 +30,7 @@
 #include "dsp/stereo_sample.h"
 #include "memory/general_memory_allocator.h"
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <new>
@@ -53,6 +54,13 @@ public:
 
 	static constexpr size_t kMaxChunk = 64;
 
+	static constexpr uint8_t kDirtyRoomSize = 1 << 0;
+	static constexpr uint8_t kDirtyDamping = 1 << 1;
+	static constexpr uint8_t kDirtyWidth = 1 << 2;
+	static constexpr uint8_t kDirtyDecay = 1 << 3;
+	static constexpr uint8_t kDirtyDiffusion = 1 << 4;
+	static constexpr uint8_t kDirtyHPF = 1 << 5;
+
 	~FxBloc() {
 		// Only runs at global teardown with the audio task long stopped.
 		destroyEngine(engine_);
@@ -62,6 +70,47 @@ public:
 
 	Model getModel() const { return model_; }
 	bool isEmpty() const { return model_ == Model::EMPTY; }
+
+	/// The engine interface is reverb-shaped, and every engine aliases its real
+	/// parameters onto those setters (delay: roomSize=time-L, decay=feedback,
+	/// damping=tone; chorus: roomSize=rate, decay=depth, damping=feedback;
+	/// tone: roomSize=drive, diffusion=level). The menu presents three headline
+	/// parameters per model through this mapping.
+	enum class Param : uint8_t {
+		None = 0,
+		RoomSize,
+		Damping,
+		Width,
+		Decay,
+		Diffusion,
+		HPF,
+	};
+
+	struct ParamInfo {
+		Param param;
+		const char* label; // nullptr → "--"
+	};
+
+	static constexpr std::array<ParamInfo, 3> headlineParams(Model m) {
+		switch (m) {
+		case Model::FREEVERB:
+		case Model::MUTABLE:
+			return {{{Param::RoomSize, "SIZE"}, {Param::Damping, "DAMP"}, {Param::Width, "WIDTH"}}};
+		case Model::KDFX_REVERB:
+			return {{{Param::RoomSize, "SIZE"}, {Param::Decay, "DECAY"}, {Param::Damping, "DAMP"}}};
+		case Model::KDFX_DELAY:
+			return {{{Param::RoomSize, "TIME"}, {Param::Decay, "FDBK"}, {Param::Damping, "TONE"}}};
+		case Model::KDFX_CHORUS:
+			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "DEPTH"}, {Param::Damping, "FDBK"}}};
+		case Model::KDFX_TONE:
+			return {{{Param::RoomSize, "DRIVE"}, {Param::Diffusion, "LEVEL"}, {Param::None, nullptr}}};
+		case Model::EMPTY:
+		case Model::COMPRESSOR:
+		case Model::FILTER:
+		default:
+			return {{{Param::None, nullptr}, {Param::None, nullptr}, {Param::None, nullptr}}};
+		}
+	}
 
 	/// UI thread. Allocates and fully constructs the new engine; the swap itself is
 	/// deferred to the next render boundary. Returns false (state unchanged) if the
@@ -85,6 +134,20 @@ public:
 		pendingEngine_ = replacement;
 		pendingModel_ = m;
 		pendingSwap_ = true;
+
+		// Seed the param cache from the fresh engine's own defaults so the menu shows
+		// values matching what will actually render, and nothing needs pushing until
+		// the user touches a param. pendingEngine_ is still UI-private here, so calling
+		// its getters is safe.
+		if (replacement != nullptr) {
+			params_.roomSize = replacement->getRoomSize();
+			params_.damping = replacement->getDamping();
+			params_.width = replacement->getWidth();
+			params_.decay = replacement->getDecay();
+			params_.diffusion = replacement->getDiffusion();
+			params_.hpf = replacement->getHPF();
+		}
+		paramsDirty_ = 0;
 		return true;
 	}
 
@@ -103,36 +166,96 @@ public:
 			model_ = pendingModel_;
 		}
 		// Deferred parameter application: menus write the cache from the UI thread at
-		// any time; the engine is only touched here, at the render boundary.
-		if (engine_ != nullptr && paramsDirty_) {
-			paramsDirty_ = false;
-			engine_->setRoomSize(params_.roomSize);
-			engine_->setDamping(params_.damping);
-			engine_->setWidth(params_.width);
-			engine_->setDecay(params_.decay);
-			engine_->setHPF(params_.hpf);
-			engine_->setPreDelay(params_.preDelay);
-			engine_->setEarlyReflections(params_.erLevel);
+		// any time; the engine is only touched here, at the render boundary. Only the
+		// params actually written get pushed — the rest keep the engine's own state.
+		if (engine_ != nullptr && paramsDirty_ != 0) {
+			uint8_t dirty = paramsDirty_;
+			paramsDirty_ = 0;
+			if (dirty & kDirtyRoomSize) {
+				engine_->setRoomSize(params_.roomSize);
+			}
+			if (dirty & kDirtyDamping) {
+				engine_->setDamping(params_.damping);
+			}
+			if (dirty & kDirtyWidth) {
+				engine_->setWidth(params_.width);
+			}
+			if (dirty & kDirtyDecay) {
+				engine_->setDecay(params_.decay);
+			}
+			if (dirty & kDirtyDiffusion) {
+				engine_->setDiffusion(params_.diffusion);
+			}
+			if (dirty & kDirtyHPF) {
+				engine_->setHPF(params_.hpf);
+			}
 		}
 	}
 
-	/// UI thread. Cache-and-defer for the bloc's core params — mirrors the deferred
-	/// application the global reverb wrapper uses. Values are 0..1 normalized floats;
-	/// the cache seeds from the engine defaults and only pushes once touched.
+	/// UI thread. Cache-and-defer for the bloc's headline params — mirrors the deferred
+	/// application the global reverb wrapper uses. Values are 0..1 normalized floats.
 	struct Params {
 		float roomSize = 0.5f;
 		float damping = 0.5f;
 		float width = 0.5f;
 		float decay = 0.5f;
+		float diffusion = 0.5f;
 		float hpf = 0.f;
-		float preDelay = 0.f;
-		float erLevel = 0.4f;
 	};
 
 	[[nodiscard]] Params const& params() const { return params_; }
-	void setRoomSize(float v) { params_.roomSize = v; paramsDirty_ = true; }
-	void setDamping(float v) { params_.damping = v; paramsDirty_ = true; }
-	void setWidth(float v) { params_.width = v; paramsDirty_ = true; }
+
+	[[nodiscard]] float getParam(Param p) const {
+		switch (p) {
+		case Param::RoomSize:
+			return params_.roomSize;
+		case Param::Damping:
+			return params_.damping;
+		case Param::Width:
+			return params_.width;
+		case Param::Decay:
+			return params_.decay;
+		case Param::Diffusion:
+			return params_.diffusion;
+		case Param::HPF:
+			return params_.hpf;
+		default:
+			return 0.f;
+		}
+	}
+
+	void setParam(Param p, float v) {
+		uint8_t bit;
+		switch (p) {
+		case Param::RoomSize:
+			params_.roomSize = v;
+			bit = kDirtyRoomSize;
+			break;
+		case Param::Damping:
+			params_.damping = v;
+			bit = kDirtyDamping;
+			break;
+		case Param::Width:
+			params_.width = v;
+			bit = kDirtyWidth;
+			break;
+		case Param::Decay:
+			params_.decay = v;
+			bit = kDirtyDecay;
+			break;
+		case Param::Diffusion:
+			params_.diffusion = v;
+			bit = kDirtyDiffusion;
+			break;
+		case Param::HPF:
+			params_.hpf = v;
+			bit = kDirtyHPF;
+			break;
+		default:
+			return;
+		}
+		paramsDirty_ |= bit;
+	}
 
 	/// In-place stereo processing. Returns false for passthrough blocs (EMPTY, or an
 	/// adapter that has not landed yet) — the router then skips them entirely.
@@ -224,7 +347,7 @@ private:
 	bool pendingSwap_ = false;
 	Model pendingModel_ = Model::EMPTY;
 	Params params_{};
-	bool paramsDirty_ = false;
+	uint8_t paramsDirty_ = 0; // bitmask of kDirty* — UI writes, audio reads+clears (single byte)
 
 	reverb::Base* engine_ = nullptr;
 	reverb::Base* pendingEngine_ = nullptr;

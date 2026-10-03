@@ -82,13 +82,19 @@ public:
 	}
 };
 
-/// One core bloc param (SIZE / DAMP / WIDTH) for one master slot, percent-scaled.
+/// One of the selected bloc's three headline params (percent-scaled). The label and
+/// the backing param resolve through the slot's CURRENT model, so the page adapts
+/// when the bloc changes — delay shows TIME/FDBK/TONE, chorus RATE/DEPTH/FDBK, etc.
 class MasterSlotParam final : public Integer {
 public:
-	enum class Which { SIZE, DAMP, WIDTH };
+	MasterSlotParam(int32_t slotIndex, int32_t ordinal)
+	    : Integer(l10n::String::EMPTY_STRING), slot_(slotIndex), ordinal_(ordinal) {}
 
-	MasterSlotParam(int32_t slotIndex, Which which)
-	    : Integer(l10n::String::EMPTY_STRING), slot_(slotIndex), which_(which) {}
+	[[nodiscard]] std::string_view getName() const override {
+		auto info = dsp::FxBloc::headlineParams(
+		                    AudioEngine::masterFxChain.slot(slot_).getModel())[ordinal_];
+		return info.label != nullptr ? std::string_view{info.label} : std::string_view{"--"};
+	}
 
 	[[nodiscard]] int32_t getMinValue() const override { return 0; }
 	[[nodiscard]] int32_t getMaxValue() const override { return 100; }
@@ -96,41 +102,34 @@ public:
 	[[nodiscard]] const char* getUnit() override { return "%"; }
 
 	void readCurrentValue() override {
-		auto& params = AudioEngine::masterFxChain.slot(slot_).params();
-		float v = 0.5f;
-		switch (which_) {
-		case Which::SIZE:
-			v = params.roomSize;
-			break;
-		case Which::DAMP:
-			v = params.damping;
-			break;
-		case Which::WIDTH:
-			v = params.width;
-			break;
-		}
-		this->setValue(static_cast<int32_t>(std::round(v * 100.0f)));
+		auto& bloc = AudioEngine::masterFxChain.slot(slot_);
+		auto info = dsp::FxBloc::headlineParams(bloc.getModel())[ordinal_];
+		this->setValue(static_cast<int32_t>(std::round(bloc.getParam(info.param) * 100.0f)));
 	}
 
 	void writeCurrentValue() override {
-		float v = static_cast<float>(this->getValue()) / 100.0f;
 		auto& bloc = AudioEngine::masterFxChain.slot(slot_);
-		switch (which_) {
-		case Which::SIZE:
-			bloc.setRoomSize(v);
-			break;
-		case Which::DAMP:
-			bloc.setDamping(v);
-			break;
-		case Which::WIDTH:
-			bloc.setWidth(v);
-			break;
+		auto info = dsp::FxBloc::headlineParams(bloc.getModel())[ordinal_];
+		bloc.setParam(info.param, static_cast<float>(this->getValue()) / 100.0f);
+	}
+
+	void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) override {
+		auto& bloc = AudioEngine::masterFxChain.slot(slot_);
+		auto info = dsp::FxBloc::headlineParams(bloc.getModel())[ordinal_];
+		if (info.param == dsp::FxBloc::Param::None || bloc.isEmpty()) {
+			if (outBuffer && bufferSize > 0) {
+				outBuffer[0] = '-';
+				outBuffer[1] = '-';
+				outBuffer[2] = '\0';
+			}
+			return;
 		}
+		Integer::formatValueForVisualMenu(outBuffer, bufferSize);
 	}
 
 private:
 	int32_t slot_;
-	Which which_;
+	int32_t ordinal_;
 };
 
 } // namespace deluge::gui::menu_item::fx_bloc
