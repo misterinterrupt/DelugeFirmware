@@ -404,6 +404,22 @@ static const VisualCategory midiCvCategories[] = {
 };
 
 // -------------------------------------------------------------------------------------------------
+// Song-level (master FX) categories. Deliberately NOT the audio-clip tables: the audio-clip
+// items (reverse / interpolation / transpose / attack) dereference getCurrentAudioClip(),
+// which is null outside an actual audio clip — editing them from song mode is a hard fault.
+// -------------------------------------------------------------------------------------------------
+static const VisualPage songMasterPages[] = {
+    {"Main Level", STRING_FOR_MASTER_LEVEL,
+     {{{&globalLevelMenu, "LEVEL"}, {&globalPanMenu, "PAN"}, {nullptr, ""}, {nullptr, ""}}}},
+};
+
+static const VisualCategory songCategories[] = {
+    {STRING_FOR_MASTER, nullptr, songMasterPages},
+    {STRING_FOR_FILTERS, nullptr, audioClipFilterPages},
+    {STRING_FOR_FX, nullptr, audioClipFxPages},
+};
+
+// -------------------------------------------------------------------------------------------------
 // Getters
 // -------------------------------------------------------------------------------------------------
 std::span<const VisualCategory> getSynthCategories() {
@@ -423,7 +439,7 @@ std::span<const VisualCategory> getMidiCvCategories() {
 }
 
 std::span<const VisualCategory> getGlobalFxCategories() {
-	return audioClipCategories;
+	return songCategories;
 }
 
 bool findMenuItemLocation(std::span<const VisualCategory> categories, const MenuItem* targetItem,

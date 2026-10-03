@@ -60,15 +60,17 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
                                     int8_t activeHeldSlot, int8_t decimalCursorSlot, int8_t decimalEditPos) {
 	canvas.clear();
 
-	// 1. Top Status Header (Category Name & Page Counter)
-	std::string_view catName = category.getName();
-	std::string_view pageTitle = page.getTitle();
+	// Two-line header so the page counter never collides with long titles:
+	//   line 1: category name
+	//   line 2: page title (left) + [n/m] (right-aligned)
+	int32_t top = OLED_MAIN_TOPMOST_PIXEL;
 
-	canvas.drawString(catName, 2, 0, kTextSpacingX, kTextSizeYUpdated, 0, 95);
+	std::string_view catName = category.getName();
+	canvas.drawString(catName, 2, top + 0, kTextSpacingX, kTextSizeYUpdated, 0, 95);
+
+	std::string_view pageTitle = page.getTitle();
 	if (!pageTitle.empty()) {
-		int32_t sepX = 2 + (static_cast<int32_t>(catName.length()) + 1) * kTextSpacingX;
-		canvas.drawString(">", sepX, 0, kTextSpacingX, kTextSizeYUpdated);
-		canvas.drawString(pageTitle, sepX + kTextSpacingX * 2, 0, kTextSpacingX, kTextSizeYUpdated, 0, 95);
+		canvas.drawString(pageTitle, 2, top + 10, kTextSpacingX, kTextSizeYUpdated, 0, 90);
 	}
 
 	char pageCounterBuf[12];
@@ -80,10 +82,11 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 	intToString(totalPages, numBuf);
 	strcat(pageCounterBuf, numBuf);
 	strcat(pageCounterBuf, "]");
-	canvas.drawString(pageCounterBuf, 96, 0, kTextSpacingX, kTextSizeYUpdated);
+	int32_t counterWidth = static_cast<int32_t>(strlen(pageCounterBuf)) * kTextSpacingX;
+	canvas.drawString(pageCounterBuf, 126 - counterWidth, top + 10, kTextSpacingX, kTextSizeYUpdated);
 
-	// Header line
-	canvas.drawHorizontalLine(10, 0, 127);
+	// Header separator
+	canvas.drawHorizontalLine(top + 20, 0, 127);
 
 	// 2. Render 4 Columns (32 pixels each)
 	for (int32_t s = 0; s < kSlotsPerPage; ++s) {
@@ -94,51 +97,51 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 
 		// Vertical separator line
 		if (s > 0) {
-			canvas.drawVerticalLine(colLeft, 11, 63);
+			canvas.drawVerticalLine(colLeft, top + 21, top + 63);
 		}
 
 		if (slot.item != nullptr) {
-			// Row 1: Parameter Short Name (y = 13)
+			// Row 1: Parameter Short Name
 			std::string_view name = slot.getDisplayName();
 			int32_t nameWidth = static_cast<int32_t>(name.length()) * kTextSpacingX;
 			int32_t nameX = colCenter - (nameWidth / 2);
 			if (nameX < colLeft + 1) nameX = colLeft + 1;
-			canvas.drawString(name, nameX, 13, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
+			canvas.drawString(name, nameX, top + 24, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
 
-			// Row 2: Live Value (y = 26)
+			// Row 2: Live Value
 			char valBuf[16];
 			formatSlotValue(slot.item, slot.sourceIndexOverride, valBuf, sizeof(valBuf));
 			int32_t valLen = static_cast<int32_t>(strlen(valBuf));
 			int32_t valWidth = valLen * kTextSpacingX;
 			int32_t valX = colCenter - (valWidth / 2);
 			if (valX < colLeft + 1) valX = colLeft + 1;
-			canvas.drawString(valBuf, valX, 26, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
+			canvas.drawString(valBuf, valX, top + 36, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
 
 			// Decimal cursor if active
 			if (s == decimalCursorSlot && decimalEditPos >= 0) {
-				canvas.drawString("^", colCenter - 3, 38, kTextSpacingX, kTextSizeYUpdated);
+				canvas.drawString("^", colCenter - 3, top + 47, kTextSpacingX, kTextSizeYUpdated);
 			}
 
-			// Row 3: Button Label / Slot Indicator (y = 52)
+			// Row 3: Button Label / Slot Indicator
 			const char* btnLabel = kSlotButtonLabels[s];
 			int32_t btnWidth = static_cast<int32_t>(strlen(btnLabel)) * kTextSpacingX;
 			int32_t btnX = colCenter - (btnWidth / 2);
-			canvas.drawString(btnLabel, btnX, 52, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
+			canvas.drawString(btnLabel, btnX, top + 54, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
 
 			// Active highlight: invertArea()'s byte walk (image_[rowY][xMin] + width bytes)
 				// runs past the end of the canvas image for these coordinates and XORs
 				// display masks over adjacent .bss (stemExport, AudioEngine::reverb, ...),
 				// which is what crashed the audio task. Use bounded line primitives instead.
 				if (s == activeHeldSlot) {
-					canvas.drawVerticalLine(colLeft + 1, 11, 63);
-					canvas.drawVerticalLine(colLeft + 30, 11, 63);
-					canvas.drawHorizontalLine(11, colLeft + 1, colLeft + 30);
-					canvas.drawHorizontalLine(63, colLeft + 1, colLeft + 30);
+					canvas.drawVerticalLine(colLeft + 1, top + 21, top + 63);
+					canvas.drawVerticalLine(colLeft + 30, top + 21, top + 63);
+					canvas.drawHorizontalLine(top + 21, colLeft + 1, colLeft + 30);
+					canvas.drawHorizontalLine(top + 63, colLeft + 1, colLeft + 30);
 				}
 		}
 		else {
 			// Empty slot indicator
-			canvas.drawString("--", colCenter - 6, 26, kTextSpacingX, kTextSizeYUpdated);
+			canvas.drawString("--", colCenter - 6, top + 36, kTextSpacingX, kTextSizeYUpdated);
 		}
 	}
 }
