@@ -43,6 +43,10 @@ echo \n\n=== STACK (abort SP) ===\n
 x/64wx $sp
 echo \n\n=== EDITING CONTEXT GLOBALS ===\n
 p currentSong
+p scribbleCanaryTrips
+p stemExport.processStarted
+p stemExport.numStemsExported
+p stemExport.totalNumStemsToExport
 p soundEditor.currentParamManager
 p soundEditor.currentSound
 p soundEditor.currentModControllable

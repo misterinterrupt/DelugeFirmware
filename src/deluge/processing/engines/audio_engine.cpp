@@ -133,6 +133,9 @@ constexpr int32_t direnessThreshold = numSamplesLimit - 30;
 constexpr int MIN_VOICES = 7;
 
 dsp::Reverb reverb{};
+// Incremented whenever the stem-export state fails its impossible-value check in the audio
+// routine — a live counter of memory-scribbler hits on that global (dumped by capture scripts).
+uint32_t scribbleCanaryTrips = 0;
 PLACE_INTERNAL_FRUNK SideChain reverbSidechain{};
 int32_t reverbSidechainVolume;
 int32_t reverbSidechainShape;
@@ -1045,6 +1048,17 @@ void routine() {
 	}
 
 	audioRoutineLocked = true;
+
+	// Tripwire for the memory-scribbler: the export counters are only ever assigned 0 or
+	// positive counts, so a negative value means the stemExport global was poisoned (observed
+	// as a permanent "Exported -1 of -1 clips" popup plus this offline-render branch freezing
+	// audio, with no export ever started). Heal the branch decision and count the trip; the
+	// J-Link capture scripts dump scribbleCanaryTrips to bracket when the write landed.
+	if (stemExport.processStarted
+	    && (stemExport.numStemsExported < 0 || stemExport.totalNumStemsToExport < 0)) {
+		stemExport.processStarted = false;
+		scribbleCanaryTrips++;
+	}
 
 	numRoutines = 0;
 	if (!stemExport.processStarted || (stemExport.processStarted && !stemExport.renderOffline)) {

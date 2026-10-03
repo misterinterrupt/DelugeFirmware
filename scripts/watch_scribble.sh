@@ -53,6 +53,7 @@ while $n < 40
   p stemExport.numStemsExported
   p stemExport.totalNumStemsToExport
   p stemExport.processStarted
+  p scribbleCanaryTrips
   p currentSong
   p soundEditor.currentParamManager
   p/x $pc
