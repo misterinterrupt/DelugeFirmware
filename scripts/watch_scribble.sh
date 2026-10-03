@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-# Watchpoint trap for the pointer-poisoning scribble.
+# Watchpoint trap for the memory-poisoning scribble.
 #
-# The crash report showed currentSong / soundEditor.currentParamManager /
-# currentSound overwritten with Q31-arithmetic garbage (0x0f8xxxxx). This script arms
-# hardware watchpoints on those globals and catches the exact writing instruction.
+# Round 6/7: currentSong / soundEditor.currentParamManager were overwritten with
+# Q31-arithmetic garbage (0x0f8xxxxx) — but watchpoints on those globals never fired,
+# so the writer doesn't store to them directly (it writes THROUGH poisoned pointers).
+#
+# Round 9 gave us a victim that code NEVER legitimately writes -1 to:
+# stemExport.numStemsExported / totalNumStemsToExport showed "-1 of -1" on the OLED
+# ("Exported -1 of -1 clips" permanent popup, processStarted spontaneously true).
+# Those fields are only ever assigned 0 or a positive count, so any write that puts
+# 0xFFFFFFFF there IS the scribbler. Watching them should finally name the writer.
 #
 # How to use:
-#   1. Power-cycle the Deluge (clear the parked fault state), load your song, start it.
+#   1. Power-cycle the Deluge, load your song, start it.
 #   2. Run:  ./scripts/watch_scribble.sh
-#      (it attaches, halts the CPU briefly, arms watchpoints, then resumes)
-#   3. On the device: open the visual menu, go to FILTERS > Low-Pass Filter,
-#      tap KIT to latch RESONANCE, and turn SELECT until the trap fires
-#      (the script exits on its own and writes the report).
+#   3. On the device: open the visual menu, FILTERS > LPF, hold KIT, turn SELECT.
+#      Also worth trying: audition a kit row with the menu open, then edit a slot.
 #   4. Send back scripts/watch_report.txt
 #
 set -u
@@ -37,20 +41,23 @@ set confirm off
 set can-use-hw-watchpoints 1
 target remote :2331
 echo \n\n=== ARMING WATCHPOINTS ===\n
-watch *(unsigned int *)&currentSong
-watch *(unsigned int *)&soundEditor.currentParamManager
-echo \nWatchpoints armed. Now reproduce on the device (menu -> FILTERS -> LPF -> KIT/RESO -> turn SELECT).\n
+watch *(unsigned int *)&stemExport.numStemsExported
+watch *(unsigned int *)&stemExport.totalNumStemsToExport
+echo \nWatchpoints armed on stemExport counters. Reproduce on the device now.\n
 set $n = 0
 while $n < 40
   continue
   set $n = $n + 1
   echo \n\n=== WATCHPOINT STOP ===\n
-  bt 10
+  bt 12
+  p stemExport.numStemsExported
+  p stemExport.totalNumStemsToExport
+  p stemExport.processStarted
   p currentSong
   p soundEditor.currentParamManager
-  p soundEditor.currentSound
-  if ((unsigned long) soundEditor.currentParamManager > 0x08000000) && ((unsigned long) soundEditor.currentParamManager < 0x20000000)
-    echo \n\n=== POISON WRITER CAUGHT ===\n
+  p/x $pc
+  if (stemExport.numStemsExported == -1) || (stemExport.totalNumStemsToExport == -1)
+    echo \n\n=== SCRIBBLER CAUGHT WRITING -1 ===\n
     bt
     info registers
     x/12iw $pc-8
@@ -70,7 +77,7 @@ EOF
 SERVER_PID=$!
 sleep 2
 
-echo "Reproduce the crash on the device now (FILTERS > LPF > KIT latches RESO > turn SELECT)..."
+echo "Reproduce on the device now (visual menu -> FILTERS > LPF -> hold KIT -> turn SELECT; or audition a row then edit)..."
 "$GDB" -q -x "$GDBCMD" "$ELF" >"$REPORT" 2>&1
 STATUS=$?
 

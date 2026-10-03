@@ -119,10 +119,14 @@ void VisualMenuUI::closeVisualMenu() {
 	indicator_leds::setLedState(IndicatorLED::KIT, false);
 	indicator_leds::setLedState(IndicatorLED::MIDI, false);
 	indicator_leds::setLedState(IndicatorLED::CV, false);
-	// If a clip-press mode got stranded while we were current (its release eaten by our pad
-	// consumption), leaving it set blocks the session view's input — including the song
-	// button — after we close.
+	// If an interaction mode got stranded while we were current (its release eaten by our pad
+	// or button consumption), leaving it set blocks the root view's input after we close —
+	// including the song button, slot presses, and (for a stranded save-hold) accidental
+	// stem-export launches on the next RECORD press.
 	exitUIMode(UI_MODE_CLIP_PRESSED_IN_SONG_VIEW);
+	exitUIMode(UI_MODE_AUDITIONING);
+	exitUIMode(UI_MODE_NOTES_PRESSED);
+	exitUIMode(UI_MODE_HOLDING_SAVE_BUTTON);
 	close();
 }
 
@@ -142,7 +146,20 @@ ActionResult VisualMenuUI::padAction(int32_t x, int32_t y, int32_t velocity) {
 	// Auditioning only makes sense over a clip-minder view. Over session/arranger roots a pad
 	// press selects clips and can transition the root UI underneath this menu (and strand
 	// UI_MODE_CLIP_PRESSED_IN_SONG_VIEW, which blocks slot buttons) — so consume pads there.
-	if (rootUIIsClipMinderScreen() && (currentUIMode == UI_MODE_NONE || currentUIMode == UI_MODE_AUDITIONING)) {
+	if (!rootUIIsClipMinderScreen()) {
+		return ActionResult::DEALT_WITH;
+	}
+
+	// Releases must ALWAYS reach the root view. A forwarded press can enter modes beyond our
+	// press gate (note pads enter UI_MODE_NOTES_PRESSED, kit-row drags enter
+	// UI_MODE_DRAGGING_KIT_NOTEROW); if the matching release is swallowed because of the mode
+	// the press created, the mode strands and its guard then eats every slot press and encoder
+	// turn — the "KIT button won't edit" freeze.
+	if (velocity == 0) {
+		return getRootUI()->padAction(x, y, velocity);
+	}
+
+	if (currentUIMode == UI_MODE_NONE || currentUIMode == UI_MODE_AUDITIONING) {
 		return getRootUI()->padAction(x, y, velocity);
 	}
 	return ActionResult::DEALT_WITH;
