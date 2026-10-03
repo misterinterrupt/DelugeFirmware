@@ -243,8 +243,11 @@ SECTIONS
 	/* See http://embdev.net/topic/282936 */
 	.ARM.exidx : {
 		PROVIDE_HIDDEN(__exidx_start = .);
-		 *(.ARM.exidx*) 
-		 *(.gnu.linkonce.armexidx.*)
+		 /* Input sections discarded at the bottom of this script: the firmware is
+		    -fno-exceptions and nothing unwinds, and these markers were growing into
+		    .program_stack. */
+		 /* *(.ARM.exidx*) */
+		 /* *(.gnu.linkonce.armexidx.*) */
 		PROVIDE_HIDDEN(__exidx_end = .);
 	} > RAM012L
 
@@ -330,7 +333,7 @@ SECTIONS
 		program_stack_end = .;
 	} >RAM012L
 
-/* Remove information from the compiler libraries 
+/* Remove information from the compiler libraries
    mainly a sanity check since linker gc should
    do this too*/
   /DISCARD/ :
@@ -340,6 +343,17 @@ SECTIONS
     libm.a ( * )
     libgcc.a ( * )
     libstdc++_nano.a ( * )
+  }
+
+  /* ARM unwind index/tables. The firmware is built -fno-exceptions, nothing in the
+     image references __exidx_start or unwinds (libgcc's unwind code is gc'd out), so
+     these are pure per-function CANTUNWIND markers sitting at the very end of the
+     RAM012L image — and they were pushing .ARM.exidx into .program_stack. */
+  /DISCARD/ :
+  {
+    *(.ARM.exidx*)
+    *(.ARM.extab*)
+    *(.gnu.linkonce.armexidx.*)
   }
 
 }
