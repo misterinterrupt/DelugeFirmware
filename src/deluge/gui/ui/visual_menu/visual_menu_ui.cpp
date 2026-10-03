@@ -355,18 +355,14 @@ ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inC
 		return ActionResult::DEALT_WITH;
 	}
 
-	// The song button escapes the overlay: close and re-dispatch to the root view so it behaves
-	// exactly as it would if the menu weren't open. (The classic sound editor instead swallows
-	// the world; for a quick-edit overlay, escape is the useful behavior.)
-	if (b == SESSION_VIEW) {
-		if (on) {
-			if (inCardRoutine) {
-				return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
-			}
+	// Root-view navigation escapes the overlay first, so the menu can't be left dangling
+	// over a root it didn't open on. Everything else is forwarded live (tail of this function).
+	if (b == SESSION_VIEW || b == CLIP_VIEW || b == KEYBOARD) {
+		if (on && !inCardRoutine) {
 			closeVisualMenu();
-			return getRootUI()->buttonAction(b, on, inCardRoutine);
 		}
-		return ActionResult::DEALT_WITH;
+		UI* root = getRootUI();
+		return root != nullptr ? root->buttonAction(b, on, inCardRoutine) : ActionResult::DEALT_WITH;
 	}
 
 	// A press while a foreign interaction mode is active means that mode is stranded — the menu
@@ -477,13 +473,6 @@ ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inC
 		}
 		return ActionResult::DEALT_WITH;
 	}
-	else if (b == AFFECT_ENTIRE && contextIsClipMinder_) {
-		// Affect-entire retargets kit editing between the selected row and global FX. The list
-		// menu delegates this to the clip minder; do the same (the handler only toggles state
-		// and LEDs, it never transitions the root UI). refreshEditContext() notices the change
-		// and re-derives the context before the next slot interaction.
-		return getRootUI()->buttonAction(b, on, inCardRoutine);
-	}
 	else if (b == SELECT_ENC) {
 		if (on) {
 			if (selectedSlot_ >= 0 && currentCategoryIndex_ < static_cast<int32_t>(categories_.size())) {
@@ -512,8 +501,50 @@ ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inC
 		return ActionResult::DEALT_WITH;
 	}
 
-	// Sound-editor parity: while this menu is current it owns the input. Everything not handled
-	// above is consumed so no global button handler ever fires underneath us.
+	// This menu owns only the select encoder and the four slot buttons; every other button
+	// belongs to the view underneath. Forward so the rest of the front panel stays live while
+	// the menu is open; a NOT_DEALT_WITH from the root falls through to the global handlers
+	// in Buttons::buttonAction exactly as it would without the menu.
+	UI* root = getRootUI();
+	if (root != nullptr) {
+		return root->buttonAction(b, on, inCardRoutine);
+	}
+	return ActionResult::DEALT_WITH;
+}
+
+ActionResult VisualMenuUI::horizontalEncoderAction(int32_t offset) {
+	UI* root = getRootUI();
+	return root != nullptr ? root->horizontalEncoderAction(offset) : ActionResult::DEALT_WITH;
+}
+
+ActionResult VisualMenuUI::verticalEncoderAction(int32_t offset, bool inCardRoutine) {
+	UI* root = getRootUI();
+	return root != nullptr ? root->verticalEncoderAction(offset, inCardRoutine) : ActionResult::DEALT_WITH;
+}
+
+void VisualMenuUI::modEncoderAction(int32_t whichModEncoder, int32_t offset) {
+	if (UI* root = getRootUI()) {
+		root->modEncoderAction(whichModEncoder, offset);
+	}
+}
+
+void VisualMenuUI::modButtonAction(uint8_t whichButton, bool on) {
+	if (UI* root = getRootUI()) {
+		root->modButtonAction(whichButton, on);
+	}
+}
+
+void VisualMenuUI::modEncoderButtonAction(uint8_t whichModEncoder, bool on) {
+	if (UI* root = getRootUI()) {
+		root->modEncoderButtonAction(whichModEncoder, on);
+	}
+}
+
+ActionResult VisualMenuUI::timerCallback() {
+	// Root-view timers (clip-press, song-button etc.) must keep firing while the menu is open.
+	if (UI* root = getRootUI()) {
+		return root->timerCallback();
+	}
 	return ActionResult::DEALT_WITH;
 }
 

@@ -41,6 +41,15 @@ public:
 	void selectEncoderAction(int8_t offset) override;
 	void renderOLED(deluge::hid::display::oled_canvas::Canvas& canvas) override;
 
+	/// The menu owns only the select encoder and the four slot buttons; every other input
+	/// is forwarded to the root view so the rest of the front panel stays live underneath.
+	ActionResult horizontalEncoderAction(int32_t offset) override;
+	ActionResult verticalEncoderAction(int32_t offset, bool inCardRoutine) override;
+	void modEncoderAction(int32_t whichModEncoder, int32_t offset) override;
+	void modButtonAction(uint8_t whichButton, bool on) override;
+	void modEncoderButtonAction(uint8_t whichModEncoder, bool on) override;
+	ActionResult timerCallback() override;
+
 	UIType getUIType() override { return UIType::VISUAL_MENU; }
 	const char* getName() override { return "visual_menu"; }
 
