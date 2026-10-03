@@ -43,6 +43,7 @@ defines it but our engine does not implement it yet (never list those — rule 3
 | KDFX TREMOLO | 961 Tremolo, 962 Tremolo BPM | Insert-style; BPM sync later |
 | KDFX PAN | 963 AutoPanner, 964 Dual AutoPanner | Insert-style; linear crossfade v1 |
 | KDFX DIST | Distortion 724–728 (Mono/Stereo Distort, +Cab, +EQ) | Insert-style: LOCUT/DRIVE/4 shaper modes/CAB/HCUT; "+EQ" = chain KDFX TONE after it |
+| KDFX TUBEAMP | TubeAmp/PolyAmp<>MD>Chor/Flan 729–732 | Insert-style combination: amp (distortion engine) + modulated delay; CFG swaps order (AMP>MOD / MOD>AMP) |
 | COMPRESSOR | Comp/gate family 950–957 stand-in | Stock engine wrapped insert-style; THRSH/RATIO/ATK/REL/SIDE/BLEND |
 
 Send-style blocs wet-add (reverb-class); tremolo/panner are insert engines via
@@ -52,7 +53,6 @@ Send-style blocs wet-add (reverb-class); tremolo/panner are insert engines via
 
 - **Reverb variants** 1–15 as distinct voicings (MiniVerb, gated, plate/room/hall presets)
 - **Combination chains** 700–723 (Chorus+Delay, Flange<>Reverb, Pitcher+Chor+Dly, LaserVerb …)
-- **TubeAmp chains** 729–732 (TubeAmp<>MD>Chor class — distortion + chorus compositions)
 - **Tone wheel organ** 733–737 (VibChor+Rotor, KB3)
 - **Filters** 900–906 (Env Follow, Trig Envelope, LFO Sweep, Resonant, EQ Morpher)
 - **Special FX** 907–913 (Ring Modulator, Pitcher, LaserVerb family)
