@@ -140,18 +140,14 @@ int8_t VisualMenuUI::getActiveHeldSlot() const {
 }
 
 ActionResult VisualMenuUI::padAction(int32_t x, int32_t y, int32_t velocity) {
-	// Auditioning only makes sense over a clip-minder view. Over session/arranger roots a pad
-	// press selects clips and can transition the root UI underneath this menu (and strand
-	// UI_MODE_CLIP_PRESSED_IN_SONG_VIEW, which blocks slot buttons) — so consume pads there.
-	if (!rootUIIsClipMinderScreen()) {
-		return ActionResult::DEALT_WITH;
-	}
-
-	// Releases must ALWAYS reach the root view. A forwarded press can enter modes beyond our
-	// press gate (note pads enter UI_MODE_NOTES_PRESSED, kit-row drags enter
-	// UI_MODE_DRAGGING_KIT_NOTEROW); if the matching release is swallowed because of the mode
-	// the press created, the mode strands and its guard then eats every slot press and encoder
-	// turn — the "KIT button won't edit" freeze.
+	// The menu owns only the select encoder and the four slot buttons — pads belong to
+	// the view underneath in every root (user directive: the rest of the panel stays
+	// live while the menu is open). Releases must ALWAYS reach the root view: a
+	// forwarded press can enter modes beyond our press gate (note pads enter
+	// UI_MODE_NOTES_PRESSED, kit-row drags enter UI_MODE_DRAGGING_KIT_NOTEROW); if the
+	// matching release is swallowed because of the mode the press created, the mode
+	// strands and its guard then eats every slot press and encoder turn — the "KIT
+	// button won't edit" freeze.
 	if (velocity == 0) {
 		return getRootUI()->padAction(x, y, velocity);
 	}
@@ -483,10 +479,16 @@ ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inC
 						// Cycle decimal edit cursor if on decimal slot
 						decimalCursorSlot_ = selectedSlot_;
 						decimalEditPos_ = (decimalEditPos_ + 1) % 3;
-						soundEditor.numberEditPos = decimalEditPos_;
-						soundEditor.numberEditSize = 1;
-						for (int32_t i = 0; i < decimalEditPos_; i++) {
-							soundEditor.numberEditSize *= 10;
+						if (slot.item->supportsFineEdit()) {
+							// Fine items scale their own steps from decimalEditPos_
+							// (whole → tenths → hundredths of a display step).
+						}
+						else {
+							soundEditor.numberEditPos = decimalEditPos_;
+							soundEditor.numberEditSize = 1;
+							for (int32_t i = 0; i < decimalEditPos_; i++) {
+								soundEditor.numberEditSize *= 10;
+							}
 						}
 					}
 				}
@@ -573,7 +575,57 @@ void VisualMenuUI::selectEncoderAction(int8_t offset) {
 		return;
 	}
 
-	// 1. Shift + Select Knob always navigates categories directly
+	int8_t activeSlot = getActiveHeldSlot();
+
+	// 2. If a slot is active, edit its parameter value smoothly. Fine-edit items
+	// keep the slot edit even with shift held (shift = faster); stock items fall
+	// through to the shift-category navigation below, exactly as before.
+	if (activeSlot >= 0 && currentCategoryIndex_ < static_cast<int32_t>(categories_.size())) {
+		const auto& page = categories_[currentCategoryIndex_].pages[currentPageIndex_];
+		if (activeSlot < static_cast<int32_t>(page.slots.size())) {
+			const auto& slot = page.slots[activeSlot];
+			if (slot.item != nullptr
+			    && (slot.item->supportsFineEdit() || !Buttons::isShiftButtonPressed())) {
+				if (decimalCursorSlot_ != activeSlot) {
+					decimalEditPos_ = 0;
+					soundEditor.numberEditPos = 0;
+					soundEditor.numberEditSize = 1;
+				}
+				turnedWhileHeld_[activeSlot] = true;
+				selectedSlot_ = activeSlot;
+				decimalCursorSlot_ = activeSlot;
+
+				SlotSourceContext ctx;
+				pushSlotContext(slot, ctx);
+				if (slot.item->supportsFineEdit()) {
+					// FX-bloc fine controls (user directive; stock items are untouched):
+					// shift doubles the step speed, and the select-click decimal
+					// position scales the step (0 = whole display steps, 1 = tenths,
+					// 2 = hundredths — items hold values at 1/100 of a display step).
+					int32_t scale = 1;
+					for (int32_t i = decimalEditPos_; i < 2; i++) {
+						scale *= 10;
+					}
+					int32_t speed = Buttons::isShiftButtonPressed() ? 2 : 1;
+					slot.item->selectEncoderAction(offset * scale * speed);
+				}
+				else {
+					slot.item->selectEncoderAction(offset);
+				}
+				popSlotContext(ctx);
+				if (!soundEditor.inSettingsMenu()) {
+					soundEditor.markInstrumentAsEdited();
+				}
+
+				updateButtonLEDs();
+				renderUIsForOled();
+				return;
+			}
+		}
+	}
+
+	// 1b. Shift + Select Knob navigates categories directly (reached when no fine
+	// slot is being edited).
 	if (Buttons::isShiftButtonPressed()) {
 		int32_t numCats = static_cast<int32_t>(categories_.size());
 		currentCategoryIndex_ = (currentCategoryIndex_ + (offset % numCats) + numCats) % numCats;
@@ -588,38 +640,6 @@ void VisualMenuUI::selectEncoderAction(int8_t offset) {
 		applySourceIndexForCurrentPage();
 		renderUIsForOled();
 		return;
-	}
-
-	int8_t activeSlot = getActiveHeldSlot();
-
-	// 2. If a slot is active, edit its parameter value smoothly
-	if (activeSlot >= 0 && currentCategoryIndex_ < static_cast<int32_t>(categories_.size())) {
-		const auto& page = categories_[currentCategoryIndex_].pages[currentPageIndex_];
-		if (activeSlot < static_cast<int32_t>(page.slots.size())) {
-			const auto& slot = page.slots[activeSlot];
-			if (slot.item != nullptr) {
-				if (decimalCursorSlot_ != activeSlot) {
-					decimalEditPos_ = 0;
-					soundEditor.numberEditPos = 0;
-					soundEditor.numberEditSize = 1;
-				}
-				turnedWhileHeld_[activeSlot] = true;
-				selectedSlot_ = activeSlot;
-				decimalCursorSlot_ = activeSlot;
-
-				SlotSourceContext ctx;
-				pushSlotContext(slot, ctx);
-				slot.item->selectEncoderAction(offset);
-				popSlotContext(ctx);
-				if (!soundEditor.inSettingsMenu()) {
-					soundEditor.markInstrumentAsEdited();
-				}
-
-				updateButtonLEDs();
-				renderUIsForOled();
-				return;
-			}
-		}
 	}
 
 	// 3. Otherwise (no slot selected), navigate pages across categories

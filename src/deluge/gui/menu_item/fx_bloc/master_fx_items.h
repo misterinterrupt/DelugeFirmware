@@ -99,14 +99,26 @@ public:
 	}
 };
 
-/// One entry of the selected bloc's param table (percent-scaled floats, plain
-/// integers for enum-ish params). The label, kind and backing param all resolve
-/// through the slot's CURRENT model, so the pages adapt when the bloc changes —
-/// delay shows TIME/FDBK/TONE, chorus RATE/DEPTH/FDBK, and so on.
+/// One entry of the selected bloc's param table. The label, kind and backing param
+/// all resolve through the slot's CURRENT model, so the pages adapt when the bloc
+/// changes — delay shows TIME/FDBK/TONE, chorus RATE/DEPTH/FDBK, and so on.
+///
+/// Value space: int params step by plain integers; continuous params are stored in
+/// units of 1/100 of their display step (step = 10^-decimals of the real unit, 1%
+/// for uncalibrated), so the encoder can address two extra decimal places without
+/// skipping increments — select-click cycles the decimal position, shift doubles
+/// the step (see VisualMenuUI::selectEncoderAction).
 class MasterSlotParam final : public Integer {
 public:
+	static constexpr int32_t kFineScale = 100;
+
 	MasterSlotParam(int32_t slotIndex, int32_t defIndex)
 	    : Integer(l10n::String::EMPTY_STRING), slot_(slotIndex), defIndex_(defIndex) {}
+
+	[[nodiscard]] bool supportsFineEdit() const override {
+		auto d = def();
+		return d.param != dsp::FxBloc::Param::None && !d.isInt;
+	}
 
 	[[nodiscard]] std::string_view getName() const override {
 		dsp::FxBloc::ParamDef d = def();
@@ -114,22 +126,38 @@ public:
 	}
 
 	[[nodiscard]] int32_t getMinValue() const override { return def().isInt ? def().intMin : 0; }
-	[[nodiscard]] int32_t getMaxValue() const override { return def().isInt ? def().intMax : 100; }
+	[[nodiscard]] int32_t getMaxValue() const override {
+		auto d = def();
+		if (d.isInt) {
+			return d.intMax;
+		}
+		return static_cast<int32_t>(std::lround(spanSteps(d) * kFineScale));
+	}
 
 	[[nodiscard]] const char* getUnit() override { return def().isInt ? "" : "%"; }
 
 	void readCurrentValue() override {
 		auto& bloc = AudioEngine::masterFxChain.slot(slot_);
-		float v = bloc.getParam(def().param);
-		this->setValue(def().isInt ? static_cast<int32_t>(std::lround(v))
-		                           : static_cast<int32_t>(std::round(v * 100.0f)));
+		auto d = def();
+		float raw = bloc.getParam(d.param);
+		if (d.isInt) {
+			this->setValue(static_cast<int32_t>(std::lround(raw)));
+			return;
+		}
+		float real = dsp::FxBloc::displayValue(d, raw);
+		this->setValue(static_cast<int32_t>(std::lround((real - dispMin(d)) / stepOf(d) * kFineScale)));
+		this->setValue(std::clamp(this->getValue(), getMinValue(), getMaxValue()));
 	}
 
 	void writeCurrentValue() override {
 		auto& bloc = AudioEngine::masterFxChain.slot(slot_);
 		auto d = def();
-		bloc.setParam(d.param, d.isInt ? static_cast<float>(this->getValue())
-		                               : static_cast<float>(this->getValue()) / 100.0f);
+		if (d.isInt) {
+			bloc.setParam(d.param, static_cast<float>(this->getValue()));
+			return;
+		}
+		float real = dispMin(d) + this->getValue() / static_cast<float>(kFineScale) * stepOf(d);
+		bloc.setParam(d.param, dsp::FxBloc::tFromReal(d, real));
 	}
 
 	void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) override {
@@ -148,15 +176,13 @@ public:
 			snprintf(outBuffer, bufferSize, "%s", s);
 			return;
 		}
-		if (d.isInt || d.unit == nullptr) {
+		if (d.isInt) {
 			Integer::formatValueForVisualMenu(outBuffer, bufferSize);
 			return;
 		}
-		// Real-unit readout: the menu value is travel percent; convert through the
-		// engine's own range (FxBloc::displayValue handles the curve shapes).
-		float t = static_cast<float>(this->getValue()) / 100.0f;
-		float real = dsp::FxBloc::displayValue(d, t);
-		snprintf(outBuffer, bufferSize, "%.*f%s", d.decimals, real, d.unit);
+		// Real-unit readout from the fine value space.
+		float real = dispMin(d) + this->getValue() / static_cast<float>(kFineScale) * stepOf(d);
+		snprintf(outBuffer, bufferSize, "%.*f%s", d.decimals, real, d.unit != nullptr ? d.unit : "%");
 	}
 
 private:
@@ -166,6 +192,23 @@ private:
 			return {}; // None — inert column
 		}
 		return defs[defIndex_];
+	}
+
+	/// Display-unit step: 10^-decimals of the real unit, 1% when uncalibrated.
+	static float stepOf(const dsp::FxBloc::ParamDef& d) {
+		if (d.unit == nullptr) {
+			return 1.0f;
+		}
+		float s = 1.0f;
+		for (uint8_t i = 0; i < d.decimals && i < 6; i++) {
+			s /= 10.0f;
+		}
+		return s;
+	}
+	static float dispMin(const dsp::FxBloc::ParamDef& d) { return d.bipolar ? -d.realMax : d.realMin; }
+	static float spanSteps(const dsp::FxBloc::ParamDef& d) {
+		float span = d.bipolar ? 2.0f * d.realMax : d.realMax - d.realMin;
+		return span / stepOf(d);
 	}
 
 	int32_t slot_;

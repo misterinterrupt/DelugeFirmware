@@ -200,6 +200,11 @@ public:
 	/// @brief Synchronize value for visual menu without triggering display side-effects.
 	virtual void syncValueForVisualMenu() {}
 
+	/// @brief Whether this item participates in the FX-bloc fine-edit controls: shift
+	/// doubles encoder speed and select-click steps the decimal position. False for
+	/// everything stock, so only items that opt in change behaviour.
+	virtual bool supportsFineEdit() const { return false; }
+
 	/// @}
 	///
 	/// @name Submenu entry support

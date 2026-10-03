@@ -163,6 +163,35 @@ public:
 		}
 	}
 
+	/// Inverse of displayValue (real unit → 0..1 travel), for the fine-grained
+	/// menu value space. Result is clamped to [0, 1].
+	static float tFromReal(const ParamDef& d, float r) {
+		float t;
+		switch (d.curve) {
+		case 2:
+			t = std::sqrt((r - d.realMin) / (d.realMax - d.realMin));
+			break;
+		case 3:
+			t = (r >= 1.0f) ? 0.5f + std::log(r) / 9.70406052f
+			                : 0.5f - (1.0f / r - 1.0f) / 18.0f;
+			break;
+		case 4: {
+			float frac = (r - d.realMin) / (d.realMax - d.realMin);
+			t = std::log(1.0f + frac * (std::exp(d.expK) - 1.0f)) / d.expK;
+			break;
+		}
+		case 5: {
+			float g = std::exp(-0.594f / std::max(r, 0.01f));
+			t = (g - d.realMin) / (d.realMax - d.realMin);
+			break;
+		}
+		default:
+			t = d.bipolar ? 0.5f + r / (2.0f * d.realMax) : (r - d.realMin) / (d.realMax - d.realMin);
+			break;
+		}
+		return std::clamp(t, 0.0f, 1.0f);
+	}
+
 	/// Per-model menu/persistence table, variable length. Index 3 is always LEVEL;
 	/// the menu lays params out 4 per page, as many pages as the table needs.
 	static constexpr size_t kMaxSlotParams = 16; // menu item pool per slot
