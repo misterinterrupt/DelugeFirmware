@@ -94,6 +94,13 @@ struct Base {
 	virtual void setDrive(float value) {}
 	[[nodiscard]] virtual float getDrive() const { return 0.0f; }
 
+	// Extended KDFX Distortion parameters
+	virtual void setLoCut(float value) {}
+	[[nodiscard]] virtual float getLoCut() const { return 0.0f; }
+	virtual void setCab(float value) {}
+	[[nodiscard]] virtual float getCab() const { return 0.0f; }
+	virtual void setHiCut(float value) {}
+	[[nodiscard]] virtual float getHiCut() const { return 1.0f; }
 	virtual void setShaperMode(int32_t value) {}
 	[[nodiscard]] virtual int32_t getShaperMode() const { return 0; }
 

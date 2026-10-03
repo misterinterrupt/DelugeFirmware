@@ -38,7 +38,7 @@ public:
 	    dsp::FxBloc::Model::KDFX_CHORUS, dsp::FxBloc::Model::KDFX_TONE,
 	    dsp::FxBloc::Model::KDFX_FLANGER, dsp::FxBloc::Model::KDFX_PHASER,
 	    dsp::FxBloc::Model::KDFX_TREMOLO, dsp::FxBloc::Model::KDFX_AUTOPAN,
-	    dsp::FxBloc::Model::COMPRESSOR,
+	    dsp::FxBloc::Model::KDFX_DIST, dsp::FxBloc::Model::COMPRESSOR,
 	};
 
 	MasterSlotBloc(int32_t slotIndex) : Selection(l10n::String::EMPTY_STRING), slot_(slotIndex) {}
@@ -73,7 +73,8 @@ public:
 	deluge::vector<std::string_view> getOptions() override {
 		// Shown on the full-width Bloc pages, so longer names fit.
 		return {"EMPTY",    "FREEVERB", "MUTABLE",    "KDFX REV",    "KDFX DLY",  "KDFX CHO",
-		        "KDFX TONE", "KDFX FLANGER", "KDFX PHASER", "KDFX TREMOLO", "KDFX PAN", "COMPRESSOR"};
+		        "KDFX TONE", "KDFX FLANGER", "KDFX PHASER", "KDFX TREMOLO", "KDFX PAN", "KDFX DIST",
+		        "COMPRESSOR"};
 	}
 
 private:

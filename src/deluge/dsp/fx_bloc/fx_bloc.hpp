@@ -26,6 +26,7 @@
 #include "dsp/reverb/kdfx/autopanner.hpp"
 #include "dsp/reverb/kdfx/chorus.hpp"
 #include "dsp/reverb/kdfx/delay.hpp"
+#include "dsp/reverb/kdfx/distortion.hpp"
 #include "dsp/reverb/kdfx/flanger.hpp"
 #include "dsp/reverb/kdfx/phaser.hpp"
 #include "dsp/reverb/kdfx/reverb.hpp"
@@ -60,6 +61,7 @@ public:
 		KDFX_PHASER,
 		KDFX_TREMOLO,
 		KDFX_AUTOPAN,
+		KDFX_DIST,
 	};
 
 	static constexpr size_t kMaxChunk = 64;
@@ -105,6 +107,9 @@ public:
 		TrebleFreq,
 		AirShelf,   // kdfx reverb
 		DelayPhase, // kdfx delay, int (0 off / 1 invert)
+		CabSim,     // kdfx distortion
+		LoCut,      // kdfx distortion
+		HiCut,      // kdfx distortion
 		kNumParams
 	};
 	static_assert(util::to_underlying(Param::kNumParams) <= 32, "dirty bitmask is uint32");
@@ -272,6 +277,9 @@ public:
 		case Param::TrebleFreq: return "trebleFreq";
 		case Param::AirShelf: return "airShelf";
 		case Param::DelayPhase: return "phase";
+		case Param::CabSim: return "cab";
+		case Param::LoCut: return "locut";
+		case Param::HiCut: return "hicut";
 		default: return nullptr;
 		}
 	}
@@ -468,6 +476,9 @@ private:
 		case Param::TrebleFreq: e->setTrebleFreq(v); break;
 		case Param::AirShelf: e->setAirShelf(v); break;
 		case Param::DelayPhase: e->setPhaseInvert(v >= 0.5f); break;
+		case Param::CabSim: e->setCab(v); break;
+		case Param::LoCut: e->setLoCut(v); break;
+		case Param::HiCut: e->setHiCut(v); break;
 		default: break;
 		}
 	}
@@ -498,6 +509,9 @@ private:
 		case Param::TrebleFreq: return e->getTrebleFreq();
 		case Param::AirShelf: return e->getAirShelf();
 		case Param::DelayPhase: return e->getPhaseInvert() ? 1.0f : 0.0f;
+		case Param::CabSim: return e->getCab();
+		case Param::LoCut: return e->getLoCut();
+		case Param::HiCut: return e->getHiCut();
 		default: return 0.f;
 		}
 	}
@@ -532,6 +546,9 @@ private:
 		case Model::KDFX_AUTOPAN:
 			size = sizeof(reverb::KdfxAutoPanner);
 			break;
+		case Model::KDFX_DIST:
+			size = sizeof(reverb::KdfxDistortion);
+			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
 			break;
@@ -563,6 +580,8 @@ private:
 			return new (memory) reverb::KdfxTremolo();
 		case Model::KDFX_AUTOPAN:
 			return new (memory) reverb::KdfxAutoPanner();
+		case Model::KDFX_DIST:
+			return new (memory) reverb::KdfxDistortion();
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:
@@ -700,6 +719,14 @@ constexpr FxBloc::ParamDef kDefsKdfxAutoPan[3] = {
     FxBloc::pct(FxBloc::Param::Decay, "WIDTH"),
     FxBloc::LEVEL_DEF(),
 };
+constexpr FxBloc::ParamDef kDefsKdfxDist[6] = {
+    FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
+    {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
+    FxBloc::hz(FxBloc::Param::LoCut, "LOCUT", 20.f, 300.f, 0),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::pct(FxBloc::Param::CabSim, "CAB"),
+    FxBloc::hz(FxBloc::Param::HiCut, "HCUT", 1000.f, 16000.f, 0),
+};
 /// Stock compressor wrapped as a bloc (manual comp/gate family 950-957 stand-in).
 /// Param aliases: roomSize=threshold, decay=ratio, damping=attack, diffusion=release,
 /// hpf=sidechain HPF, width=wet/dry blend — curves match the engine's setters.
@@ -728,6 +755,7 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_PHASER: return kDefsKdfxPhaser;
 	case Model::KDFX_TREMOLO: return kDefsKdfxTremolo;
 	case Model::KDFX_AUTOPAN: return kDefsKdfxAutoPan;
+	case Model::KDFX_DIST: return kDefsKdfxDist;
 	case Model::EMPTY:
 	case Model::FILTER:
 	default: return kDefsEmpty;
