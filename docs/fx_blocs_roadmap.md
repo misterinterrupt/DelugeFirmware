@@ -26,10 +26,11 @@ Stock wrapping is a convenience; the manual's algorithms are the product.
 | (this push) | COMPRESSOR bloc live: stock RMSFeedbackCompressor wrapped insert-style (rule 0 — wrap only), THRSH/RATIO/ATK/REL/SIDE/BLEND with faithful curves |
 | 785fd9096 | **param flush off-by-one fixed** — every edit had pushed the NEXT param id's cached value (the "edits do nothing, then snap" report); song-load apply had the same bug |
 | 380bd4268 | **reverb trio in real units** (SIZE metres, DECAY RT60 seconds, DAMP Hz) + **dynamic param pages**: tables variable-length (no 8 cap), pages = ceil(params/4) per bloc, rebuilt on selection; reverb gains AIR, delay gains WIDTH + PHASE, tone gains MFREQ/TFREQ, chorus gains HPF |
-| 98a55adfe | **fine controls (FX items only, stock untouched)**: pads forwarded in song view (panel stays live), shift+select = ×2 step speed while editing, select-click cycles decimal position, value space at 1/100 display step — no skipped increments (delay 1 MS steps, rates 0.01 HZ, thresholds 0.1 DB); FxBloc::tFromReal inverse curves |
+| 98a55adfe | **fine controls (FX items only, stock untouched)**: pads forwarded in song view (panel stays live), select-click cycles decimal position, value space at 1/100 display step; FxBloc::tFromReal inverse curves |
+| d404bfa66 | **regression fixes + coarse/fine swap**: percent params had collapsed to 0-1 (LEVEL read 0%/1%) — explicit 0-100 ranges; unshifted = coarse nice-number steps (span in ~100 detents), shift = fine; compact readouts (7.0K, 1480) never truncated; manual ch.5 parameter audit table in docs/kdfx_coverage.md |
 
 **Not yet hardware-verified:** everything from ecd715ad9 onward. Flash
-`build/Release/deluge.bin` (13:02 or later).
+`build/Release/deluge.bin` (13:27 or later).
 
 ## Push order (KDFX first)
 
@@ -39,8 +40,10 @@ Flash the latest build. In order:
   until a neighbour edit); re-check the song reload too — loads applied staged
   params shifted by one id before the fix.
 - **Fine controls**: pads and the rest of the panel stay live with the FX menu
-  open; shift+select turns = ×2 speed; select click cycles whole→tenths→hundredths;
-  delay TIME sweeps 1 MS at a time, rates 0.01 HZ, no skipped increments.
+  open; unshifted turning = coarse (nice-number steps spanning the range in ~100
+  detents), shift held = fine (base step + select-click decimals to 0.01); readouts
+  compact instead of squashed (7.0K, -24DB, 1480); LEVEL and all percent params
+  cover their full 0-100 range again.
 - **Reverb reads metres / RT60 seconds / Hz**; every bloc's param pages match its
   full suite (reverb 3 pages, delay 3, tone 3; tremolo 1) and re-selecting a bloc
   reflows the pages live.
