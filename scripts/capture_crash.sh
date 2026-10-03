@@ -43,11 +43,19 @@ echo \n\n=== STACK (abort SP) ===\n
 x/64wx $sp
 echo \n\n=== EDITING CONTEXT GLOBALS ===\n
 p currentSong
+p soundEditor.currentParamManager
+p soundEditor.currentSound
+p soundEditor.currentModControllable
+p soundEditor.currentSourceIndex
+p deluge::gui::ui::visual_menu::visualMenuUI.selectedSlot_
+p deluge::gui::ui::visual_menu::visualMenuUI.currentCategoryIndex_
+p deluge::gui::ui::visual_menu::visualMenuUI.currentPageIndex_
+echo \n\n=== SCRIBBLE CANARY (newest symbols last so an elf mismatch cannot cut these off) ===\n
 p scribbleCanaryTrips
 p stemExport.processStarted
 p stemExport.numStemsExported
 p stemExport.totalNumStemsToExport
-p soundEditor.currentParamManager
+p/x $cpsr
 p soundEditor.currentSound
 p soundEditor.currentModControllable
 p soundEditor.currentSourceIndex

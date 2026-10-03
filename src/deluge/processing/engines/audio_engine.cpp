@@ -1049,13 +1049,17 @@ void routine() {
 
 	audioRoutineLocked = true;
 
-	// Tripwire for the memory-scribbler: the export counters are only ever assigned 0 or
-	// positive counts, so a negative value means the stemExport global was poisoned (observed
-	// as a permanent "Exported -1 of -1 clips" popup plus this offline-render branch freezing
-	// audio, with no export ever started). Heal the branch decision and count the trip; the
-	// J-Link capture scripts dump scribbleCanaryTrips to bracket when the write landed.
-	if (stemExport.processStarted
-	    && (stemExport.numStemsExported < 0 || stemExport.totalNumStemsToExport < 0)) {
+	// Tripwire for the memory-scribbler: a real export only ever assigns processStarted the
+	// values 0 or 1 and the counters 0 or positive counts. A processStarted byte of 255 (the
+	// captured signature of the forged export state) or a negative counter means the
+	// stemExport global was poisoned - with renderOffline true by constructor default, that
+	// alone freezes this routine in the offline-render branch. Heal the branch decision and
+	// count the trip; the J-Link capture scripts dump scribbleCanaryTrips.
+	uint8_t processStartedRaw;
+	memcpy(&processStartedRaw, &stemExport.processStarted, 1);
+	if (processStartedRaw > 1
+	    || (stemExport.processStarted
+	        && (stemExport.numStemsExported < 0 || stemExport.totalNumStemsToExport < 0))) {
 		stemExport.processStarted = false;
 		scribbleCanaryTrips++;
 	}
