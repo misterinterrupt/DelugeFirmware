@@ -77,7 +77,8 @@ public:
 	}
 
 	deluge::vector<std::string_view> getOptions() override {
-		return {"SERIES", "PARALLEL", "SER+PAR", "PAR+SER"};
+		// Compact topology diagrams — words get cut off in the 32px visual-menu columns.
+		return {"1|2|3", "1+2+3", "1|2+3", "1+2|3"};
 	}
 };
 

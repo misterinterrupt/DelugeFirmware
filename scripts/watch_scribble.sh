@@ -66,7 +66,7 @@ resolve() {
 ADDR_PS=$(resolve '&stemExport.processStarted')
 ADDR_NUM=$(resolve '&stemExport.numStemsExported')
 ADDR_TOTAL=$(resolve '&stemExport.totalNumStemsToExport')
-ADDR_CANARY=$(resolve '&scribbleCanaryTrips')
+ADDR_CANARY=$(resolve '&AudioEngine::scribbleCanaryTrips')
 ADDR_SONG=$(resolve '&currentSong')
 
 {
@@ -92,6 +92,7 @@ GDBCMD=$(mktemp)
 	echo 'echo \n\n=== ARMING WATCHPOINTS ===\n'
 	[ "$ADDR_PS" != SKIP ] && echo "watch *(unsigned char *)$ADDR_PS"
 	[ "$ADDR_NUM" != SKIP ] && echo "watch *(unsigned int *)$ADDR_NUM"
+	[ "$ADDR_SONG" != SKIP ] && echo "watch *(unsigned int *)$ADDR_SONG"
 	echo 'echo \nWatchpoints armed. Resuming target - reproduce on the device now.\n'
 	# Log everything at every stop, live and into the report file.
 	echo "define hook-stop"
@@ -117,8 +118,9 @@ sleep 2
 cat <<'BANNER'
 
   Live watch session starting. On the device, reproduce now:
-    visual menu -> FILTERS > LPF -> hold KIT -> turn SELECT
-    (or audition a kit row with the menu open, then edit a slot)
+    song mode -> visual menu -> FX BLOCS -> change ROUTE (works),
+    then turn BLOC 1 away from EMPTY (this is the wedge step).
+    currentSong is watched directly - any hit names the poison writer.
 
   Every stop logs pc / instruction / watchpoint old+new / backtrace live
   and to scripts/watch_report.txt.

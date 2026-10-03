@@ -63,10 +63,18 @@ p deluge::gui::ui::visual_menu::visualMenuUI.selectedSlot_
 p deluge::gui::ui::visual_menu::visualMenuUI.currentCategoryIndex_
 p deluge::gui::ui::visual_menu::visualMenuUI.currentPageIndex_
 echo \n\n=== SCRIBBLE CANARY (newest symbols last so an elf mismatch cannot cut these off) ===\n
-p scribbleCanaryTrips
+p AudioEngine::scribbleCanaryTrips
 p stemExport.processStarted
 p stemExport.numStemsExported
 p stemExport.totalNumStemsToExport
+echo \n\n=== MASTER FX CHAIN STATE ===\n
+p AudioEngine::masterFxChain.routing_
+p AudioEngine::masterFxChain.slots_[0].model_
+p AudioEngine::masterFxChain.slots_[0].engine_
+p AudioEngine::masterFxChain.slots_[0].pendingSwap_
+p AudioEngine::masterFxChain.slots_[0].pendingEngine_
+p AudioEngine::masterFxChain.slots_[1].model_
+p AudioEngine::masterFxChain.slots_[2].model_
 p/x $cpsr
 p soundEditor.currentSound
 p soundEditor.currentModControllable
