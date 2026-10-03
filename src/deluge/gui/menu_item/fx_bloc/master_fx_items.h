@@ -34,6 +34,7 @@ public:
 	    dsp::FxBloc::Model::KDFX_CHORUS, dsp::FxBloc::Model::KDFX_TONE,
 	    dsp::FxBloc::Model::KDFX_FLANGER, dsp::FxBloc::Model::KDFX_PHASER,
 	    dsp::FxBloc::Model::KDFX_TREMOLO, dsp::FxBloc::Model::KDFX_AUTOPAN,
+	    dsp::FxBloc::Model::COMPRESSOR,
 	};
 
 	MasterSlotBloc(int32_t slotIndex) : Selection(l10n::String::EMPTY_STRING), slot_(slotIndex) {}
@@ -61,7 +62,7 @@ public:
 	deluge::vector<std::string_view> getOptions() override {
 		// Shown on the full-width Bloc pages, so longer names fit.
 		return {"EMPTY",    "FREEVERB", "MUTABLE",    "KDFX REV",    "KDFX DLY",  "KDFX CHO",
-		        "KDFX TONE", "KDFX FLANGER", "KDFX PHASER", "KDFX TREMOLO", "KDFX PAN"};
+		        "KDFX TONE", "KDFX FLANGER", "KDFX PHASER", "KDFX TREMOLO", "KDFX PAN", "COMPRESSOR"};
 	}
 
 private:
@@ -142,9 +143,9 @@ public:
 			return;
 		}
 		// Real-unit readout: the menu value is travel percent; convert through the
-		// engine's own range (FxBloc::ParamDef).
+		// engine's own range (FxBloc::displayValue handles the curve shapes).
 		float t = static_cast<float>(this->getValue()) / 100.0f;
-		float real = d.bipolar ? (t - 0.5f) * 2.0f * d.realMax : d.realMin + t * (d.realMax - d.realMin);
+		float real = dsp::FxBloc::displayValue(d, t);
 		snprintf(outBuffer, bufferSize, "%.*f%s", d.decimals, real, d.unit);
 	}
 

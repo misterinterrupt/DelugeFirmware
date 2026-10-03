@@ -22,6 +22,7 @@
 
 #include "dsp/reverb/base.hpp"
 #include "dsp/reverb/freeverb/freeverb.hpp"
+#include "dsp/fx_bloc/stock_adapters.hpp"
 #include "dsp/reverb/kdfx/autopanner.hpp"
 #include "dsp/reverb/kdfx/chorus.hpp"
 #include "dsp/reverb/kdfx/delay.hpp"
@@ -35,6 +36,7 @@
 #include "memory/general_memory_allocator.h"
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <new>
@@ -117,13 +119,34 @@ public:
 		// mapping (read from its setters): shown value = bipolar
 		// ? ±(t-0.5)*2*realMax : realMin + t*(realMax-realMin), t = the 0..1 cache
 		// value. A null unit means the param has no physical calibration — shown
-		// as 0-100%.
+		// as 0-100%. Curve selects the conversion for the non-linear shapes
+		// (compressor ratio/attack/release/sidechain).
 		const char* unit = nullptr;
 		float realMin = 0.f;
 		float realMax = 1.f;
 		uint8_t decimals = 0;
 		bool bipolar = false;
+		uint8_t curve = 0;   // 0 linear, 1 bipolar, 2 quadratic, 3 ratio, 4 exponential
+		float expK = 1.5f;   // exponential curve constant
 	};
+
+	/// Real-unit readout conversion for a ParamDef (t = 0..1 travel).
+	static float displayValue(const ParamDef& d, float t) {
+		switch (d.curve) {
+		case 2: // quadratic (compressor attack/release)
+			return d.realMin + t * t * (d.realMax - d.realMin);
+		case 3: // ratio: 1:0.1 .. 1:1 .. 1:128, exponential around 1:1
+			return (t >= 0.5f) ? std::exp(9.70406052f * (t - 0.5f))
+			                   : 1.0f / (1.0f + 9.0f * (1.0f - 2.0f * t));
+		case 4: { // exponential (compressor sidechain Hz)
+			float e = std::exp(d.expK * t) - 1.0f;
+			float eMax = std::exp(d.expK) - 1.0f;
+			return d.realMin + (e / eMax) * (d.realMax - d.realMin);
+		}
+		default:
+			return d.bipolar ? (t - 0.5f) * 2.0f * d.realMax : d.realMin + t * (d.realMax - d.realMin);
+		}
+	}
 
 	/// Per-model menu/persistence table. Indices 0-3 render on the Slot page
 	/// (3 headline + LEVEL at index 3, always), indices 4-7 on the "+ page".
@@ -154,6 +177,8 @@ public:
 
 	static constexpr std::array<ParamDef, kMaxParamDefs> paramDefs(Model m) {
 		switch (m) {
+		case Model::COMPRESSOR:
+			return compressorParamDefs();
 		case Model::FREEVERB:
 			// Freeverb implements size/damping/width only — no HPF, no decay: never
 			// list a param the engine doesn't have.
@@ -222,11 +247,23 @@ public:
 		case Model::KDFX_AUTOPAN:
 			return {{{hz(Param::RoomSize, "RATE", 0.05f, 10.f)}, {Param::Decay, "WIDTH"}, {}, LEVEL_DEF()}};
 		case Model::EMPTY:
-		case Model::COMPRESSOR:
 		case Model::FILTER:
 		default:
 			return {{}};
 		}
+	}
+
+	/// Stock compressor wrapped as a bloc (manual comp/gate family 950-957 stand-in).
+	/// Param aliases: roomSize=threshold, decay=ratio, damping=attack, diffusion=release,
+	/// hpf=sidechain HPF, width=wet/dry blend — curves match the engine's setters.
+	static constexpr std::array<ParamDef, kMaxParamDefs> compressorParamDefs() {
+		return {{{Param::RoomSize, "THRSH", false, 0, 1, nullptr, "DB", 0.f, -48.f, 1, false},
+		         {Param::Decay, "RATIO", false, 0, 1, nullptr, "", 0.f, 1.f, 1, false, 3, 1.5f},
+		         {Param::Damping, "ATK", false, 0, 1, nullptr, "MS", 0.5f, 100.f, 1, false, 2, 1.5f},
+		         LEVEL_DEF(),
+		         {Param::Diffusion, "REL", false, 0, 1, nullptr, "MS", 10.f, 1000.f, 0, false, 2, 1.5f},
+		         {Param::HPF, "SIDE", false, 0, 1, nullptr, "HZ", 0.f, 100.f, 0, false, 4, 1.5f},
+		         {Param::Width, "BLEND", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false}}};
 	}
 
 	/// Whether a param id holds a plain integer (menu steps and XML round-trip as
@@ -275,7 +312,7 @@ public:
 		reclaimRetired();
 
 		reverb::Base* replacement = nullptr;
-		if (m != Model::EMPTY && m != Model::COMPRESSOR && m != Model::FILTER) {
+		if (m != Model::EMPTY && m != Model::FILTER) {
 			replacement = constructEngine(m);
 			if (replacement == nullptr) {
 				return false; // pool exhausted; keep the current bloc as-is
@@ -485,6 +522,9 @@ private:
 	static reverb::Base* constructEngine(Model m) {
 		size_t size;
 		switch (m) {
+		case Model::COMPRESSOR:
+			size = sizeof(reverb::CompressorAdapter);
+			break;
 		case Model::KDFX_REVERB:
 			size = sizeof(reverb::KdfxReverb);
 			break;
@@ -522,6 +562,8 @@ private:
 			return nullptr;
 		}
 		switch (m) {
+		case Model::COMPRESSOR:
+			return new (memory) reverb::CompressorAdapter();
 		case Model::KDFX_REVERB:
 			return new (memory) reverb::KdfxReverb();
 		case Model::KDFX_DELAY:
