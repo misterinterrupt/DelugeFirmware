@@ -17,6 +17,7 @@
 
 #include "dsp/reverb/reverb.hpp"
 #include "dsp/stereo_sample.h"
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <span>
@@ -56,19 +57,18 @@ public:
 
 	/// Audio thread only, at the top of each render block.
 	void applyPending() {
-		if (!pending_) {
-			return;
-		}
-		pending_ = false;
-		Model m = pendingModel_;
-		if (m == Model::EMPTY || m == Model::COMPRESSOR || m == Model::FILTER) {
-			// Nothing to reconfigure in the reverb engine; EMPTY/FILTER/COMPRESSOR
-			// handling lives in process()/future adapters.
+		if (pending_) {
+			pending_ = false;
+			Model m = pendingModel_;
+			if (m != Model::EMPTY && m != Model::COMPRESSOR && m != Model::FILTER) {
+				engine_.setModel(reverbModelFor(m));
+			}
 			model_ = m;
-			return;
 		}
-		engine_.setModel(reverbModelFor(m));
-		model_ = m;
+		// Must run every boundary, not just on model changes: menus write bloc params
+		// through reverbEngine() at any time, and those deferred writes (plus the
+		// setModel above) are only serviced by the engine's own applyPending().
+		engine_.applyPending();
 	}
 
 	/// In-place stereo processing. Returns false when this bloc is a passthrough

@@ -19,6 +19,7 @@
 
 #include "dsp/fx_bloc/fx_bloc.hpp"
 #include "util/fixedpoint.h"
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 
