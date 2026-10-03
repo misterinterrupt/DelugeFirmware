@@ -16,8 +16,10 @@
 #include "hid/display/display.h"
 #include "processing/engines/audio_engine.h"
 #include "util/misc.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <string_view>
 
 namespace deluge::gui::menu_item::fx_bloc {
@@ -86,41 +88,43 @@ public:
 	}
 };
 
-/// One of the selected bloc's three headline params (percent-scaled). The label and
-/// the backing param resolve through the slot's CURRENT model, so the page adapts
-/// when the bloc changes — delay shows TIME/FDBK/TONE, chorus RATE/DEPTH/FDBK, etc.
+/// One entry of the selected bloc's param table (percent-scaled floats, plain
+/// integers for enum-ish params). The label, kind and backing param all resolve
+/// through the slot's CURRENT model, so the pages adapt when the bloc changes —
+/// delay shows TIME/FDBK/TONE, chorus RATE/DEPTH/FDBK, and so on.
 class MasterSlotParam final : public Integer {
 public:
-	MasterSlotParam(int32_t slotIndex, int32_t ordinal)
-	    : Integer(l10n::String::EMPTY_STRING), slot_(slotIndex), ordinal_(ordinal) {}
+	MasterSlotParam(int32_t slotIndex, int32_t defIndex)
+	    : Integer(l10n::String::EMPTY_STRING), slot_(slotIndex), defIndex_(defIndex) {}
 
 	[[nodiscard]] std::string_view getName() const override {
-		auto info = dsp::FxBloc::headlineParams(
-		                    AudioEngine::masterFxChain.slot(slot_).getModel())[ordinal_];
-		return info.label != nullptr ? std::string_view{info.label} : std::string_view{"--"};
+		dsp::FxBloc::ParamDef d = def();
+		return d.param != dsp::FxBloc::Param::None ? std::string_view{d.label} : std::string_view{"--"};
 	}
 
-	[[nodiscard]] int32_t getMinValue() const override { return 0; }
-	[[nodiscard]] int32_t getMaxValue() const override { return 100; }
+	[[nodiscard]] int32_t getMinValue() const override { return def().isInt ? def().intMin : 0; }
+	[[nodiscard]] int32_t getMaxValue() const override { return def().isInt ? def().intMax : 100; }
 
-	[[nodiscard]] const char* getUnit() override { return "%"; }
+	[[nodiscard]] const char* getUnit() override { return def().isInt ? "" : "%"; }
 
 	void readCurrentValue() override {
 		auto& bloc = AudioEngine::masterFxChain.slot(slot_);
-		auto info = dsp::FxBloc::headlineParams(bloc.getModel())[ordinal_];
-		this->setValue(static_cast<int32_t>(std::round(bloc.getParam(info.param) * 100.0f)));
+		float v = bloc.getParam(def().param);
+		this->setValue(def().isInt ? static_cast<int32_t>(std::lround(v))
+		                           : static_cast<int32_t>(std::round(v * 100.0f)));
 	}
 
 	void writeCurrentValue() override {
 		auto& bloc = AudioEngine::masterFxChain.slot(slot_);
-		auto info = dsp::FxBloc::headlineParams(bloc.getModel())[ordinal_];
-		bloc.setParam(info.param, static_cast<float>(this->getValue()) / 100.0f);
+		auto d = def();
+		bloc.setParam(d.param, d.isInt ? static_cast<float>(this->getValue())
+		                               : static_cast<float>(this->getValue()) / 100.0f);
 	}
 
 	void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) override {
 		auto& bloc = AudioEngine::masterFxChain.slot(slot_);
-		auto info = dsp::FxBloc::headlineParams(bloc.getModel())[ordinal_];
-		if (info.param == dsp::FxBloc::Param::None || bloc.isEmpty()) {
+		auto d = def();
+		if (d.param == dsp::FxBloc::Param::None || bloc.isEmpty()) {
 			if (outBuffer && bufferSize > 0) {
 				outBuffer[0] = '-';
 				outBuffer[1] = '-';
@@ -128,12 +132,21 @@ public:
 			}
 			return;
 		}
+		if (d.isInt && d.intOptions != nullptr) {
+			const char* s = d.intOptions[std::clamp(this->getValue(), d.intMin, d.intMax) - d.intMin];
+			snprintf(outBuffer, bufferSize, "%s", s);
+			return;
+		}
 		Integer::formatValueForVisualMenu(outBuffer, bufferSize);
 	}
 
 private:
+	[[nodiscard]] dsp::FxBloc::ParamDef def() const {
+		return dsp::FxBloc::paramDefs(AudioEngine::masterFxChain.slot(slot_).getModel())[defIndex_];
+	}
+
 	int32_t slot_;
-	int32_t ordinal_;
+	int32_t defIndex_;
 };
 
 } // namespace deluge::gui::menu_item::fx_bloc

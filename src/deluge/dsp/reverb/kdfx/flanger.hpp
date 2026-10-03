@@ -82,6 +82,14 @@ public:
 	}
 	[[nodiscard]] float getDiffusion() const override { return spread_val_; }
 
+	void setBaseDelay(float value) override {
+		base_delay_val_ = value;
+		// 0.1 ms to 7.0 ms (4.4 to 309 samples in Q16)
+		float samples = 5.0f + value * 300.0f;
+		baseDelayQ16_ = static_cast<int32_t>(samples * 65536.0f);
+	}
+	[[nodiscard]] float getBaseDelay() const override { return base_delay_val_; }
+
 	void setHPF(float f) override {
 		hpf_val_ = f;
 		float fc_hz = 20.0f + f * 980.0f;
@@ -126,6 +134,7 @@ private:
 	q31_t hpfCoeff_ = 0;
 
 	float rate_val_ = 0.3f, depth_val_ = 0.4f, feedback_val_ = 0.5f, spread_val_ = 0.5f, hpf_val_ = 0.0f;
+	float base_delay_val_ = 0.3f;
 };
 
 } // namespace deluge::dsp::reverb

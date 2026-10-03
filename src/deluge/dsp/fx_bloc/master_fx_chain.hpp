@@ -94,33 +94,26 @@ private:
 
 	/// Sum of the given branch slots' outputs, each fed the same input snapshot. A -1
 	/// branch is skipped. Output overwrites buf: dry plus each branch's contribution.
+	/// KDFX-style gain staging: the dry signal is never attenuated when blocs are
+	/// added — branches simply sum (saturating), and each bloc's LEVEL controls its
+	/// own contribution. (An earlier unity-mix compensation scaled dry by 2/(N+1),
+	/// which audibly ducked the whole signal with every added bloc.)
 	void runParallel(StereoSample* buf, size_t n, int32_t a, int32_t b, int32_t c) {
 		int32_t branches[3] = {a, b, c};
 
 		// Snapshot the branch input, then restart from dry and add each producing
 		// branch's delta (its output minus the dry it was fed).
 		std::memcpy(branchScratch_, buf, n * sizeof(StereoSample));
-		int32_t producing = 0;
 		for (int32_t idx : branches) {
 			if (idx < 0) {
 				continue;
 			}
 			std::memcpy(accumScratch_, branchScratch_, n * sizeof(StereoSample));
 			if (slots_[idx].process(accumScratch_, n)) {
-				producing++;
 				for (size_t j = 0; j < n; j++) {
-					buf[j].l += accumScratch_[j].l - branchScratch_[j].l;
-					buf[j].r += accumScratch_[j].r - branchScratch_[j].r;
+					buf[j].l = add_saturation(buf[j].l, accumScratch_[j].l - branchScratch_[j].l);
+					buf[j].r = add_saturation(buf[j].r, accumScratch_[j].r - branchScratch_[j].r);
 				}
-			}
-		}
-
-		// Unity-mix compensation when several producing branches stack on the dry signal.
-		if (producing > 1) {
-			int32_t gain = ONE_Q31 / (producing + 1); // branches + dry
-			for (size_t j = 0; j < n; j++) {
-				buf[j].l = multiply_32x32_rshift32_rounded(buf[j].l, gain) << 1;
-				buf[j].r = multiply_32x32_rshift32_rounded(buf[j].r, gain) << 1;
 			}
 		}
 	}

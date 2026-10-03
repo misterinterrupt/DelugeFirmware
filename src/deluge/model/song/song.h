@@ -407,11 +407,14 @@ public:
 	SyncLevel reverbSidechainSync;
 
 	// Modular master FX chain, staged from XML between loading and the song being made
-	// active; applied by AudioEngine::getReverbParamsFromSong(). Slot params follow
-	// dsp::FxBloc::kPersistParams order.
+	// active; applied by AudioEngine::getReverbParamsFromSong(). Slot params are
+	// indexed by dsp::FxBloc::Param; masterFxParamSeen marks which were present in
+	// the file (the rest take the engine's own defaults).
+	static constexpr int32_t kMasterFxNumParams = 24; // dsp::FxBloc::Param::kNumParams
 	int32_t masterFxRouting = 0;                      // dsp::MasterFxChain::Routing
 	int32_t masterFxModels[3] = {0, 0, 0};            // dsp::FxBloc::Model per slot
-	float masterFxParams[3][6] = {};
+	float masterFxParams[3][kMasterFxNumParams] = {};
+	uint32_t masterFxParamSeen[3] = {};
 
 	// START ~ new Automation Arranger View Variables
 	int32_t lastSelectedParamID; // last selected Parameter to be edited in Automation Arranger View

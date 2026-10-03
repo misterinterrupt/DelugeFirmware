@@ -186,10 +186,10 @@ Song::Song() : backedUpParamManagers(sizeof(BackedUpParamManager)) {
 	masterFxRouting = 0;
 	for (int32_t s = 0; s < 3; s++) {
 		masterFxModels[s] = 0;
+		masterFxParamSeen[s] = 0;
 		for (auto& p : masterFxParams[s]) {
-			p = 0.5f;
+			p = 0;
 		}
-		masterFxParams[s][5] = 0; // HPF default
 	}
 
 	// setup base compressor gain to match 1.0
@@ -1187,8 +1187,6 @@ weAreInArrangementEditorOrInClipInstance:
 			}
 		}
 		if (anySlot || AudioEngine::masterFxChain.getRouting() != dsp::MasterFxChain::Routing::SERIES) {
-			static constexpr const char* kParamNames[6] = {"roomSize", "damping", "width", "decay", "diffusion",
-			                                              "hpf"};
 			writer.writeOpeningTagBeginning("masterFx");
 			writer.writeAttribute("routing", util::to_underlying(AudioEngine::masterFxChain.getRouting()));
 			writer.writeOpeningTagEnd();
@@ -1200,10 +1198,22 @@ weAreInArrangementEditorOrInClipInstance:
 				writer.writeOpeningTagBeginning("slot");
 				writer.writeAttribute("index", (int32_t)s);
 				writer.writeAttribute("model", util::to_underlying(bloc.getModel()));
-				for (size_t p = 0; p < dsp::FxBloc::kPersistParams.size(); p++) {
-					uint32_t v = bloc.getParam(dsp::FxBloc::kPersistParams[p]) * (uint32_t)2147483648u;
-					v = std::min(v, (uint32_t)2147483647);
-					writer.writeAttribute(kParamNames[p], v);
+				for (const auto& def : dsp::FxBloc::paramDefs(bloc.getModel())) {
+					if (def.param == dsp::FxBloc::Param::None) {
+						continue;
+					}
+					const char* name = dsp::FxBloc::paramName(def.param);
+					if (name == nullptr) {
+						continue;
+					}
+					if (def.isInt) {
+						writer.writeAttribute(name, (int32_t)std::lround(bloc.getParam(def.param)));
+					}
+					else {
+						uint32_t v = bloc.getParam(def.param) * (uint32_t)2147483648u;
+						v = std::min(v, (uint32_t)2147483647);
+						writer.writeAttribute(name, v);
+					}
 				}
 				writer.closeTag();
 			}
@@ -1466,7 +1476,8 @@ Error Song::readFromFile(Deserializer& reader) {
 					else if (!strcmp(tagName, "slot")) {
 						int32_t slotIndex = -1;
 						int32_t modelVal = 0;
-						float params[6] = {0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.0f};
+						float params[Song::kMasterFxNumParams] = {};
+						uint32_t seen = 0;
 						while (*(tagName = reader.readNextTagOrAttributeName())) {
 							if (!strcmp(tagName, "index")) {
 								slotIndex = reader.readTagOrAttributeValueInt();
@@ -1476,26 +1487,31 @@ Error Song::readFromFile(Deserializer& reader) {
 								modelVal = reader.readTagOrAttributeValueInt();
 								reader.exitTag("model");
 							}
-							else if (!strcmp(tagName, "roomSize") || !strcmp(tagName, "damping")
-							         || !strcmp(tagName, "width") || !strcmp(tagName, "decay")
-							         || !strcmp(tagName, "diffusion") || !strcmp(tagName, "hpf")) {
-								static constexpr const char* kParamNames[6] = {"roomSize", "damping", "width",
-								                                                         "decay", "diffusion", "hpf"};
-								for (int32_t p = 0; p < 6; p++) {
-									if (!strcmp(tagName, kParamNames[p])) {
-										params[p] = (float)reader.readTagOrAttributeValueInt() / 2147483648u;
-										break;
+							else {
+								// Any known param name, by FxBloc::paramName(). Int params
+								// round-trip as plain integers; floats as uint32 × 2^31.
+								bool matched = false;
+								for (uint32_t pid = 1;
+								     pid < static_cast<uint32_t>(Song::kMasterFxNumParams) && !matched; pid++) {
+									const char* nm =
+									    dsp::FxBloc::paramName(static_cast<dsp::FxBloc::Param>(pid));
+									if (nm != nullptr && !strcmp(tagName, nm)) {
+										int32_t raw = reader.readTagOrAttributeValueInt();
+										auto p = static_cast<dsp::FxBloc::Param>(pid);
+										params[pid] = dsp::FxBloc::paramIsInt(p)
+										                    ? (float)raw
+										                    : (float)raw / 2147483648u;
+										seen |= (1u << pid);
+										matched = true;
 									}
 								}
-								reader.exitTag(tagName);
-							}
-							else {
 								reader.exitTag(tagName);
 							}
 						}
 						if (slotIndex >= 0 && slotIndex < 3) {
 							masterFxModels[slotIndex] = modelVal;
-							for (int32_t p = 0; p < 6; p++) {
+							masterFxParamSeen[slotIndex] = seen;
+							for (int32_t p = 1; p < Song::kMasterFxNumParams; p++) {
 								masterFxParams[slotIndex][p] = params[p];
 							}
 						}

@@ -415,15 +415,14 @@ MasterSlotBloc masterSlotBlocMenu0{0};
 MasterSlotBloc masterSlotBlocMenu1{1};
 MasterSlotBloc masterSlotBlocMenu2{2};
 MasterRouting masterRoutingMenu{};
-MasterSlotParam masterParam00{0, 0};
-MasterSlotParam masterParam01{0, 1};
-MasterSlotParam masterParam02{0, 2};
-MasterSlotParam masterParam10{1, 0};
-MasterSlotParam masterParam11{1, 1};
-MasterSlotParam masterParam12{1, 2};
-MasterSlotParam masterParam20{2, 0};
-MasterSlotParam masterParam21{2, 1};
-MasterSlotParam masterParam22{2, 2};
+// Per-slot param items: defs 0-3 (3 headline + LEVEL) on the Slot page, defs 4-7
+// (extended suite) on the "+" page. Labels resolve dynamically per model.
+MasterSlotParam masterParam00{0, 0}, masterParam01{0, 1}, masterParam02{0, 2}, masterParam03{0, 3};
+MasterSlotParam masterParam04{0, 4}, masterParam05{0, 5}, masterParam06{0, 6}, masterParam07{0, 7};
+MasterSlotParam masterParam10{1, 0}, masterParam11{1, 1}, masterParam12{1, 2}, masterParam13{1, 3};
+MasterSlotParam masterParam14{1, 4}, masterParam15{1, 5}, masterParam16{1, 6}, masterParam17{1, 7};
+MasterSlotParam masterParam20{2, 0}, masterParam21{2, 1}, masterParam22{2, 2}, masterParam23{2, 3};
+MasterSlotParam masterParam24{2, 4}, masterParam25{2, 5}, masterParam26{2, 6}, masterParam27{2, 7};
 
 static const VisualPage fxBlocPages[] = {
     // Chain holds only the routing topology — each slot's bloc selector has its own
@@ -433,26 +432,41 @@ static const VisualPage fxBlocPages[] = {
     {"Bloc 1", EMPTY_STRING,
      {{{&masterSlotBlocMenu0, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
     // Param labels resolve through the slot's current model at render time
-    // (no shortName override → item's dynamic getName()).
+    // (no shortName override → item's dynamic getName()). Column 4 is LEVEL.
     {"Slot 1", EMPTY_STRING,
      {{{&masterParam00, nullptr, -1, 1},
        {&masterParam01, nullptr, -1, 1},
        {&masterParam02, nullptr, -1, 1},
-       {nullptr, "", -1, 0}}}},
+       {&masterParam03, nullptr, -1, 1}}}},
+    {"Slot 1+", EMPTY_STRING,
+     {{{&masterParam04, nullptr, -1, 1},
+       {&masterParam05, nullptr, -1, 1},
+       {&masterParam06, nullptr, -1, 1},
+       {&masterParam07, nullptr, -1, 1}}}},
     {"Bloc 2", EMPTY_STRING,
      {{{&masterSlotBlocMenu1, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
     {"Slot 2", EMPTY_STRING,
      {{{&masterParam10, nullptr, -1, 1},
        {&masterParam11, nullptr, -1, 1},
        {&masterParam12, nullptr, -1, 1},
-       {nullptr, "", -1, 0}}}},
+       {&masterParam13, nullptr, -1, 1}}}},
+    {"Slot 2+", EMPTY_STRING,
+     {{{&masterParam14, nullptr, -1, 1},
+       {&masterParam15, nullptr, -1, 1},
+       {&masterParam16, nullptr, -1, 1},
+       {&masterParam17, nullptr, -1, 1}}}},
     {"Bloc 3", EMPTY_STRING,
      {{{&masterSlotBlocMenu2, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
     {"Slot 3", EMPTY_STRING,
      {{{&masterParam20, nullptr, -1, 1},
        {&masterParam21, nullptr, -1, 1},
        {&masterParam22, nullptr, -1, 1},
-       {nullptr, "", -1, 0}}}},
+       {&masterParam23, nullptr, -1, 1}}}},
+    {"Slot 3+", EMPTY_STRING,
+     {{{&masterParam24, nullptr, -1, 1},
+       {&masterParam25, nullptr, -1, 1},
+       {&masterParam26, nullptr, -1, 1},
+       {&masterParam27, nullptr, -1, 1}}}},
 };
 
 // -------------------------------------------------------------------------------------------------

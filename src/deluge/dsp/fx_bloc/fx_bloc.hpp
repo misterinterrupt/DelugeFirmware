@@ -62,13 +62,6 @@ public:
 
 	static constexpr size_t kMaxChunk = 64;
 
-	static constexpr uint8_t kDirtyRoomSize = 1 << 0;
-	static constexpr uint8_t kDirtyDamping = 1 << 1;
-	static constexpr uint8_t kDirtyWidth = 1 << 2;
-	static constexpr uint8_t kDirtyDecay = 1 << 3;
-	static constexpr uint8_t kDirtyDiffusion = 1 << 4;
-	static constexpr uint8_t kDirtyHPF = 1 << 5;
-
 	~FxBloc() {
 		// Only runs at global teardown with the audio task long stopped.
 		destroyEngine(engine_);
@@ -82,8 +75,8 @@ public:
 	/// The engine interface is reverb-shaped, and every engine aliases its real
 	/// parameters onto those setters (delay: roomSize=time-L, decay=feedback,
 	/// damping=tone; chorus: roomSize=rate, decay=depth, damping=feedback;
-	/// tone: roomSize=drive, diffusion=level). The menu presents three headline
-	/// parameters per model through this mapping.
+	/// tone: roomSize=drive, diffusion=level). Param ids cover the union of the
+	/// engines' extended suites; the menu presents each model's table below.
 	enum class Param : uint8_t {
 		None = 0,
 		RoomSize,
@@ -92,45 +85,153 @@ public:
 		Decay,
 		Diffusion,
 		HPF,
+		Level,        // chain wet level (send blocs) / effect blend (insert blocs)
+		PreDelay,     // kdfx reverb
+		ERLevel,      // kdfx reverb
+		BassDecay,    // kdfx reverb
+		DelayTimeR,   // kdfx delay
+		DelayDrive,   // kdfx delay
+		BaseDelay,    // chorus / flanger
+		ChorusVoices, // int
+		ChorusWaveform,
+		ShaperMode, // kdfx tone, int
+		BassGain,   // kdfx tone EQ
+		BassFreq,
+		MidGain,
+		MidFreq,
+		TrebleGain,
+		TrebleFreq,
+		kNumParams
+	};
+	static_assert(util::to_underlying(Param::kNumParams) <= 32, "dirty bitmask is uint32");
+
+	struct ParamDef {
+		Param param;                       // None → "--", column inert
+		const char* label;                 // ≤5 chars, fits a 32px column
+		bool isInt = false;
+		int32_t intMin = 0;
+		int32_t intMax = 1;
+		const char* const* intOptions = nullptr; // display strings for int params
 	};
 
-	struct ParamInfo {
-		Param param;
-		const char* label; // nullptr → "--"
-	};
+	/// Per-model menu/persistence table. Indices 0-3 render on the Slot page
+	/// (3 headline + LEVEL at index 3, always), indices 4-7 on the "+ page".
+	static constexpr size_t kMaxParamDefs = 8;
 
-	/// Canonical param order for XML persistence of a slot's cache.
-	static constexpr std::array<Param, 6> kPersistParams = {
-	    Param::RoomSize, Param::Damping, Param::Width, Param::Decay, Param::Diffusion, Param::HPF};
+	// Display option strings for the int params, and the LEVEL column definition.
+	static constexpr const char* kWaveformOptionStrings[] = {"SINE", "TRI", "S&H"};
+	static constexpr const char* kShaperOptionStrings[] = {"SOFT", "TAPE", "HARD", "FOLD"};
 
-	static constexpr std::array<ParamInfo, 3> headlineParams(Model m) {
+	static constexpr ParamDef LEVEL_DEF() { return {Param::Level, "LEVEL"}; }
+	static constexpr const char* const* kWaveformOptions() { return kWaveformOptionStrings; }
+	static constexpr const char* const* kShaperOptions() { return kShaperOptionStrings; }
+
+	static constexpr std::array<ParamDef, kMaxParamDefs> paramDefs(Model m) {
 		switch (m) {
 		case Model::FREEVERB:
+			return {{{Param::RoomSize, "SIZE"}, {Param::Damping, "DAMP"}, {Param::Width, "WIDTH"}, LEVEL_DEF(),
+			         {Param::HPF, "HPF"}}};
 		case Model::MUTABLE:
-			return {{{Param::RoomSize, "SIZE"}, {Param::Damping, "DAMP"}, {Param::Width, "WIDTH"}}};
+			return {{{Param::RoomSize, "SIZE"}, {Param::Damping, "DAMP"}, {Param::Width, "WIDTH"}, LEVEL_DEF(),
+			         {Param::HPF, "HPF"}}};
 		case Model::KDFX_REVERB:
-			return {{{Param::RoomSize, "SIZE"}, {Param::Decay, "DECAY"}, {Param::Damping, "DAMP"}}};
+			return {{{Param::RoomSize, "SIZE"},
+			         {Param::Decay, "DECAY"},
+			         {Param::Damping, "DAMP"},
+			         LEVEL_DEF(),
+			         {Param::Width, "WIDTH"},
+			         {Param::PreDelay, "PREDL"},
+			         {Param::ERLevel, "ER"},
+			         {Param::BassDecay, "BASS"}}};
 		case Model::KDFX_DELAY:
-			return {{{Param::RoomSize, "TIME"}, {Param::Decay, "FDBK"}, {Param::Damping, "TONE"}}};
+			return {{{Param::RoomSize, "TIME"},
+			         {Param::Decay, "FDBK"},
+			         {Param::Damping, "TONE"},
+			         LEVEL_DEF(),
+			         {Param::Diffusion, "XFEED"},
+			         {Param::DelayTimeR, "TIM R"},
+			         {Param::DelayDrive, "DRV"},
+			         {Param::HPF, "HPF"}}};
 		case Model::KDFX_CHORUS:
-			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "DEPTH"}, {Param::Damping, "FDBK"}}};
+			return {{{Param::RoomSize, "RATE"},
+			         {Param::Decay, "DEPTH"},
+			         {Param::Damping, "FDBK"},
+			         LEVEL_DEF(),
+			         {Param::BaseDelay, "BASE"},
+			         {Param::ChorusVoices, "VOICE", true, 2, 6},
+			         {Param::ChorusWaveform, "WAVE", true, 0, 2, kWaveformOptions()},
+			         {Param::Diffusion, "SPRD"}}};
 		case Model::KDFX_TONE:
-			return {{{Param::RoomSize, "DRIVE"}, {Param::Diffusion, "LEVEL"}, {Param::None, nullptr}}};
+			return {{{Param::RoomSize, "DRIVE"},
+			         {Param::BassGain, "BASS"},
+			         {Param::MidGain, "MID"},
+			         LEVEL_DEF(),
+			         {Param::ShaperMode, "SHPR", true, 0, 3, kShaperOptions()},
+			         {Param::BassFreq, "BFREQ"},
+			         {Param::TrebleGain, "TRBL"},
+			         {Param::Diffusion, "TLVL"}}};
 		case Model::KDFX_FLANGER:
-			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "DEPTH"}, {Param::Damping, "FDBK"}}};
+			return {{{Param::RoomSize, "RATE"},
+			         {Param::Decay, "DEPTH"},
+			         {Param::Damping, "FDBK"},
+			         LEVEL_DEF(),
+			         {Param::BaseDelay, "BASE"},
+			         {Param::Diffusion, "SPRD"},
+			         {Param::HPF, "HPF"}}};
 		case Model::KDFX_PHASER:
-			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "DEPTH"}, {Param::Damping, "FDBK"}}};
+			return {{{Param::RoomSize, "RATE"},
+			         {Param::Decay, "DEPTH"},
+			         {Param::Damping, "FDBK"},
+			         LEVEL_DEF(),
+			         {Param::Diffusion, "SPRD"},
+			         {Param::HPF, "HPF"}}};
 		case Model::KDFX_TREMOLO:
-			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "DEPTH"}, {Param::None, nullptr}}};
+			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "DEPTH"}, {}, LEVEL_DEF()}};
 		case Model::KDFX_AUTOPAN:
-			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "WIDTH"}, {Param::None, nullptr}}};
+			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "WIDTH"}, {}, LEVEL_DEF()}};
 		case Model::EMPTY:
 		case Model::COMPRESSOR:
 		case Model::FILTER:
 		default:
-			return {{{Param::None, nullptr}, {Param::None, nullptr}, {Param::None, nullptr}}};
+			return {{}};
 		}
 	}
+
+	/// Whether a param id holds a plain integer (menu steps and XML round-trip as
+	/// ints rather than 0-100%).
+	static constexpr bool paramIsInt(Param p) {
+		return p == Param::ChorusVoices || p == Param::ChorusWaveform || p == Param::ShaperMode;
+	}
+
+	/// Canonical XML name for a param id (single source for write and read).
+	static constexpr const char* paramName(Param p) {
+		switch (p) {
+		case Param::RoomSize: return "roomSize";
+		case Param::Damping: return "damping";
+		case Param::Width: return "width";
+		case Param::Decay: return "decay";
+		case Param::Diffusion: return "diffusion";
+		case Param::HPF: return "hpf";
+		case Param::Level: return "level";
+		case Param::PreDelay: return "preDelay";
+		case Param::ERLevel: return "erLevel";
+		case Param::BassDecay: return "bassDecay";
+		case Param::DelayTimeR: return "delayTimeR";
+		case Param::DelayDrive: return "delayDrive";
+		case Param::BaseDelay: return "baseDelay";
+		case Param::ChorusVoices: return "voices";
+		case Param::ChorusWaveform: return "waveform";
+		case Param::ShaperMode: return "shaperMode";
+		case Param::BassGain: return "bassGain";
+		case Param::BassFreq: return "bassFreq";
+		case Param::MidGain: return "midGain";
+		case Param::MidFreq: return "midFreq";
+		case Param::TrebleGain: return "trebleGain";
+		case Param::TrebleFreq: return "trebleFreq";
+		default: return nullptr;
+		}
+	}
+
 
 	/// UI thread. Allocates and fully constructs the new engine; the swap itself is
 	/// deferred to the next render boundary. Returns false (state unchanged) if the
@@ -158,19 +259,21 @@ public:
 		// Seed the param cache from the fresh engine's own defaults so the menu shows
 		// values matching what will actually render, and nothing needs pushing until
 		// the user touches a param. pendingEngine_ is still UI-private here, so calling
-		// its getters is safe.
+		// its getters is safe. LEVEL is the chain's own wet/blend control, not an
+		// engine param — it resets to unity on every model change.
 		if (replacement != nullptr) {
 			// mixWet() scales by panLevel << 5; Base's pan defaults to 0, which mutes
 			// every send-style engine — blocs were silently passthrough until this.
 			replacement->setPanLevels(reverb::kdfx::unityWetPan(), reverb::kdfx::unityWetPan());
-			params_.roomSize = replacement->getRoomSize();
-			params_.damping = replacement->getDamping();
-			params_.width = replacement->getWidth();
-			params_.decay = replacement->getDecay();
-			params_.diffusion = replacement->getDiffusion();
-			params_.hpf = replacement->getHPF();
+			for (const auto& def : paramDefs(m)) {
+				if (def.param == Param::None || def.param == Param::Level) {
+					continue;
+				}
+				cache_[util::to_underlying(def.param)] = readEngineParam(replacement, def.param);
+			}
 		}
-		paramsDirty_ = 0;
+		cache_[util::to_underlying(Param::Level)] = 1.0f;
+		dirty_ = 0;
 		return true;
 	}
 
@@ -191,93 +294,46 @@ public:
 		// Deferred parameter application: menus write the cache from the UI thread at
 		// any time; the engine is only touched here, at the render boundary. Only the
 		// params actually written get pushed — the rest keep the engine's own state.
-		if (engine_ != nullptr && paramsDirty_ != 0) {
-			uint8_t dirty = paramsDirty_;
-			paramsDirty_ = 0;
-			if (dirty & kDirtyRoomSize) {
-				engine_->setRoomSize(params_.roomSize);
-			}
-			if (dirty & kDirtyDamping) {
-				engine_->setDamping(params_.damping);
-			}
-			if (dirty & kDirtyWidth) {
-				engine_->setWidth(params_.width);
-			}
-			if (dirty & kDirtyDecay) {
-				engine_->setDecay(params_.decay);
-			}
-			if (dirty & kDirtyDiffusion) {
-				engine_->setDiffusion(params_.diffusion);
-			}
-			if (dirty & kDirtyHPF) {
-				engine_->setHPF(params_.hpf);
+		if (engine_ != nullptr && dirty_ != 0) {
+			uint32_t dirty = dirty_;
+			dirty_ = 0;
+			for (uint32_t id = 1; dirty != 0 && id < util::to_underlying(Param::kNumParams); id++, dirty >>= 1) {
+				if (!(dirty & 1u)) {
+					continue;
+				}
+				if (static_cast<Param>(id) == Param::Level) {
+					// LEVEL on send engines is a wet-output scale, applied through the
+					// same pan-level input mixWet() already uses. Insert engines blend
+					// in process() and need nothing here.
+					if (!engine_->isInsert()) {
+						float level = std::clamp(cache_[id], 0.0f, 1.0f);
+						int32_t pan = static_cast<int32_t>(level * 67108864.0f); // level × 2^26
+						engine_->setPanLevels(pan, pan);
+					}
+				}
+				else {
+					applyParamToEngine(engine_, static_cast<Param>(id), cache_[id]);
+				}
 			}
 		}
 	}
 
-	/// UI thread. Cache-and-defer for the bloc's headline params — mirrors the deferred
-	/// application the global reverb wrapper uses. Values are 0..1 normalized floats.
-	struct Params {
-		float roomSize = 0.5f;
-		float damping = 0.5f;
-		float width = 0.5f;
-		float decay = 0.5f;
-		float diffusion = 0.5f;
-		float hpf = 0.f;
-	};
-
-	[[nodiscard]] Params const& params() const { return params_; }
-
+	/// UI thread. Cache-and-defer for the bloc's params — mirrors the deferred
+	/// application the global reverb wrapper uses. Floats are 0..1 normalized;
+	/// int params are stored as their plain integer value.
 	[[nodiscard]] float getParam(Param p) const {
-		switch (p) {
-		case Param::RoomSize:
-			return params_.roomSize;
-		case Param::Damping:
-			return params_.damping;
-		case Param::Width:
-			return params_.width;
-		case Param::Decay:
-			return params_.decay;
-		case Param::Diffusion:
-			return params_.diffusion;
-		case Param::HPF:
-			return params_.hpf;
-		default:
+		if (p == Param::None || p >= Param::kNumParams) {
 			return 0.f;
 		}
+		return cache_[util::to_underlying(p)];
 	}
 
 	void setParam(Param p, float v) {
-		uint8_t bit;
-		switch (p) {
-		case Param::RoomSize:
-			params_.roomSize = v;
-			bit = kDirtyRoomSize;
-			break;
-		case Param::Damping:
-			params_.damping = v;
-			bit = kDirtyDamping;
-			break;
-		case Param::Width:
-			params_.width = v;
-			bit = kDirtyWidth;
-			break;
-		case Param::Decay:
-			params_.decay = v;
-			bit = kDirtyDecay;
-			break;
-		case Param::Diffusion:
-			params_.diffusion = v;
-			bit = kDirtyDiffusion;
-			break;
-		case Param::HPF:
-			params_.hpf = v;
-			bit = kDirtyHPF;
-			break;
-		default:
+		if (p == Param::None || p >= Param::kNumParams) {
 			return;
 		}
-		paramsDirty_ |= bit;
+		cache_[util::to_underlying(p)] = v;
+		dirty_ |= (1u << util::to_underlying(p));
 	}
 
 	/// In-place stereo processing. Returns false for passthrough blocs (EMPTY, or an
@@ -289,7 +345,33 @@ public:
 			return false;
 		}
 		if (engine_->isInsert()) {
-			engine_->processInsert(std::span<StereoSample>{buffer, numSamples});
+			float level = std::clamp(cache_[util::to_underlying(Param::Level)], 0.0f, 1.0f);
+			if (level >= 0.999f) {
+				engine_->processInsert(std::span<StereoSample>{buffer, numSamples});
+				return true;
+			}
+			// Wet/dry blend: dry + level × (processed − dry), chunked against the
+			// fixed dry scratch.
+			q31_t levelQ31 = static_cast<q31_t>(level * ONE_Q31f);
+			for (size_t done = 0; done < numSamples;) {
+				size_t n = std::min(kMaxChunk, numSamples - done);
+				StereoSample* buf = buffer + done;
+				std::memcpy(insertDry_, buf, n * sizeof(StereoSample));
+				engine_->processInsert(std::span<StereoSample>{buf, n});
+				for (size_t i = 0; i < n; i++) {
+					buf[i].l = add_saturation(insertDry_[i].l,
+					                          reverb::kdfx::q31_mul(
+					                              reverb::kdfx::qcollapse(
+					                                  static_cast<int64_t>(buf[i].l) - insertDry_[i].l),
+					                              levelQ31));
+					buf[i].r = add_saturation(insertDry_[i].r,
+					                          reverb::kdfx::q31_mul(
+					                              reverb::kdfx::qcollapse(
+					                                  static_cast<int64_t>(buf[i].r) - insertDry_[i].r),
+					                              levelQ31));
+				}
+				done += n;
+			}
 			return true;
 		}
 		// Reverb-class engines consume a mono input and add wet output into the stereo
@@ -311,6 +393,62 @@ public:
 	reverb::Base* engine() { return engine_; }
 
 private:
+	/// Push one cached param into an engine (audio thread, render boundary).
+	static void applyParamToEngine(reverb::Base* e, Param p, float v) {
+		switch (p) {
+		case Param::RoomSize: e->setRoomSize(v); break;
+		case Param::Damping: e->setDamping(v); break;
+		case Param::Width: e->setWidth(v); break;
+		case Param::Decay: e->setDecay(v); break;
+		case Param::Diffusion: e->setDiffusion(v); break;
+		case Param::HPF: e->setHPF(v); break;
+		case Param::PreDelay: e->setPreDelay(v); break;
+		case Param::ERLevel: e->setEarlyReflections(v); break;
+		case Param::BassDecay: e->setBassDecay(v); break;
+		case Param::DelayTimeR: e->setDelayTimeR(v); break;
+		case Param::DelayDrive: e->setDelayDrive(v); break;
+		case Param::BaseDelay: e->setBaseDelay(v); break;
+		case Param::ChorusVoices: e->setChorusVoices(static_cast<int32_t>(v)); break;
+		case Param::ChorusWaveform: e->setChorusWaveform(static_cast<int32_t>(v)); break;
+		case Param::ShaperMode: e->setShaperMode(static_cast<int32_t>(v)); break;
+		case Param::BassGain: e->setBassGain(v); break;
+		case Param::BassFreq: e->setBassFreq(v); break;
+		case Param::MidGain: e->setMidGain(v); break;
+		case Param::MidFreq: e->setMidFreq(v); break;
+		case Param::TrebleGain: e->setTrebleGain(v); break;
+		case Param::TrebleFreq: e->setTrebleFreq(v); break;
+		default: break;
+		}
+	}
+
+	/// Read an engine's current value for cache seeding (UI thread, engine private).
+	static float readEngineParam(reverb::Base const* e, Param p) {
+		switch (p) {
+		case Param::RoomSize: return e->getRoomSize();
+		case Param::Damping: return e->getDamping();
+		case Param::Width: return e->getWidth();
+		case Param::Decay: return e->getDecay();
+		case Param::Diffusion: return e->getDiffusion();
+		case Param::HPF: return e->getHPF();
+		case Param::PreDelay: return e->getPreDelay();
+		case Param::ERLevel: return e->getEarlyReflections();
+		case Param::BassDecay: return e->getBassDecay();
+		case Param::DelayTimeR: return e->getDelayTimeR();
+		case Param::DelayDrive: return e->getDelayDrive();
+		case Param::BaseDelay: return e->getBaseDelay();
+		case Param::ChorusVoices: return static_cast<float>(e->getChorusVoices());
+		case Param::ChorusWaveform: return static_cast<float>(e->getChorusWaveform());
+		case Param::ShaperMode: return static_cast<float>(e->getShaperMode());
+		case Param::BassGain: return e->getBassGain();
+		case Param::BassFreq: return e->getBassFreq();
+		case Param::MidGain: return e->getMidGain();
+		case Param::MidFreq: return e->getMidFreq();
+		case Param::TrebleGain: return e->getTrebleGain();
+		case Param::TrebleFreq: return e->getTrebleFreq();
+		default: return 0.f;
+		}
+	}
+
 	static reverb::Base* constructEngine(Model m) {
 		size_t size;
 		switch (m) {
@@ -395,8 +533,11 @@ private:
 	Model model_ = Model::EMPTY;
 	bool pendingSwap_ = false;
 	Model pendingModel_ = Model::EMPTY;
-	Params params_{};
-	uint8_t paramsDirty_ = 0; // bitmask of kDirty* — UI writes, audio reads+clears (single byte)
+
+	/// Param cache indexed by Param id. UI thread writes + the render boundary reads;
+	/// floats for continuous params, plain integers stored as floats for int params.
+	float cache_[util::to_underlying(Param::kNumParams)]{};
+	uint32_t dirty_ = 0; // bit per param id — UI writes, audio reads+clears
 
 	reverb::Base* engine_ = nullptr;
 	reverb::Base* pendingEngine_ = nullptr;
@@ -409,6 +550,7 @@ private:
 	uint32_t retiredAtGeneration_ = 0;
 
 	int32_t monoScratch_[kMaxChunk]{};
+	StereoSample insertDry_[kMaxChunk]{}; // dry snapshot for the insert wet/dry blend
 };
 
 } // namespace deluge::dsp
