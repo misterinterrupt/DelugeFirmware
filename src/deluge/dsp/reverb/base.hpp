@@ -101,6 +101,17 @@ struct Base {
 	[[nodiscard]] virtual float getCab() const { return 0.0f; }
 	virtual void setHiCut(float value) {}
 	[[nodiscard]] virtual float getHiCut() const { return 1.0f; }
+
+	// Combination-bloc parameters (TubeAmp<>MD>Chor class): order config plus the
+	// modulation LFO trio, routed by each combination to its own sub-engines.
+	virtual void setComboCfg(int32_t value) {}
+	[[nodiscard]] virtual int32_t getComboCfg() const { return 0; }
+	virtual void setModRate(float value) {}
+	[[nodiscard]] virtual float getModRate() const { return 0.5f; }
+	virtual void setModDepth(float value) {}
+	[[nodiscard]] virtual float getModDepth() const { return 0.5f; }
+	virtual void setModFdbk(float value) {}
+	[[nodiscard]] virtual float getModFdbk() const { return 0.5f; }
 	virtual void setShaperMode(int32_t value) {}
 	[[nodiscard]] virtual int32_t getShaperMode() const { return 0; }
 

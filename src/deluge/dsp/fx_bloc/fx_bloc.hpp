@@ -32,6 +32,7 @@
 #include "dsp/reverb/kdfx/reverb.hpp"
 #include "dsp/reverb/kdfx/tone.hpp"
 #include "dsp/reverb/kdfx/tremolo.hpp"
+#include "dsp/reverb/kdfx/tubeamp.hpp"
 #include "dsp/reverb/mutable/reverb.hpp"
 #include "dsp/stereo_sample.h"
 #include "memory/general_memory_allocator.h"
@@ -62,6 +63,7 @@ public:
 		KDFX_TREMOLO,
 		KDFX_AUTOPAN,
 		KDFX_DIST,
+		KDFX_TUBEAMP,
 	};
 
 	static constexpr size_t kMaxChunk = 64;
@@ -110,9 +112,13 @@ public:
 		CabSim,     // kdfx distortion
 		LoCut,      // kdfx distortion
 		HiCut,      // kdfx distortion
+		ComboCfg,   // combination blocs, int (0 = A->B, 1 = B->A)
+		ModRate,    // combination blocs: modulation LFO rate
+		ModDepth,   // combination blocs: modulation depth
+		ModFdbk,    // combination blocs: modulation feedback
 		kNumParams
 	};
-	static_assert(util::to_underlying(Param::kNumParams) <= 32, "dirty bitmask is uint32");
+	static_assert(util::to_underlying(Param::kNumParams) <= 64, "dirty bitmask is uint64");
 
 	struct ParamDef {
 		Param param;                       // None → "--", column inert
@@ -205,11 +211,13 @@ public:
 	static constexpr const char* kWaveformOptionStrings[] = {"SINE", "TRI", "S&H"};
 	static constexpr const char* kShaperOptionStrings[] = {"SOFT", "TAPE", "HARD", "FOLD"};
 	static constexpr const char* kPhaseOptionStrings[] = {"OFF", "ON"};
+	static constexpr const char* kCfgOptionStrings[] = {"AMP>MOD", "MOD>AMP"};
 
 	static constexpr ParamDef LEVEL_DEF() { return {Param::Level, "LEVEL", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false}; }
 	static constexpr const char* const* kWaveformOptions() { return kWaveformOptionStrings; }
 	static constexpr const char* const* kShaperOptions() { return kShaperOptionStrings; }
 	static constexpr const char* const* kPhaseOptions() { return kPhaseOptionStrings; }
+	static constexpr const char* const* kCfgOptions() { return kCfgOptionStrings; }
 
 	// Real-unit helpers for the tables below (defaults leave out the trailing fields).
 	static constexpr ParamDef hz(Param p, const char* label, float minHz, float maxHz, uint8_t dec = 2) {
@@ -280,6 +288,10 @@ public:
 		case Param::CabSim: return "cab";
 		case Param::LoCut: return "locut";
 		case Param::HiCut: return "hicut";
+		case Param::ComboCfg: return "cfg";
+		case Param::ModRate: return "modRate";
+		case Param::ModDepth: return "modDepth";
+		case Param::ModFdbk: return "modFdbk";
 		default: return nullptr;
 		}
 	}
@@ -347,14 +359,14 @@ public:
 		// any time; the engine is only touched here, at the render boundary. Only the
 		// params actually written get pushed — the rest keep the engine's own state.
 		if (engine_ != nullptr && dirty_ != 0) {
-			uint32_t dirty = dirty_;
+			uint64_t dirty = dirty_;
 			dirty_ = 0;
 			// Bit position == param id (setParam sets 1u << id) — test each bit
 			// explicitly. (A shift-first loop here tested bit id-1 at iteration id,
 			// so every edit flushed the NEXT param's cached value: edits seemed dead
 			// until a neighbour param's push dragged them in all at once.)
 			for (uint32_t id = 1; id < util::to_underlying(Param::kNumParams); id++) {
-				if (!(dirty & (1u << id))) {
+				if (!(dirty & (1ull << id))) {
 					continue;
 				}
 				if (static_cast<Param>(id) == Param::Level) {
@@ -390,7 +402,7 @@ public:
 			return;
 		}
 		cache_[util::to_underlying(p)] = v;
-		dirty_ |= (1u << util::to_underlying(p));
+		dirty_ |= (1ull << util::to_underlying(p));
 	}
 
 	/// In-place stereo processing. Returns false for passthrough blocs (EMPTY, or an
@@ -479,6 +491,10 @@ private:
 		case Param::CabSim: e->setCab(v); break;
 		case Param::LoCut: e->setLoCut(v); break;
 		case Param::HiCut: e->setHiCut(v); break;
+		case Param::ComboCfg: e->setComboCfg(static_cast<int32_t>(v)); break;
+		case Param::ModRate: e->setModRate(v); break;
+		case Param::ModDepth: e->setModDepth(v); break;
+		case Param::ModFdbk: e->setModFdbk(v); break;
 		default: break;
 		}
 	}
@@ -512,6 +528,10 @@ private:
 		case Param::CabSim: return e->getCab();
 		case Param::LoCut: return e->getLoCut();
 		case Param::HiCut: return e->getHiCut();
+		case Param::ComboCfg: return static_cast<float>(e->getComboCfg());
+		case Param::ModRate: return e->getModRate();
+		case Param::ModDepth: return e->getModDepth();
+		case Param::ModFdbk: return e->getModFdbk();
 		default: return 0.f;
 		}
 	}
@@ -549,6 +569,9 @@ private:
 		case Model::KDFX_DIST:
 			size = sizeof(reverb::KdfxDistortion);
 			break;
+		case Model::KDFX_TUBEAMP:
+			size = sizeof(reverb::KdfxTubeAmp);
+			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
 			break;
@@ -582,6 +605,8 @@ private:
 			return new (memory) reverb::KdfxAutoPanner();
 		case Model::KDFX_DIST:
 			return new (memory) reverb::KdfxDistortion();
+		case Model::KDFX_TUBEAMP:
+			return new (memory) reverb::KdfxTubeAmp();
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:
@@ -614,7 +639,7 @@ private:
 	/// Param cache indexed by Param id. UI thread writes + the render boundary reads;
 	/// floats for continuous params, plain integers stored as floats for int params.
 	float cache_[util::to_underlying(Param::kNumParams)]{};
-	uint32_t dirty_ = 0; // bit per param id — UI writes, audio reads+clears
+	uint64_t dirty_ = 0; // bit per param id — UI writes, audio reads+clears
 
 	reverb::Base* engine_ = nullptr;
 	reverb::Base* pendingEngine_ = nullptr;
@@ -719,6 +744,18 @@ constexpr FxBloc::ParamDef kDefsKdfxAutoPan[3] = {
     FxBloc::pct(FxBloc::Param::Decay, "WIDTH"),
     FxBloc::LEVEL_DEF(),
 };
+constexpr FxBloc::ParamDef kDefsKdfxTubeAmp[11] = {
+    FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
+    {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
+    FxBloc::hz(FxBloc::Param::LoCut, "LOCUT", 20.f, 300.f, 0),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::pct(FxBloc::Param::CabSim, "CAB"),
+    FxBloc::hz(FxBloc::Param::HiCut, "HCUT", 1000.f, 16000.f, 0),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 5.f),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 10.f),
+    {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
+};
 constexpr FxBloc::ParamDef kDefsKdfxDist[6] = {
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
@@ -756,6 +793,7 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_TREMOLO: return kDefsKdfxTremolo;
 	case Model::KDFX_AUTOPAN: return kDefsKdfxAutoPan;
 	case Model::KDFX_DIST: return kDefsKdfxDist;
+	case Model::KDFX_TUBEAMP: return kDefsKdfxTubeAmp;
 	case Model::EMPTY:
 	case Model::FILTER:
 	default: return kDefsEmpty;
