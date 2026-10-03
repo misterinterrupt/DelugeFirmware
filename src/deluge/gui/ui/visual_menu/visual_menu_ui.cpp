@@ -649,6 +649,26 @@ void VisualMenuUI::selectEncoderAction(int8_t offset) {
 	renderUIsForOled();
 }
 
+void VisualMenuUI::fxBlocPagesRebuilt() {
+	if (contextIsClipMinder_) {
+		return; // FX BLOCS pages only exist in the song-mode category set
+	}
+	categories_ = getGlobalFxCategories();
+	if (currentCategoryIndex_ >= static_cast<int32_t>(categories_.size())) {
+		currentCategoryIndex_ = static_cast<int32_t>(categories_.size()) - 1;
+	}
+	auto& pages = categories_[currentCategoryIndex_].pages;
+	if (currentPageIndex_ >= static_cast<int32_t>(pages.size())) {
+		currentPageIndex_ = static_cast<int32_t>(pages.size()) - 1;
+	}
+	selectedSlot_ = -1;
+	decimalCursorSlot_ = -1;
+	for (size_t i = 0; i < 4; ++i) {
+		slotHeld_[i] = false;
+		turnedWhileHeld_[i] = false;
+	}
+}
+
 void VisualMenuUI::renderOLED(deluge::hid::display::oled_canvas::Canvas& canvas) {
 	if (categories_.empty()) {
 		canvas.clear();

@@ -18,6 +18,9 @@
 #include "visual_menu_data.h"
 #include "gui/l10n/strings.h"
 #include "gui/menu_item/menu_item.h"
+#include <algorithm>
+#include <cstdio>
+#include <cstring>
 
 using namespace deluge;
 using namespace deluge::gui::ui::visual_menu;
@@ -411,63 +414,75 @@ static const VisualCategory midiCvCategories[] = {
 // -------------------------------------------------------------------------------------------------
 using namespace deluge::gui::menu_item::fx_bloc;
 
-MasterSlotBloc masterSlotBlocMenu0{0};
-MasterSlotBloc masterSlotBlocMenu1{1};
-MasterSlotBloc masterSlotBlocMenu2{2};
+MasterSlotBloc masterSlotBlocMenus[3] = {{0}, {1}, {2}};
 MasterRouting masterRoutingMenu{};
-// Per-slot param items: defs 0-3 (3 headline + LEVEL) on the Slot page, defs 4-7
-// (extended suite) on the "+" page. Labels resolve dynamically per model.
-MasterSlotParam masterParam00{0, 0}, masterParam01{0, 1}, masterParam02{0, 2}, masterParam03{0, 3};
-MasterSlotParam masterParam04{0, 4}, masterParam05{0, 5}, masterParam06{0, 6}, masterParam07{0, 7};
-MasterSlotParam masterParam10{1, 0}, masterParam11{1, 1}, masterParam12{1, 2}, masterParam13{1, 3};
-MasterSlotParam masterParam14{1, 4}, masterParam15{1, 5}, masterParam16{1, 6}, masterParam17{1, 7};
-MasterSlotParam masterParam20{2, 0}, masterParam21{2, 1}, masterParam22{2, 2}, masterParam23{2, 3};
-MasterSlotParam masterParam24{2, 4}, masterParam25{2, 5}, masterParam26{2, 6}, masterParam27{2, 7};
-
-static const VisualPage fxBlocPages[] = {
-    // Chain holds only the routing topology — each slot's bloc selector has its own
-    // full-width page (names need more than one 32px column to stay readable).
-    {"Chain", EMPTY_STRING,
-     {{{&masterRoutingMenu, "ROUTE", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
-    {"Bloc 1", EMPTY_STRING,
-     {{{&masterSlotBlocMenu0, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
-    // Param labels resolve through the slot's current model at render time
-    // (no shortName override → item's dynamic getName()). Column 4 is LEVEL.
-    {"Slot 1", EMPTY_STRING,
-     {{{&masterParam00, nullptr, -1, 1},
-       {&masterParam01, nullptr, -1, 1},
-       {&masterParam02, nullptr, -1, 1},
-       {&masterParam03, nullptr, -1, 1}}}},
-    {"Slot 1+", EMPTY_STRING,
-     {{{&masterParam04, nullptr, -1, 1},
-       {&masterParam05, nullptr, -1, 1},
-       {&masterParam06, nullptr, -1, 1},
-       {&masterParam07, nullptr, -1, 1}}}},
-    {"Bloc 2", EMPTY_STRING,
-     {{{&masterSlotBlocMenu1, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
-    {"Slot 2", EMPTY_STRING,
-     {{{&masterParam10, nullptr, -1, 1},
-       {&masterParam11, nullptr, -1, 1},
-       {&masterParam12, nullptr, -1, 1},
-       {&masterParam13, nullptr, -1, 1}}}},
-    {"Slot 2+", EMPTY_STRING,
-     {{{&masterParam14, nullptr, -1, 1},
-       {&masterParam15, nullptr, -1, 1},
-       {&masterParam16, nullptr, -1, 1},
-       {&masterParam17, nullptr, -1, 1}}}},
-    {"Bloc 3", EMPTY_STRING,
-     {{{&masterSlotBlocMenu2, "BLOC", -1, 4}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}, {nullptr, "", -1, 0}}}},
-    {"Slot 3", EMPTY_STRING,
-     {{{&masterParam20, nullptr, -1, 1},
-       {&masterParam21, nullptr, -1, 1},
-       {&masterParam22, nullptr, -1, 1},
-       {&masterParam23, nullptr, -1, 1}}}},
-    {"Slot 3+", EMPTY_STRING,
-     {{{&masterParam24, nullptr, -1, 1},
-       {&masterParam25, nullptr, -1, 1},
-       {&masterParam26, nullptr, -1, 1},
-       {&masterParam27, nullptr, -1, 1}}}},
+// Per-slot param item pool: defIndex is the absolute index into the bloc's
+// paramDefs() table; the page layout below decides which are on screen.
+MasterSlotParam masterParamMenus[3][dsp::FxBloc::kMaxSlotParams] = {
+    {{0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 5}, {0, 6}, {0, 7}, {0, 8}, {0, 9}, {0, 10}, {0, 11}, {0, 12},
+     {0, 13}, {0, 14}, {0, 15}},
+    {{1, 0}, {1, 1}, {1, 2}, {1, 3}, {1, 4}, {1, 5}, {1, 6}, {1, 7}, {1, 8}, {1, 9}, {1, 10}, {1, 11}, {1, 12},
+     {1, 13}, {1, 14}, {1, 15}},
+    {{2, 0}, {2, 1}, {2, 2}, {2, 3}, {2, 4}, {2, 5}, {2, 6}, {2, 7}, {2, 8}, {2, 9}, {2, 10}, {2, 11}, {2, 12},
+     {2, 13}, {2, 14}, {2, 15}},
 };
+
+// FX BLOCS pages are built at runtime: Chain + (Bloc page + N param pages) per
+// slot, where N follows the selected bloc's real param count (4 per page, the
+// last page may be partial). Rebuilt whenever the song-mode menu is opened and
+// whenever a slot's bloc changes — see rebuildFxBlocPages().
+static VisualPage fxBlocRuntimePages[1 + 3 * (1 + dsp::FxBloc::kMaxSlotParams / 4)];
+static size_t fxBlocRuntimePageCount = 0;
+static char fxBlocRuntimeTitles[sizeof(fxBlocRuntimePages) / sizeof(VisualPage)][12];
+static VisualCategory songCategories[4]; // defined below; entry 3 is mutated by rebuild
+static constexpr size_t kFxBlocSongCategoryIndex = 3;
+static void ensureSongCategoriesInit(); // lazy fill, defined below
+
+void rebuildFxBlocPages() {
+	ensureSongCategoriesInit();
+	size_t p = 0;
+	auto nextTitle = [&p]() { return fxBlocRuntimeTitles[p]; };
+
+	fxBlocRuntimePages[p++] = {"Chain", EMPTY_STRING,
+	                           {{{&masterRoutingMenu, "ROUTE", -1, 4},
+	                             {nullptr, "", -1, 0},
+	                             {nullptr, "", -1, 0},
+	                             {nullptr, "", -1, 0}}}};
+
+	for (int32_t s = 0; s < 3; s++) {
+		snprintf(nextTitle(), 12, "BLOC %d", s + 1);
+		fxBlocRuntimePages[p++] = {fxBlocRuntimeTitles[p - 1],
+		                           EMPTY_STRING,
+		                           {{{&masterSlotBlocMenus[s], "BLOC", -1, 4},
+	                             {nullptr, "", -1, 0},
+	                             {nullptr, "", -1, 0},
+	                             {nullptr, "", -1, 0}}}};
+
+		auto model = AudioEngine::masterFxChain.slot(s).getModel();
+		size_t n = dsp::FxBloc::paramDefs(model).size();
+		size_t numParamPages = std::max<size_t>(1, (n + 3) / 4);
+		for (size_t pg = 0; pg < numParamPages; pg++) {
+			char* t = nextTitle();
+			snprintf(t, 12, "SLOT %d", s + 1);
+			for (size_t plus = 0; plus < pg; plus++) {
+				strncat(t, "+", 2);
+			}
+			VisualPage page{t, EMPTY_STRING, {}};
+			for (size_t c = 0; c < 4; c++) {
+				size_t idx = pg * 4 + c;
+				if (idx < n) {
+					page.slots[c] = {&masterParamMenus[s][idx], nullptr, -1, 1};
+				}
+				else {
+					page.slots[c] = {nullptr, "", -1, 0};
+				}
+			}
+			fxBlocRuntimePages[p++] = page;
+		}
+	}
+	fxBlocRuntimePageCount = p;
+	songCategories[kFxBlocSongCategoryIndex].pages = std::span{fxBlocRuntimePages, fxBlocRuntimePageCount};
+}
 
 // -------------------------------------------------------------------------------------------------
 // Song-level (master FX) categories. Deliberately NOT the audio-clip tables: the audio-clip
@@ -479,12 +494,20 @@ static const VisualPage songMasterPages[] = {
      {{{&globalLevelMenu, "LEVEL"}, {&globalPanMenu, "PAN"}, {nullptr, ""}, {nullptr, ""}}}},
 };
 
-static const VisualCategory songCategories[] = {
-    {STRING_FOR_MASTER, nullptr, songMasterPages},
-    {STRING_FOR_FILTERS, nullptr, audioClipFilterPages},
-    {STRING_FOR_FX, nullptr, audioClipFxPages},
-    {EMPTY_STRING, "FX BLOCS", fxBlocPages},
-};
+// Defined (tentatively, zero-init) above so rebuildFxBlocPages() can mutate
+// entry kFxBlocSongCategoryIndex; filled lazily on first song-mode fetch —
+// static-init-order-safe (everything it touches is runtime state).
+static bool songCategoriesInitialized = false;
+static void ensureSongCategoriesInit() {
+	if (songCategoriesInitialized) {
+		return;
+	}
+	songCategoriesInitialized = true;
+	songCategories[0] = {STRING_FOR_MASTER, nullptr, songMasterPages};
+	songCategories[1] = {STRING_FOR_FILTERS, nullptr, audioClipFilterPages};
+	songCategories[2] = {STRING_FOR_FX, nullptr, audioClipFxPages};
+	songCategories[3] = {EMPTY_STRING, "FX BLOCS", {}};
+}
 
 // -------------------------------------------------------------------------------------------------
 // Getters
@@ -506,6 +529,8 @@ std::span<const VisualCategory> getMidiCvCategories() {
 }
 
 std::span<const VisualCategory> getGlobalFxCategories() {
+	ensureSongCategoriesInit();
+	rebuildFxBlocPages(); // page structure follows the currently selected blocs
 	return songCategories;
 }
 

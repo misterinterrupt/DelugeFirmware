@@ -13,6 +13,9 @@
 #include "dsp/fx_bloc/master_fx_chain.hpp"
 #include "gui/menu_item/integer.h"
 #include "gui/menu_item/selection.h"
+#include "gui/ui/ui.h"
+#include "gui/ui/visual_menu/visual_menu_data.h"
+#include "gui/ui/visual_menu/visual_menu_ui.h"
 #include "hid/display/display.h"
 #include "processing/engines/audio_engine.h"
 #include "util/misc.h"
@@ -56,6 +59,13 @@ public:
 			// Pool exhausted: surface it and revert the displayed value.
 			display->displayError(Error::INSUFFICIENT_RAM);
 			readCurrentValue();
+			return;
+		}
+		// The param-page layout follows the newly selected bloc's table; rebuild and
+		// rebind the open menu (page count may have changed under the cursor).
+		deluge::gui::ui::visual_menu::rebuildFxBlocPages();
+		if (getCurrentUI() == &deluge::gui::ui::visual_menu::visualMenuUI) {
+			deluge::gui::ui::visual_menu::visualMenuUI.fxBlocPagesRebuilt();
 		}
 	}
 
@@ -151,7 +161,11 @@ public:
 
 private:
 	[[nodiscard]] dsp::FxBloc::ParamDef def() const {
-		return dsp::FxBloc::paramDefs(AudioEngine::masterFxChain.slot(slot_).getModel())[defIndex_];
+		auto defs = dsp::FxBloc::paramDefs(AudioEngine::masterFxChain.slot(slot_).getModel());
+		if (defIndex_ < 0 || static_cast<size_t>(defIndex_) >= defs.size()) {
+			return {}; // None — inert column
+		}
+		return defs[defIndex_];
 	}
 
 	int32_t slot_;

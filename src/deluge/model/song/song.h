@@ -410,7 +410,7 @@ public:
 	// active; applied by AudioEngine::getReverbParamsFromSong(). Slot params are
 	// indexed by dsp::FxBloc::Param; masterFxParamSeen marks which were present in
 	// the file (the rest take the engine's own defaults).
-	static constexpr int32_t kMasterFxNumParams = 24; // dsp::FxBloc::Param::kNumParams
+	static constexpr int32_t kMasterFxNumParams = 26; // dsp::FxBloc::Param::kNumParams
 	int32_t masterFxRouting = 0;                      // dsp::MasterFxChain::Routing
 	int32_t masterFxModels[3] = {0, 0, 0};            // dsp::FxBloc::Model per slot
 	float masterFxParams[3][kMasterFxNumParams] = {};

@@ -59,6 +59,12 @@ public:
 	int8_t getActiveHeldSlot() const;
 	void updateButtonLEDs();
 
+	/// Re-fetch categories after the FX BLOCS page structure changed under us (a
+	/// slot's bloc was re-selected, changing its param-page count) and clamp the
+	/// navigation indices into the new bounds. Only meaningful while this UI is
+	/// current (song-mode menu).
+	void fxBlocPagesRebuilt();
+
 	/// Save/restore the soundEditor source context (index AND pointer) around per-slot access, so that slots
 	/// targeting osc/env/modulator 2 don't silently read or write source 1's state.
 	struct SlotSourceContext {

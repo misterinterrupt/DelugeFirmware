@@ -100,6 +100,11 @@ struct VisualCategory {
 
 // Mode-specific category retrievers
 std::span<const VisualCategory> getSynthCategories();
+
+/// Rebuild the FX BLOCS runtime pages from the currently selected blocs (their
+/// param counts set the page layout). Call after any slot's model changes; the
+/// song-mode getter also invokes it on menu open.
+void rebuildFxBlocPages();
 std::span<const VisualCategory> getKitCategories();
 std::span<const VisualCategory> getAudioClipCategories();
 std::span<const VisualCategory> getMidiCvCategories();
