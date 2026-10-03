@@ -94,6 +94,7 @@ using enum deluge::l10n::String;
 #include "gui/menu_item/synth_mode.h"
 #include "gui/menu_item/patch_cable_strength/fixed.h"
 #include "gui/menu_item/master_transpose.h"
+#include "gui/menu_item/fx_bloc/master_fx_items.h"
 
 // -------------------------------------------------------------------------------------------------
 // External MenuItem declarations
@@ -404,6 +405,41 @@ static const VisualCategory midiCvCategories[] = {
 };
 
 // -------------------------------------------------------------------------------------------------
+// Modular master FX blocs (song mode). Slot models/routing write through the PAU
+// lifecycle (lazy allocation, boundary swap, deferred params); params reset on reboot
+// until XML persistence lands.
+// -------------------------------------------------------------------------------------------------
+using namespace deluge::gui::menu_item::fx_bloc;
+
+MasterSlotBloc masterSlotBlocMenu0{0};
+MasterSlotBloc masterSlotBlocMenu1{1};
+MasterSlotBloc masterSlotBlocMenu2{2};
+MasterRouting masterRoutingMenu{};
+MasterSlotParam masterParamSize0{0, MasterSlotParam::Which::SIZE};
+MasterSlotParam masterParamDamp0{0, MasterSlotParam::Which::DAMP};
+MasterSlotParam masterParamWidth0{0, MasterSlotParam::Which::WIDTH};
+MasterSlotParam masterParamSize1{1, MasterSlotParam::Which::SIZE};
+MasterSlotParam masterParamDamp1{1, MasterSlotParam::Which::DAMP};
+MasterSlotParam masterParamWidth1{1, MasterSlotParam::Which::WIDTH};
+MasterSlotParam masterParamSize2{2, MasterSlotParam::Which::SIZE};
+MasterSlotParam masterParamDamp2{2, MasterSlotParam::Which::DAMP};
+MasterSlotParam masterParamWidth2{2, MasterSlotParam::Which::WIDTH};
+
+static const VisualPage fxBlocPages[] = {
+    {"Chain", EMPTY_STRING,
+     {{{&masterRoutingMenu, "ROUTE"},
+       {&masterSlotBlocMenu0, "BLOC 1"},
+       {&masterSlotBlocMenu1, "BLOC 2"},
+       {&masterSlotBlocMenu2, "BLOC 3"}}}},
+    {"Slot 1", EMPTY_STRING,
+     {{{&masterParamSize0, "SIZE"}, {&masterParamDamp0, "DAMP"}, {&masterParamWidth0, "WIDTH"}, {nullptr, ""}}}},
+    {"Slot 2", EMPTY_STRING,
+     {{{&masterParamSize1, "SIZE"}, {&masterParamDamp1, "DAMP"}, {&masterParamWidth1, "WIDTH"}, {nullptr, ""}}}},
+    {"Slot 3", EMPTY_STRING,
+     {{{&masterParamSize2, "SIZE"}, {&masterParamDamp2, "DAMP"}, {&masterParamWidth2, "WIDTH"}, {nullptr, ""}}}},
+};
+
+// -------------------------------------------------------------------------------------------------
 // Song-level (master FX) categories. Deliberately NOT the audio-clip tables: the audio-clip
 // items (reverse / interpolation / transpose / attack) dereference getCurrentAudioClip(),
 // which is null outside an actual audio clip — editing them from song mode is a hard fault.
@@ -417,6 +453,7 @@ static const VisualCategory songCategories[] = {
     {STRING_FOR_MASTER, nullptr, songMasterPages},
     {STRING_FOR_FILTERS, nullptr, audioClipFilterPages},
     {STRING_FOR_FX, nullptr, audioClipFxPages},
+    {EMPTY_STRING, "FX BLOCS", fxBlocPages},
 };
 
 // -------------------------------------------------------------------------------------------------

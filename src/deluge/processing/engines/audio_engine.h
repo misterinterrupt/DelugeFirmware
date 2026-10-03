@@ -49,6 +49,7 @@ class AbsValueFollower;
 
 namespace deluge::dsp {
 class Reverb;
+class MasterFxChain;
 }
 
 /*
@@ -199,6 +200,7 @@ extern SideChain reverbSidechain;
 extern uint32_t timeThereWasLastSomeReverb;
 extern VoiceVector activeVoices;
 extern deluge::dsp::Reverb reverb;
+extern deluge::dsp::MasterFxChain masterFxChain;
 extern uint32_t nextVoiceState;
 extern SoundDrum* sampleForPreview;
 extern int32_t reverbSidechainVolume;

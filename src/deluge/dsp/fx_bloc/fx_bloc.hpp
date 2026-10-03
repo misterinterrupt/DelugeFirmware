@@ -102,7 +102,37 @@ public:
 			pendingEngine_ = nullptr;
 			model_ = pendingModel_;
 		}
+		// Deferred parameter application: menus write the cache from the UI thread at
+		// any time; the engine is only touched here, at the render boundary.
+		if (engine_ != nullptr && paramsDirty_) {
+			paramsDirty_ = false;
+			engine_->setRoomSize(params_.roomSize);
+			engine_->setDamping(params_.damping);
+			engine_->setWidth(params_.width);
+			engine_->setDecay(params_.decay);
+			engine_->setHPF(params_.hpf);
+			engine_->setPreDelay(params_.preDelay);
+			engine_->setEarlyReflections(params_.erLevel);
+		}
 	}
+
+	/// UI thread. Cache-and-defer for the bloc's core params — mirrors the deferred
+	/// application the global reverb wrapper uses. Values are 0..1 normalized floats;
+	/// the cache seeds from the engine defaults and only pushes once touched.
+	struct Params {
+		float roomSize = 0.5f;
+		float damping = 0.5f;
+		float width = 0.5f;
+		float decay = 0.5f;
+		float hpf = 0.f;
+		float preDelay = 0.f;
+		float erLevel = 0.4f;
+	};
+
+	[[nodiscard]] Params const& params() const { return params_; }
+	void setRoomSize(float v) { params_.roomSize = v; paramsDirty_ = true; }
+	void setDamping(float v) { params_.damping = v; paramsDirty_ = true; }
+	void setWidth(float v) { params_.width = v; paramsDirty_ = true; }
 
 	/// In-place stereo processing. Returns false for passthrough blocs (EMPTY, or an
 	/// adapter that has not landed yet) — the router then skips them entirely.
@@ -193,6 +223,8 @@ private:
 	Model model_ = Model::EMPTY;
 	bool pendingSwap_ = false;
 	Model pendingModel_ = Model::EMPTY;
+	Params params_{};
+	bool paramsDirty_ = false;
 
 	reverb::Base* engine_ = nullptr;
 	reverb::Base* pendingEngine_ = nullptr;
