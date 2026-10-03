@@ -112,6 +112,17 @@ public:
 		int32_t intMin = 0;
 		int32_t intMax = 1;
 		const char* const* intOptions = nullptr; // display strings for int params
+
+		// Real-unit display for continuous params, matching the engine's own
+		// mapping (read from its setters): shown value = bipolar
+		// ? ±(t-0.5)*2*realMax : realMin + t*(realMax-realMin), t = the 0..1 cache
+		// value. A null unit means the param has no physical calibration — shown
+		// as 0-100%.
+		const char* unit = nullptr;
+		float realMin = 0.f;
+		float realMax = 1.f;
+		uint8_t decimals = 0;
+		bool bipolar = false;
 	};
 
 	/// Per-model menu/persistence table. Indices 0-3 render on the Slot page
@@ -126,69 +137,85 @@ public:
 	static constexpr const char* const* kWaveformOptions() { return kWaveformOptionStrings; }
 	static constexpr const char* const* kShaperOptions() { return kShaperOptionStrings; }
 
+	// Real-unit helpers for the table below (defaults leave out the trailing fields).
+	static constexpr ParamDef hz(Param p, const char* label, float minHz, float maxHz, uint8_t dec = 2) {
+		return {p, label, false, 0, 1, nullptr, "HZ", minHz, maxHz, dec, false};
+	}
+	static constexpr ParamDef ms(Param p, const char* label, float minMs, float maxMs, uint8_t dec = 1) {
+		return {p, label, false, 0, 1, nullptr, "MS", minMs, maxMs, dec, false};
+	}
+	static constexpr ParamDef db(Param p, const char* label, float minDb, float maxDb, bool bipolar = false) {
+		return {p, label, false, 0, 1, nullptr, "DB", minDb, maxDb, 1, bipolar};
+	}
+	/// Bipolar percent (feedback): t=0.5 ↔ 0%, ends ±maxPercent.
+	static constexpr ParamDef bipolarPct(Param p, const char* label, float maxPercent) {
+		return {p, label, false, 0, 1, nullptr, "%", 0.f, maxPercent, 0, true};
+	}
+
 	static constexpr std::array<ParamDef, kMaxParamDefs> paramDefs(Model m) {
 		switch (m) {
 		case Model::FREEVERB:
-			return {{{Param::RoomSize, "SIZE"}, {Param::Damping, "DAMP"}, {Param::Width, "WIDTH"}, LEVEL_DEF(),
-			         {Param::HPF, "HPF"}}};
 		case Model::MUTABLE:
-			return {{{Param::RoomSize, "SIZE"}, {Param::Damping, "DAMP"}, {Param::Width, "WIDTH"}, LEVEL_DEF(),
-			         {Param::HPF, "HPF"}}};
+			return {{{Param::RoomSize, "SIZE"},
+			         {Param::Damping, "DAMP"},
+			         {Param::Width, "WIDTH"},
+			         LEVEL_DEF(),
+			         {Param::HPF, "HPF", false, 0, 1, nullptr, "HZ", 20.f, 1000.f, 0, false}}};
 		case Model::KDFX_REVERB:
 			return {{{Param::RoomSize, "SIZE"},
 			         {Param::Decay, "DECAY"},
 			         {Param::Damping, "DAMP"},
 			         LEVEL_DEF(),
 			         {Param::Width, "WIDTH"},
-			         {Param::PreDelay, "PREDL"},
+			         ms(Param::PreDelay, "PREDL", 0.f, 300.f, 0),
 			         {Param::ERLevel, "ER"},
-			         {Param::BassDecay, "BASS"}}};
+			         {Param::BassDecay, "BASS", false, 0, 1, nullptr, "X", 0.2f, 2.5f, 2, false}}};
 		case Model::KDFX_DELAY:
-			return {{{Param::RoomSize, "TIME"},
-			         {Param::Decay, "FDBK"},
+			return {{{ms(Param::RoomSize, "TIME", 1.f, 1480.f, 0)},
+			         {Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 99.f, 0, false},
 			         {Param::Damping, "TONE"},
 			         LEVEL_DEF(),
 			         {Param::Diffusion, "XFEED"},
-			         {Param::DelayTimeR, "TIM R"},
-			         {Param::DelayDrive, "DRV"},
-			         {Param::HPF, "HPF"}}};
+			         ms(Param::DelayTimeR, "TIM R", 1.f, 1480.f, 0),
+			         db(Param::DelayDrive, "DRV", 0.f, 18.f),
+			         {Param::HPF, "HPF", false, 0, 1, nullptr, "HZ", 20.f, 1000.f, 0, false}}};
 		case Model::KDFX_CHORUS:
-			return {{{Param::RoomSize, "RATE"},
-			         {Param::Decay, "DEPTH"},
-			         {Param::Damping, "FDBK"},
+			return {{{hz(Param::RoomSize, "RATE", 0.05f, 15.f)},
+			         ms(Param::Decay, "DEPTH", 0.f, 10.f),
+			         bipolarPct(Param::Damping, "FDBK", 95.f),
 			         LEVEL_DEF(),
-			         {Param::BaseDelay, "BASE"},
+			         ms(Param::BaseDelay, "BASE", 0.1f, 40.f),
 			         {Param::ChorusVoices, "VOICE", true, 2, 6},
 			         {Param::ChorusWaveform, "WAVE", true, 0, 2, kWaveformOptions()},
-			         {Param::Diffusion, "SPRD"}}};
+			         {Param::Diffusion, "SPRD", false, 0, 1, nullptr, "DEG", 0.f, 180.f, 0, false}}};
 		case Model::KDFX_TONE:
-			return {{{Param::RoomSize, "DRIVE"},
-			         {Param::BassGain, "BASS"},
-			         {Param::MidGain, "MID"},
+			return {{{db(Param::RoomSize, "DRIVE", 0.f, 24.f)},
+			         db(Param::BassGain, "BASS", -15.f, 15.f, true),
+			         db(Param::MidGain, "MID", -15.f, 15.f, true),
 			         LEVEL_DEF(),
 			         {Param::ShaperMode, "SHPR", true, 0, 3, kShaperOptions()},
-			         {Param::BassFreq, "BFREQ"},
-			         {Param::TrebleGain, "TRBL"},
+			         {Param::BassFreq, "BFREQ", false, 0, 1, nullptr, "HZ", 30.f, 400.f, 0, false},
+			         db(Param::TrebleGain, "TRBL", -15.f, 15.f, true),
 			         {Param::Diffusion, "TLVL"}}};
 		case Model::KDFX_FLANGER:
-			return {{{Param::RoomSize, "RATE"},
-			         {Param::Decay, "DEPTH"},
-			         {Param::Damping, "FDBK"},
+			return {{{hz(Param::RoomSize, "RATE", 0.05f, 8.f)},
+			         ms(Param::Decay, "DEPTH", 0.f, 3.f, 2),
+			         bipolarPct(Param::Damping, "FDBK", 95.f),
 			         LEVEL_DEF(),
-			         {Param::BaseDelay, "BASE"},
-			         {Param::Diffusion, "SPRD"},
-			         {Param::HPF, "HPF"}}};
+			         ms(Param::BaseDelay, "BASE", 0.1f, 7.f),
+			         {Param::Diffusion, "SPRD", false, 0, 1, nullptr, "DEG", 0.f, 180.f, 0, false},
+			         {Param::HPF, "HPF", false, 0, 1, nullptr, "HZ", 20.f, 1000.f, 0, false}}};
 		case Model::KDFX_PHASER:
-			return {{{Param::RoomSize, "RATE"},
+			return {{{hz(Param::RoomSize, "RATE", 0.05f, 8.f)},
 			         {Param::Decay, "DEPTH"},
-			         {Param::Damping, "FDBK"},
+			         {Param::Damping, "FDBK", false, 0, 1, nullptr, "%", 0.f, 70.f, 0, false},
 			         LEVEL_DEF(),
-			         {Param::Diffusion, "SPRD"},
-			         {Param::HPF, "HPF"}}};
+			         {Param::Diffusion, "SPRD", false, 0, 1, nullptr, "DEG", 0.f, 180.f, 0, false},
+			         {Param::HPF, "HPF", false, 0, 1, nullptr, "HZ", 20.f, 1000.f, 0, false}}};
 		case Model::KDFX_TREMOLO:
-			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "DEPTH"}, {}, LEVEL_DEF()}};
+			return {{{hz(Param::RoomSize, "RATE", 0.10f, 16.f)}, {Param::Decay, "DEPTH"}, {}, LEVEL_DEF()}};
 		case Model::KDFX_AUTOPAN:
-			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "WIDTH"}, {}, LEVEL_DEF()}};
+			return {{{hz(Param::RoomSize, "RATE", 0.05f, 10.f)}, {Param::Decay, "WIDTH"}, {}, LEVEL_DEF()}};
 		case Model::EMPTY:
 		case Model::COMPRESSOR:
 		case Model::FILTER:

@@ -137,7 +137,15 @@ public:
 			snprintf(outBuffer, bufferSize, "%s", s);
 			return;
 		}
-		Integer::formatValueForVisualMenu(outBuffer, bufferSize);
+		if (d.isInt || d.unit == nullptr) {
+			Integer::formatValueForVisualMenu(outBuffer, bufferSize);
+			return;
+		}
+		// Real-unit readout: the menu value is travel percent; convert through the
+		// engine's own range (FxBloc::ParamDef).
+		float t = static_cast<float>(this->getValue()) / 100.0f;
+		float real = d.bipolar ? (t - 0.5f) * 2.0f * d.realMax : d.realMin + t * (d.realMax - d.realMin);
+		snprintf(outBuffer, bufferSize, "%.*f%s", d.decimals, real, d.unit);
 	}
 
 private:
