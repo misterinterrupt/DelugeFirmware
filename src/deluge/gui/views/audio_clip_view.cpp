@@ -293,6 +293,11 @@ ActionResult AudioClipView::buttonAction(deluge::hid::Button b, bool on, bool in
 
 	// Song view button
 	if (b == SESSION_VIEW) {
+		// Ignore synthetic releases from the PIC's NO_PRESSES_HAPPENING sweep so the
+		// song-button hold isn't cut short while the button is still physically held.
+		if (!on && Buttons::noPressesSweepActive) {
+			return ActionResult::DEALT_WITH;
+		}
 		if (on) {
 			if (currentUIMode == UI_MODE_NONE) {
 				currentUIMode = UI_MODE_HOLDING_SONG_BUTTON;

@@ -123,10 +123,7 @@ void VisualMenuUI::closeVisualMenu() {
 	// or button consumption), leaving it set blocks the root view's input after we close —
 	// including the song button, slot presses, and (for a stranded save-hold) accidental
 	// stem-export launches on the next RECORD press.
-	exitUIMode(UI_MODE_CLIP_PRESSED_IN_SONG_VIEW);
-	exitUIMode(UI_MODE_AUDITIONING);
-	exitUIMode(UI_MODE_NOTES_PRESSED);
-	exitUIMode(UI_MODE_HOLDING_SAVE_BUTTON);
+	exitStrandedModes();
 	close();
 }
 
@@ -358,10 +355,25 @@ ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inC
 		return ActionResult::DEALT_WITH;
 	}
 
-	// Ignore new presses while a special mode owns the UI, but always let releases through so hold
-	// state can't get stranded by an intervening mode change.
-	if (on && currentUIMode != UI_MODE_NONE && currentUIMode != UI_MODE_AUDITIONING) {
+	// The song button escapes the overlay: close and re-dispatch to the root view so it behaves
+	// exactly as it would if the menu weren't open. (The classic sound editor instead swallows
+	// the world; for a quick-edit overlay, escape is the useful behavior.)
+	if (b == SESSION_VIEW) {
+		if (on) {
+			if (inCardRoutine) {
+				return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
+			}
+			closeVisualMenu();
+			return getRootUI()->buttonAction(b, on, inCardRoutine);
+		}
 		return ActionResult::DEALT_WITH;
+	}
+
+	// A press while a foreign interaction mode is active means that mode is stranded — the menu
+	// itself never creates one (only AUDITIONING may accompany it). A stranded mode used to eat
+	// every slot press ("KIT won't edit"); clear it and carry on instead of swallowing input.
+	if (on && currentUIMode != UI_MODE_NONE && currentUIMode != UI_MODE_AUDITIONING) {
+		exitStrandedModes();
 	}
 
 	int8_t slotPressed = -1;
@@ -500,7 +512,18 @@ ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inC
 		return ActionResult::DEALT_WITH;
 	}
 
-	return ActionResult::NOT_DEALT_WITH;
+	// Sound-editor parity: while this menu is current it owns the input. Everything not handled
+	// above is consumed so no global button handler ever fires underneath us.
+	return ActionResult::DEALT_WITH;
+}
+
+void VisualMenuUI::exitStrandedModes() {
+	exitUIMode(UI_MODE_CLIP_PRESSED_IN_SONG_VIEW);
+	exitUIMode(UI_MODE_AUDITIONING);
+	exitUIMode(UI_MODE_NOTES_PRESSED);
+	exitUIMode(UI_MODE_HOLDING_SAVE_BUTTON);
+	exitUIMode(UI_MODE_HOLDING_LOAD_BUTTON);
+	exitUIMode(UI_MODE_HOLDING_SONG_BUTTON);
 }
 
 void VisualMenuUI::selectEncoderAction(int8_t offset) {

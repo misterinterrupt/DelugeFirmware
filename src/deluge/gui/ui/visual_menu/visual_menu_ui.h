@@ -85,6 +85,10 @@ private:
 
 	void applySourceIndexForCurrentPage();
 
+	/// Exit every interaction mode that can strand while the menu is current (their releases
+	/// can be eaten by our input consumption). Safe to call unconditionally.
+	void exitStrandedModes();
+
 	/// Establish soundEditor context + categories for clip. Shared by openForClip() and
 	/// refreshEditContext(). Returns false if no coherent context exists for the clip.
 	bool setupEditContext(Clip* clip, const MenuItem* item = nullptr);

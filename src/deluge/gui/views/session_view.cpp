@@ -222,6 +222,11 @@ ActionResult SessionView::buttonAction(deluge::hid::Button b, bool on, bool inCa
 		if (inCardRoutine) {
 			return ActionResult::REMIND_ME_OUTSIDE_CARD_ROUTINE;
 		}
+		// Ignore synthetic releases from the PIC's NO_PRESSES_HAPPENING sweep (it tracks pad
+		// state only) so an in-progress song-button interaction isn't cut short.
+		if (!on && Buttons::noPressesSweepActive) {
+			return ActionResult::DEALT_WITH;
+		}
 		bool lastSessionButtonActiveState = sessionButtonActive;
 		sessionButtonActive = on;
 
