@@ -24,6 +24,8 @@
 #include <cstdint>
 #include <span>
 
+class Drum;
+
 namespace deluge::gui::ui::visual_menu {
 
 class VisualMenuUI final : public UI {
@@ -74,7 +76,23 @@ private:
 	Clip* currentClip_ = nullptr;
 	bool contextIsClipMinder_ = false;
 
+	// Editing-context signature captured when soundEditor was last set up for this menu.
+	// getCurrentModelStack() pairs the *live* root state (current clip, selected drum,
+	// affect-entire) with these captured fields, so any drift must trigger a re-setup
+	// before an item reads or writes a param.
+	Drum* contextDrum_ = nullptr;
+	bool contextAffectEntire_ = false;
+
 	void applySourceIndexForCurrentPage();
+
+	/// Establish soundEditor context + categories for clip. Shared by openForClip() and
+	/// refreshEditContext(). Returns false if no coherent context exists for the clip.
+	bool setupEditContext(Clip* clip, const MenuItem* item = nullptr);
+
+	/// Re-validate the captured editing context against live song/root state (clip identity,
+	/// kit's selected drum, affect-entire, root-UI kind) and re-derive it if anything moved.
+	/// Returns false (with the menu closed) if no coherent context can be re-established.
+	bool refreshEditContext();
 };
 
 extern VisualMenuUI visualMenuUI;

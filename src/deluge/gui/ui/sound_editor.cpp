@@ -1488,10 +1488,14 @@ doMIDIOrCV:
 			}
 		}
 		else {
-			if ((currentUI == &performanceSessionView) && !Buttons::isShiftButtonPressed()) {
+			// Key the root-menu choice off the root UI, not the current UI: overlay UIs
+			// (sound editor nested in the visual menu, etc.) re-run setup() while they are
+			// current, and must not fall into the settings-root branch.
+			UI* rootUI = getRootUI();
+			if ((rootUI == &performanceSessionView) && !Buttons::isShiftButtonPressed()) {
 				newItem = &soundEditorRootMenuPerformanceView;
 			}
-			else if ((currentUI == &sessionView || currentUI == &arrangerView || currentUI == &automationView)
+			else if ((rootUI == &sessionView || rootUI == &arrangerView || rootUI == &automationView)
 			         && !Buttons::isShiftButtonPressed()) {
 				newItem = &soundEditorRootMenuSongView;
 			}
@@ -1510,11 +1514,16 @@ doMIDIOrCV:
 	// This isn't a very nice solution, but we have to set currentParamManager before calling
 	// checkPermissionToBeginSession(), because in a minority of cases, like "patch cable strength" / "modulation
 	// depth", it needs this.
+	ParamManagerForTimeline* previousParamManager = currentParamManager;
 	currentParamManager = newParamManager;
 
 	MenuPermission result = newItem->checkPermissionToBeginSession(newModControllable, sourceIndex, &newRange);
 
 	if (result == MenuPermission::NO) {
+		// Don't leave a half-updated context behind: currentParamManager would point at the
+		// new target while currentModControllable/currentSound still reflect the old one, and
+		// any later edit through that mixed pairing corrupts the param node trees.
+		currentParamManager = previousParamManager;
 		display->setText("");
 		return false;
 	}

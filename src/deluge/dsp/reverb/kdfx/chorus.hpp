@@ -67,8 +67,12 @@ public:
 			auto readInterp = [this](const std::array<q31_t, kMaxDelay>& buf, int32_t delayQ16) -> q31_t {
 				size_t intPart = static_cast<size_t>(delayQ16 >> 16);
 				uint32_t fracPart = static_cast<uint32_t>(delayQ16 & 0xFFFF);
-				q31_t s0 = kdfx::circRead(buf, writePos_, intPart);
-				q31_t s1 = kdfx::circRead(buf, writePos_, intPart + 1);
+				// Both taps must fall inside the initialized region of the line
+				if (intPart >= age_) {
+					return 0;
+				}
+				q31_t s0 = kdfx::circReadCapped(buf, writePos_, intPart, age_);
+				q31_t s1 = kdfx::circReadCapped(buf, writePos_, intPart + 1, age_);
 				return s0 + static_cast<q31_t>((static_cast<int64_t>(s1 - s0) * fracPart) >> 16);
 			};
 
@@ -118,6 +122,7 @@ public:
 			kdfx::mixWet(s.l, wetL, getPanLeft());
 			kdfx::mixWet(s.r, wetR, getPanRight());
 
+			++age_;
 			writePos_ = (writePos_ + 1) % kMaxDelay;
 		}
 	}
@@ -185,10 +190,12 @@ public:
 private:
 	static constexpr size_t kMaxDelay = 4096; // ~92 ms buffer
 
-	std::array<q31_t, kMaxDelay> bufL_{};
-	std::array<q31_t, kMaxDelay> bufR_{};
+	// Deliberately uninitialized (see kdfx_util.hpp circReadCapped); reads are age-capped.
+	std::array<q31_t, kMaxDelay> bufL_;
+	std::array<q31_t, kMaxDelay> bufR_;
 
 	size_t writePos_ = 0;
+	uint32_t age_ = 0; // frames completed since construction
 	int32_t baseDelayQ16_ = 350 << 16;
 	int32_t depthQ16_ = 150 << 16;
 	uint32_t lfoPhase_ = 0;

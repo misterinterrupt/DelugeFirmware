@@ -36,19 +36,19 @@ public:
 
 			// 1. Pre-delay line write & read
 			preDelayBuf_[preWritePos_] = inSample;
-			q31_t preDelayed = kdfx::circRead(preDelayBuf_, preWritePos_, preDelaySamples_);
+			q31_t preDelayed = kdfx::circReadCapped(preDelayBuf_, preWritePos_, preDelaySamples_, age_);
 			preWritePos_ = (preWritePos_ + 1) % kPreBufSize;
 
 			// 2. Early Reflections (ER) 6-tap matrix from pre-delayed signal
 			q31_t erL = 0;
 			q31_t erR = 0;
 			if (erLevelQ31_ > 0) {
-				q31_t er1 = kdfx::circRead(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 317, 1, kPreBufSize - 1));
-				q31_t er2 = kdfx::circRead(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 563, 1, kPreBufSize - 1));
-				q31_t er3 = kdfx::circRead(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 919, 1, kPreBufSize - 1));
-				q31_t er4 = kdfx::circRead(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 1459, 1, kPreBufSize - 1));
-				q31_t er5 = kdfx::circRead(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 2087, 1, kPreBufSize - 1));
-				q31_t er6 = kdfx::circRead(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 2699, 1, kPreBufSize - 1));
+				q31_t er1 = kdfx::circReadCapped(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 317, 1, kPreBufSize - 1), age_);
+				q31_t er2 = kdfx::circReadCapped(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 563, 1, kPreBufSize - 1), age_);
+				q31_t er3 = kdfx::circReadCapped(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 919, 1, kPreBufSize - 1), age_);
+				q31_t er4 = kdfx::circReadCapped(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 1459, 1, kPreBufSize - 1), age_);
+				q31_t er5 = kdfx::circReadCapped(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 2087, 1, kPreBufSize - 1), age_);
+				q31_t er6 = kdfx::circReadCapped(preDelayBuf_, preWritePos_, std::clamp<size_t>(preDelaySamples_ + 2699, 1, kPreBufSize - 1), age_);
 
 				int64_t sumL = (int64_t)er1 * 600 + (int64_t)er3 * 450 + (int64_t)er5 * 300;
 				int64_t sumR = (int64_t)er2 * 600 + (int64_t)er4 * 450 + (int64_t)er6 * 300;
@@ -64,7 +64,7 @@ public:
 			// 4. Read delay line endpoints & apply absorption/decay/bass multiplier
 			q31_t x[4];
 			for (uint32_t l = 0; l < 4; l++) {
-				q31_t delayed = kdfx::circRead(buf_[l], writePos_, lineLen_[l]);
+				q31_t delayed = kdfx::circReadCapped(buf_[l], writePos_, lineLen_[l], age_);
 
 				// Smooth sweepable HF absorption + "air" shelf blend
 				kdfx::shelfDamp(dampState_[l], airState_[l], delayed, dampCoeff_, air_);
@@ -103,10 +103,10 @@ public:
 				return (off < 1) ? 1 : off;
 			};
 
-			q31_t l0 = kdfx::circRead(buf_[0], writePos_, safeTapOffset(0, 5));
-			q31_t l1 = kdfx::circRead(buf_[2], writePos_, safeTapOffset(2, 7));
-			q31_t r0 = kdfx::circRead(buf_[1], writePos_, safeTapOffset(1, 6));
-			q31_t r1 = kdfx::circRead(buf_[3], writePos_, safeTapOffset(3, 8));
+			q31_t l0 = kdfx::circReadCapped(buf_[0], writePos_, safeTapOffset(0, 5), age_);
+			q31_t l1 = kdfx::circReadCapped(buf_[2], writePos_, safeTapOffset(2, 7), age_);
+			q31_t r0 = kdfx::circReadCapped(buf_[1], writePos_, safeTapOffset(1, 6), age_);
+			q31_t r1 = kdfx::circReadCapped(buf_[3], writePos_, safeTapOffset(3, 8), age_);
 
 			q31_t wetL = add_saturation(kdfx::qcollapse((int64_t)l0 + l1), erL);
 			q31_t wetR = add_saturation(kdfx::qcollapse((int64_t)r0 + r1), erR);
@@ -127,6 +127,7 @@ public:
 			kdfx::mixWet(s.l, wetL, getPanLeft());
 			kdfx::mixWet(s.r, wetR, getPanRight());
 
+			++age_;
 			writePos_ = (writePos_ + 1) % kBufSize;
 		}
 	}
@@ -212,11 +213,13 @@ private:
 	static constexpr size_t kMinLine = 128;
 	static constexpr size_t kPrimeLen[4] = {1087, 1453, 1789, 2137};
 
-	std::array<std::array<q31_t, kBufSize>, 4> buf_{};
-	std::array<q31_t, kPreBufSize> preDelayBuf_{};
+	// Deliberately uninitialized (see kdfx_util.hpp circReadCapped); reads are age-capped.
+	std::array<std::array<q31_t, kBufSize>, 4> buf_;
+	std::array<q31_t, kPreBufSize> preDelayBuf_;
 
 	size_t writePos_ = 0;
 	size_t preWritePos_ = 0;
+	uint32_t age_ = 0; // frames completed since construction
 	size_t preDelaySamples_ = 0;
 	size_t lineLen_[4] = {1087, 1453, 1789, 2137};
 	uint32_t tapSpread_ = 2;

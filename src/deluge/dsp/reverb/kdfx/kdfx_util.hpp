@@ -99,6 +99,25 @@ constexpr inline q31_t circRead(const std::array<q31_t, BufSize>& buf, size_t wr
 	return buf[p];
 }
 
+/// Circular read for a delay line whose buffer is left uninitialized on construction.
+///
+/// The big KDFX engine buffers (0.5 MB for the delay) are deliberately not zero-initialized:
+/// a variant emplace clearing them inside the audio task would overrun the SSI TX buffer and
+/// glitch output on every model switch. Instead every read distance is capped to the engine's
+/// age (frames completed since construction), so we only touch positions the write cursor has
+/// already filled. Reads that would reach further back — the first lap, for long delays —
+/// return silence, which is exactly what a cleared line would have given.
+template <size_t BufSize>
+constexpr inline q31_t circReadCapped(const std::array<q31_t, BufSize>& buf, size_t writePos, size_t back,
+                                      uint32_t age) {
+	if (back > age) {
+		return 0;
+	}
+	// back == 0 stays a plain read of the write position (a zero pre-delay must pass the
+	// just-written sample through).
+	return circRead<BufSize>(buf, writePos, back);
+}
+
 /// Safe circular buffer read supporting signed offsets.
 template <size_t BufSize>
 inline q31_t circReadSigned(const std::array<q31_t, BufSize>& buf, size_t writePos, int32_t back) {

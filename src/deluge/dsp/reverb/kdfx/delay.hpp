@@ -34,10 +34,10 @@ public:
 			size_t d3 = std::clamp<size_t>(static_cast<size_t>(delaySamplesL_ * tapSpread_), 1, kMaxDelay - 1);
 			size_t d4 = std::clamp<size_t>(static_cast<size_t>(delaySamplesR_ * tapSpread_), 1, kMaxDelay - 1);
 
-			q31_t tap1 = kdfx::circRead(bufL_, writePos_, d1);
-			q31_t tap2 = kdfx::circRead(bufR_, writePos_, d2);
-			q31_t tap3 = kdfx::circRead(bufL_, writePos_, d3);
-			q31_t tap4 = kdfx::circRead(bufR_, writePos_, d4);
+			q31_t tap1 = kdfx::circReadCapped(bufL_, writePos_, d1, age_);
+			q31_t tap2 = kdfx::circReadCapped(bufR_, writePos_, d2, age_);
+			q31_t tap3 = kdfx::circReadCapped(bufL_, writePos_, d3, age_);
+			q31_t tap4 = kdfx::circReadCapped(bufR_, writePos_, d4, age_);
 
 			// Feedback loop with HF absorption damping
 			kdfx::smoothDamp(dampL_, tap1, dampCoeff_);
@@ -76,6 +76,8 @@ public:
 
 			bufL_[writePos_] = nextL;
 			bufR_[writePos_] = nextR;
+
+			++age_;
 
 			// Output summing of 4 taps with spatial spread
 			q31_t wetL = add_saturation(tap1, tap3 >> 1);
@@ -162,10 +164,14 @@ public:
 private:
 	static constexpr size_t kMaxDelay = 65536; // ~1486 ms buffer @ 44.1k
 
-	std::array<q31_t, kMaxDelay> bufL_{};
-	std::array<q31_t, kMaxDelay> bufR_{};
+	// Deliberately uninitialized: clearing 512 KB on variant emplace would run inside the
+	// audio task and blow the SSI TX buffer. circReadCapped() keeps reads within the region
+	// the write cursor has filled; see kdfx_util.hpp.
+	std::array<q31_t, kMaxDelay> bufL_;
+	std::array<q31_t, kMaxDelay> bufR_;
 
 	size_t writePos_ = 0;
+	uint32_t age_ = 0; // frames completed since construction
 	size_t delaySamplesL_ = 16384;
 	size_t delaySamplesR_ = 24576;
 	float tapSpread_ = 0.75f;

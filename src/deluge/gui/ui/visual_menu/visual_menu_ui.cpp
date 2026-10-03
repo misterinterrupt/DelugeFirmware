@@ -23,6 +23,8 @@
 #include "hid/display/oled.h"
 #include "hid/led/indicator_leds.h"
 #include "model/clip/instrument_clip.h"
+#include "model/drum/drum.h"
+#include "model/instrument/kit.h"
 #include "model/song/song.h"
 #include "processing/sound/sound.h"
 
@@ -87,6 +89,9 @@ void VisualMenuUI::focusRegained() {
 		turnedWhileHeld_[i] = false;
 		wasAlreadySelected_[i] = false;
 	}
+	// Coming back down from a UI that was above us, the editing context may have moved
+	// (clip/row/affect-entire changed while we weren't current).
+	refreshEditContext();
 	applySourceIndexForCurrentPage();
 	updateButtonLEDs();
 	renderUIsForOled();
@@ -114,6 +119,10 @@ void VisualMenuUI::closeVisualMenu() {
 	indicator_leds::setLedState(IndicatorLED::KIT, false);
 	indicator_leds::setLedState(IndicatorLED::MIDI, false);
 	indicator_leds::setLedState(IndicatorLED::CV, false);
+	// If a clip-press mode got stranded while we were current (its release eaten by our pad
+	// consumption), leaving it set blocks the session view's input — including the song
+	// button — after we close.
+	exitUIMode(UI_MODE_CLIP_PRESSED_IN_SONG_VIEW);
 	close();
 }
 
@@ -139,21 +148,22 @@ ActionResult VisualMenuUI::padAction(int32_t x, int32_t y, int32_t velocity) {
 	return ActionResult::DEALT_WITH;
 }
 
-bool VisualMenuUI::openForClip(Clip* clip, const MenuItem* targetItem) {
+bool VisualMenuUI::setupEditContext(Clip* clip, const MenuItem* item) {
 	currentClip_ = clip;
 	contextIsClipMinder_ = rootUIIsClipMinderScreen();
 
 	// A kit clip with no (sound) drum row selected cannot resolve a per-drum editing context; fall back to
 	// the kit's affect-entire (global FX) context instead of silently failing.
 	bool kitGlobalFX = false;
-	if (!soundEditor.setup(clip, targetItem)) {
+	if (!soundEditor.setup(clip, item)) {
 		InstrumentClip* kitClip = nullptr;
 		if (rootUIIsClipMinderScreen() && clip && clip->type == ClipType::INSTRUMENT) {
 			kitClip = static_cast<InstrumentClip*>(clip);
 		}
 		if (kitClip && kitClip->output && kitClip->output->type == OutputType::KIT) {
 			soundEditor.setupKitGlobalFXMenu = true;
-			if (!soundEditor.setup(clip, targetItem)) {
+			if (!soundEditor.setup(clip, item)) {
+				soundEditor.setupKitGlobalFXMenu = false;
 				return false;
 			}
 			kitGlobalFX = true;
@@ -195,6 +205,88 @@ bool VisualMenuUI::openForClip(Clip* clip, const MenuItem* targetItem) {
 	}
 	else {
 		categories_ = getSynthCategories();
+	}
+
+	// Capture the context signature so drift is detectable by refreshEditContext().
+	contextDrum_ = nullptr;
+	contextAffectEntire_ = false;
+	if (contextIsClipMinder_ && clip && clip->type == ClipType::INSTRUMENT) {
+		auto* instClip = static_cast<InstrumentClip*>(clip);
+		contextAffectEntire_ = instClip->affectEntire;
+		if (!kitGlobalFX && instClip->output && instClip->output->type == OutputType::KIT) {
+			contextDrum_ = static_cast<Kit*>(instClip->output)->selectedDrum;
+		}
+	}
+
+	return true;
+}
+
+bool VisualMenuUI::refreshEditContext() {
+	if (getCurrentUI() != this) {
+		return false;
+	}
+
+	if (rootUIIsClipMinderScreen() != contextIsClipMinder_) {
+		closeVisualMenu();
+		return false;
+	}
+
+	if (!contextIsClipMinder_) {
+		return true; // song-level context has no finer signature
+	}
+
+	Clip* clip = getCurrentClip();
+	if (clip == nullptr) {
+		closeVisualMenu();
+		return false;
+	}
+
+	if (clip == currentClip_) {
+		bool drifted = false;
+		if (clip->type == ClipType::INSTRUMENT) {
+			auto* instClip = static_cast<InstrumentClip*>(clip);
+			if (instClip->affectEntire != contextAffectEntire_) {
+				drifted = true;
+			}
+			Drum* drum = nullptr;
+			if (instClip->output && instClip->output->type == OutputType::KIT) {
+				drum = static_cast<Kit*>(instClip->output)->selectedDrum;
+			}
+			if (drum != contextDrum_) {
+				drifted = true;
+			}
+		}
+		if (!drifted) {
+			return true;
+		}
+	}
+
+	// Context moved under us (different clip, re-selected row, affect-entire toggled).
+	// Re-derive it as a whole — never edit through a mixed old/new pairing.
+	if (!setupEditContext(clip, nullptr)) {
+		closeVisualMenu();
+		return false;
+	}
+
+	// The category set may have changed shape; clamp navigation into it. Slot mapping is
+	// against the old page, so drop any selection.
+	if (currentCategoryIndex_ >= static_cast<int32_t>(categories_.size())) {
+		currentCategoryIndex_ = 0;
+	}
+	if (!categories_.empty()) {
+		const auto& cat = categories_[currentCategoryIndex_];
+		if (currentPageIndex_ >= static_cast<int32_t>(cat.pages.size())) {
+			currentPageIndex_ = 0;
+		}
+	}
+	selectedSlot_ = -1;
+	decimalCursorSlot_ = -1;
+	return true;
+}
+
+bool VisualMenuUI::openForClip(Clip* clip, const MenuItem* targetItem) {
+	if (!setupEditContext(clip, targetItem)) {
+		return false;
 	}
 
 	currentCategoryIndex_ = 0;
@@ -271,6 +363,11 @@ ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inC
 
 	if (slotPressed >= 0) {
 		if (on) {
+			// Slot press re-syncs the item's cached value (below), which reads through the
+			// soundEditor context — validate it first.
+			if (!refreshEditContext()) {
+				return ActionResult::DEALT_WITH;
+			}
 			bool switchingSlot = (selectedSlot_ != slotPressed);
 			slotHeld_[slotPressed] = true;
 			turnedWhileHeld_[slotPressed] = false;
@@ -351,6 +448,13 @@ ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inC
 		}
 		return ActionResult::DEALT_WITH;
 	}
+	else if (b == AFFECT_ENTIRE && contextIsClipMinder_) {
+		// Affect-entire retargets kit editing between the selected row and global FX. The list
+		// menu delegates this to the clip minder; do the same (the handler only toggles state
+		// and LEDs, it never transitions the root UI). refreshEditContext() notices the change
+		// and re-derives the context before the next slot interaction.
+		return getRootUI()->buttonAction(b, on, inCardRoutine);
+	}
 	else if (b == SELECT_ENC) {
 		if (on) {
 			if (selectedSlot_ >= 0 && currentCategoryIndex_ < static_cast<int32_t>(categories_.size())) {
@@ -391,6 +495,13 @@ void VisualMenuUI::selectEncoderAction(int8_t offset) {
 		return;
 	}
 
+	// Every encoder interaction touches the soundEditor context (page sync or param edit),
+	// and getCurrentModelStack() pairs live root state with the captured fields — so the
+	// whole signature (clip, selected drum, affect-entire, root kind) must still match.
+	if (!refreshEditContext()) {
+		return;
+	}
+
 	// 1. Shift + Select Knob always navigates categories directly
 	if (Buttons::isShiftButtonPressed()) {
 		int32_t numCats = static_cast<int32_t>(categories_.size());
@@ -409,25 +520,6 @@ void VisualMenuUI::selectEncoderAction(int8_t offset) {
 	}
 
 	int8_t activeSlot = getActiveHeldSlot();
-
-	// If the root UI changed kind under us (e.g. clip selection transitioned session -> clip
-	// view), the captured soundEditor context is invalid — writing through it would mix the
-	// song's param manager with a clip model stack and corrupt the node trees. Close cleanly.
-	if (rootUIIsClipMinderScreen() != contextIsClipMinder_) {
-		closeVisualMenu();
-		return;
-	}
-
-	// If the current clip changed since the menu opened (e.g. a clip was selected from the
-	// session grid while the menu stayed open), re-setup so edits target the new clip.
-	if (contextIsClipMinder_ && currentClip_ != nullptr && getCurrentClip() != currentClip_) {
-		currentClip_ = getCurrentClip();
-		soundEditor.setupKitGlobalFXMenu = false; // don't inherit the kit fallback's flag
-		if (!soundEditor.setup(currentClip_, nullptr)) {
-			// Context invalid; keep the UI alive for navigation but skip this edit
-			return;
-		}
-	}
 
 	// 2. If a slot is active, edit its parameter value smoothly
 	if (activeSlot >= 0 && currentCategoryIndex_ < static_cast<int32_t>(categories_.size())) {

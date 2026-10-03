@@ -227,6 +227,11 @@ void closeUI(UI* uiToClose) {
 }
 
 bool openUI(UI* newUI) {
+	if (numUIsOpen >= (int32_t)kUiNavigationHistoryLength) {
+		// Writing past the navigation stack would corrupt whatever sits after it in .bss
+		// (numUIsOpen, lastUIBeforeNullifying, ...). Refuse the push instead.
+		return false;
+	}
 	UI* oldUI = getCurrentUI();
 	uiNavigationHierarchy[numUIsOpen] = newUI;
 	numUIsOpen++;
