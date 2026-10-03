@@ -610,6 +610,10 @@ void renderAudioForStemExport(size_t numSamples);
 	bypassCulling = false;
 }
 void renderAudio(size_t numSamples) {
+	// Render boundary for the modular master chain: swap any pending engine selections,
+	// retire displaced engines, advance the reclamation generation.
+	masterFxChain.applyPending();
+
 	memset(&renderingBuffer, 0, numSamples * sizeof(StereoSample));
 	memset(&reverbBuffer, 0, numSamples * sizeof(StereoSample));
 
@@ -671,6 +675,15 @@ void renderAudio(size_t numSamples) {
 
 	renderSongFX(numSamples);
 
+	// Modular master FX chain — the final master insert, after the legacy chain
+	// (song FX / compressor / send-reverb) and before the metronome, so clicks stay
+	// dry and the RMS envelope reflects the post-chain signal. Dormant by default:
+	// all-EMPTY slots make isActive() false and this a pure skip, leaving legacy
+	// output bit-identical until blocs are selected via the FX BLOCS menus.
+	if (masterFxChain.isActive()) {
+		masterFxChain.process(renderingBuffer.data(), numSamples);
+	}
+
 	metronome.render(renderingBuffer.data(), numSamples);
 
 	approxRMSLevel = envelopeFollower.calcApproxRMS(renderingBuffer.data(), numSamples);
@@ -684,6 +697,8 @@ void renderAudio(size_t numSamples) {
 void renderAudioForStemExport(size_t numSamples) {
 	memset(&renderingBuffer, 0, numSamples * sizeof(StereoSample));
 	memset(&reverbBuffer, 0, numSamples * sizeof(StereoSample));
+
+	masterFxChain.applyPending();
 
 	if (sideChainHitPending) {
 		timeLastSideChainHit = audioSampleTimer;
@@ -701,6 +716,9 @@ void renderAudioForStemExport(size_t numSamples) {
 	if (stemExport.includeSongFX) {
 		renderReverb(numSamples);
 		renderSongFX(numSamples);
+		if (masterFxChain.isActive()) {
+			masterFxChain.process(renderingBuffer.data(), numSamples);
+		}
 	}
 
 	// If we're recording final output for offline stem export with song FX

@@ -40,6 +40,12 @@ public:
 	Routing getRouting() const { return routing_; }
 	void setRouting(Routing r) { routing_ = r; }
 
+	/// True when any slot holds an engine — lets the render path skip the chain entirely
+	/// (default all-EMPTY state is a zero-cost no-op, keeping legacy output bit-identical).
+	[[nodiscard]] bool isActive() const {
+		return !slots_[0].isEmpty() || !slots_[1].isEmpty() || !slots_[2].isEmpty();
+	}
+
 	FxBloc& slot(size_t i) { return slots_[i]; }
 	FxBloc const& slot(size_t i) const { return slots_[i]; }
 
