@@ -135,10 +135,11 @@ constexpr int MIN_VOICES = 7;
 
 dsp::Reverb reverb{};
 
-// Modular master FX chain (three FxBloc slots + selectable routing topology). Placed in
-// SDRAM — the per-slot engine variants are ~715KB each. Not yet wired into the render
-// path; integration lands with the master-stage milestone (defaults preserve today's
-// comp -> filter -> send-reverb behaviour).
+// Modular master FX chain (three FxBloc slots + selectable routing topology). The chain
+// object is tiny (engines are lazily allocated right-sized from SDRAM on selection, freed
+// on EMPTY — see dsp/fx_bloc/fx_bloc.hpp). Not yet wired into the render path; integration
+// lands with the master-stage milestone (defaults preserve today's comp -> filter ->
+// send-reverb behaviour).
 PLACE_SDRAM_BSS dsp::MasterFxChain masterFxChain{};
 // Incremented whenever the stem-export state fails its impossible-value check in the audio
 // routine — a live counter of memory-scribbler hits on that global (dumped by capture scripts).
