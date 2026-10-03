@@ -135,12 +135,13 @@ constexpr int MIN_VOICES = 7;
 
 dsp::Reverb reverb{};
 
-// Modular master FX chain (three FxBloc slots + selectable routing topology). The chain
-// object is tiny (engines are lazily allocated right-sized from SDRAM on selection, freed
-// on EMPTY — see dsp/fx_bloc/fx_bloc.hpp). Not yet wired into the render path; integration
-// lands with the master-stage milestone (defaults preserve today's comp -> filter ->
-// send-reverb behaviour).
-PLACE_SDRAM_BSS dsp::MasterFxChain masterFxChain{};
+// Modular master FX chain (three FxBloc slots + selectable routing topology). Small
+// (~2.5KB — engines allocate lazily, right-sized, from SDRAM on selection). Kept in
+// internal .bss: .sdram_bss was unsafe for a constructed object until the resetprg
+// zeroing fix, and .bss is zeroed before IRQs are ever enabled — the ctor-vs-first-audio-
+// block race can only ever see a valid (zero = EMPTY) state. Not yet user-reachable
+// defaults-wise; see dsp/fx_bloc/fx_bloc.hpp.
+dsp::MasterFxChain masterFxChain{};
 // Incremented whenever the stem-export state fails its impossible-value check in the audio
 // routine — a live counter of memory-scribbler hits on that global (dumped by capture scripts).
 uint32_t scribbleCanaryTrips = 0;

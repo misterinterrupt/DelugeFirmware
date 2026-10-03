@@ -183,6 +183,15 @@ void resetprg(void) {
 	// Setup SDRAM. Have to do this before we init global objects
 	userdef_bsc_cs2_init(0); // 64MB, hardcoded
 
+	// .sdram_bss must be zeroed in every build type: the full-SDRAM memset below is
+	// compiled out under NDEBUG (CMake's implicit Release flags), and IRQs are already
+	// enabled above — an audio interrupt during the static-constructor phase would
+	// otherwise find constructed-or-not objects sitting on random SDRAM junk. (Found by
+	// a .sdram_bss-resident C++ object whose first applyPending() virtual-dispatched
+	// through garbage and parked the CPU in the fault handler.)
+	memset((void*)&__sdram_bss_start, 0,
+	        (uint32_t)&__sdram_bss_end - (uint32_t)&__sdram_bss_start);
+
 #if !defined(NDEBUG)
 	const uint32_t SDRAM_SIZE = EXTERNAL_MEMORY_END - EXTERNAL_MEMORY_BEGIN;
 	memset((void*)EXTERNAL_MEMORY_BEGIN, 0, SDRAM_SIZE);
