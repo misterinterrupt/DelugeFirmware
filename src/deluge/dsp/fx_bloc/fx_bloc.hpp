@@ -99,6 +99,10 @@ public:
 		const char* label; // nullptr → "--"
 	};
 
+	/// Canonical param order for XML persistence of a slot's cache.
+	static constexpr std::array<Param, 6> kPersistParams = {
+	    Param::RoomSize, Param::Damping, Param::Width, Param::Decay, Param::Diffusion, Param::HPF};
+
 	static constexpr std::array<ParamInfo, 3> headlineParams(Model m) {
 		switch (m) {
 		case Model::FREEVERB:

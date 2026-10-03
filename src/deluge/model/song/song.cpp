@@ -17,6 +17,8 @@
 
 #include "model/song/song.h"
 #include "definitions_cxx.hpp"
+#include "dsp/fx_bloc/fx_bloc.hpp"
+#include "dsp/fx_bloc/master_fx_chain.hpp"
 #include "dsp/reverb/reverb.hpp"
 #include "gui/l10n/l10n.h"
 #include "gui/ui/browser/browser.h"
@@ -179,6 +181,16 @@ Song::Song() : backedUpParamManagers(sizeof(BackedUpParamManager)) {
 	reverbSidechainShape = -601295438;
 	reverbSidechainSync = SYNC_LEVEL_8TH;
 	model = deluge::dsp::Reverb::Model::FREEVERB;
+
+	// Master FX chain defaults to the dormant all-EMPTY state.
+	masterFxRouting = 0;
+	for (int32_t s = 0; s < 3; s++) {
+		masterFxModels[s] = 0;
+		for (auto& p : masterFxParams[s]) {
+			p = 0.5f;
+		}
+		masterFxParams[s][5] = 0; // HPF default
+	}
 
 	// setup base compressor gain to match 1.0
 	globalEffectable.compressor.setBaseGain(0.0);
@@ -1164,6 +1176,41 @@ weAreInArrangementEditorOrInClipInstance:
 
 	writer.writeClosingTag("reverb");
 
+	// Modular master FX chain. Only non-EMPTY slots are written, so legacy songs and
+	// the default all-EMPTY chain stay byte-identical. Param order: kPersistParams.
+	{
+		bool anySlot = false;
+		for (size_t s = 0; s < dsp::MasterFxChain::kNumSlots; s++) {
+			if (!AudioEngine::masterFxChain.slot(s).isEmpty()) {
+				anySlot = true;
+				break;
+			}
+		}
+		if (anySlot || AudioEngine::masterFxChain.getRouting() != dsp::MasterFxChain::Routing::SERIES) {
+			static constexpr const char* kParamNames[6] = {"roomSize", "damping", "width", "decay", "diffusion",
+			                                              "hpf"};
+			writer.writeOpeningTagBeginning("masterFx");
+			writer.writeAttribute("routing", util::to_underlying(AudioEngine::masterFxChain.getRouting()));
+			writer.writeOpeningTagEnd();
+			for (size_t s = 0; s < dsp::MasterFxChain::kNumSlots; s++) {
+				auto& bloc = AudioEngine::masterFxChain.slot(s);
+				if (bloc.isEmpty()) {
+					continue;
+				}
+				writer.writeOpeningTagBeginning("slot");
+				writer.writeAttribute("index", (int32_t)s);
+				writer.writeAttribute("model", util::to_underlying(bloc.getModel()));
+				for (size_t p = 0; p < dsp::FxBloc::kPersistParams.size(); p++) {
+					uint32_t v = bloc.getParam(dsp::FxBloc::kPersistParams[p]) * (uint32_t)2147483648u;
+					v = std::min(v, (uint32_t)2147483647);
+					writer.writeAttribute(kParamNames[p], v);
+				}
+				writer.closeTag();
+			}
+			writer.writeClosingTag("masterFx");
+		}
+	}
+
 	globalEffectable.writeTagsToFile(writer, NULL, false);
 
 	int32_t* valuesForOverride = paramsInAutomationMode ? unautomatedParamValues : NULL;
@@ -1396,6 +1443,63 @@ Error Song::readFromFile(Deserializer& reader) {
 							}
 						}
 						reader.exitTag("compressor");
+					}
+			else {
+				reader.exitTag(tagName);
+			}
+		}
+	}
+			else {
+				goto unknownTag;
+			}
+			reader.exitTag();
+			break;
+
+		// "mast" -> masterFx
+		case 0x7473616D:
+			if (!strcmp(tagName, "masterFx")) {
+				while (*(tagName = reader.readNextTagOrAttributeName())) {
+					if (!strcmp(tagName, "routing")) {
+						masterFxRouting = reader.readTagOrAttributeValueInt();
+						reader.exitTag("routing");
+					}
+					else if (!strcmp(tagName, "slot")) {
+						int32_t slotIndex = -1;
+						int32_t modelVal = 0;
+						float params[6] = {0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.0f};
+						while (*(tagName = reader.readNextTagOrAttributeName())) {
+							if (!strcmp(tagName, "index")) {
+								slotIndex = reader.readTagOrAttributeValueInt();
+								reader.exitTag("index");
+							}
+							else if (!strcmp(tagName, "model")) {
+								modelVal = reader.readTagOrAttributeValueInt();
+								reader.exitTag("model");
+							}
+							else if (!strcmp(tagName, "roomSize") || !strcmp(tagName, "damping")
+							         || !strcmp(tagName, "width") || !strcmp(tagName, "decay")
+							         || !strcmp(tagName, "diffusion") || !strcmp(tagName, "hpf")) {
+								static constexpr const char* kParamNames[6] = {"roomSize", "damping", "width",
+								                                                         "decay", "diffusion", "hpf"};
+								for (int32_t p = 0; p < 6; p++) {
+									if (!strcmp(tagName, kParamNames[p])) {
+										params[p] = (float)reader.readTagOrAttributeValueInt() / 2147483648u;
+										break;
+									}
+								}
+								reader.exitTag(tagName);
+							}
+							else {
+								reader.exitTag(tagName);
+							}
+						}
+						if (slotIndex >= 0 && slotIndex < 3) {
+							masterFxModels[slotIndex] = modelVal;
+							for (int32_t p = 0; p < 6; p++) {
+								masterFxParams[slotIndex][p] = params[p];
+							}
+						}
+						reader.exitTag("slot");
 					}
 					else {
 						reader.exitTag(tagName);

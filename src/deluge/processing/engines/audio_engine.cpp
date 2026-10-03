@@ -1465,6 +1465,30 @@ void getReverbParamsFromSong(Song* song) {
 	reverbSidechain.attack = song->reverbSidechainAttack;
 	reverbSidechain.release = song->reverbSidechainRelease;
 	reverbSidechain.syncLevel = song->reverbSidechainSync;
+
+	// Modular master FX chain, staged from the same song XML. Loading always resets
+	// every slot first, so nothing from the previously-active song can bleed through;
+	// a model whose allocation fails degrades to passthrough rather than keeping the
+	// previous bloc. Saved params stage into the cache and flush at the next render
+	// boundary, like every other param write.
+	masterFxChain.setRouting(static_cast<dsp::MasterFxChain::Routing>(std::clamp<int32_t>(
+	    song->masterFxRouting, 0, util::to_underlying(dsp::MasterFxChain::Routing::PARALLEL_SERIES))));
+	for (size_t s = 0; s < dsp::MasterFxChain::kNumSlots; s++) {
+		auto& bloc = masterFxChain.slot(s);
+		auto wanted = static_cast<dsp::FxBloc::Model>(
+		    std::clamp<int32_t>(song->masterFxModels[s], 0,
+		                        util::to_underlying(dsp::FxBloc::Model::KDFX_AUTOPAN)));
+		if (bloc.setModel(wanted)) {
+			if (wanted != dsp::FxBloc::Model::EMPTY) {
+				for (size_t p = 0; p < dsp::FxBloc::kPersistParams.size(); p++) {
+					bloc.setParam(dsp::FxBloc::kPersistParams[p], song->masterFxParams[s][p]);
+				}
+			}
+		}
+		else {
+			bloc.setModel(dsp::FxBloc::Model::EMPTY);
+		}
+	}
 }
 
 Voice* solicitVoice(Sound* forSound) {
