@@ -133,7 +133,12 @@ constexpr int32_t direnessThreshold = numSamplesLimit - 30;
 // to the limit
 constexpr int MIN_VOICES = 7;
 
-dsp::Reverb reverb{};
+// The global reverb wrapper embeds its engine variant (~521KB) and was the single
+// biggest internal-.bss resident — the code image had grown hard against
+// .program_stack. SDRAM placement is equivalent-safety to .bss here: resetprg
+// unconditionally zeroes .sdram_bss before IRQs are enabled (see 5a36d3f63), and
+// the ctor timing is identical in either section. DSP state only, no DMA touches it.
+PLACE_SDRAM_BSS dsp::Reverb reverb{};
 
 // Modular master FX chain (three FxBloc slots + selectable routing topology). Small
 // (~2.5KB — engines allocate lazily, right-sized, from SDRAM on selection). Kept in
