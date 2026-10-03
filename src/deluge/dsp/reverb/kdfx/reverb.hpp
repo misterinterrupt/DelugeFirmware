@@ -143,7 +143,12 @@ public:
 
 	void setDecay(float value) override {
 		decay_val_ = value;
-		decay_ = static_cast<q31_t>((0.40f + value * 0.595f) * ONE_Q31f);
+		// Capped at 0.97: the low-band path also multiplies by the bass-boost
+		// factor, and the two together must stay below unity or the reverb builds
+		// up without bound (see updateBassClamp).
+		decayFloat_ = std::min(0.40f + value * 0.595f, 0.97f);
+		decay_ = static_cast<q31_t>(decayFloat_ * ONE_Q31f);
+		updateBassClamp();
 	}
 	[[nodiscard]] float getDecay() const override { return decay_val_; }
 
@@ -194,9 +199,10 @@ public:
 
 	void setBassDecay(float value) override {
 		bass_decay_val_ = value;
-		// 0.2x to 2.5x multiplier -> Q31 scalar centered around unity
-		float mult = 0.2f + value * 2.3f;
-		bassDecayMultQ31_ = static_cast<q31_t>((mult - 1.0f) * 0.5f * ONE_Q31f);
+		// 0.2x to 2.5x multiplier wanted; the actually-applied factor is clamped
+		// (updateBassClamp) so the low-band loop gain stays below unity.
+		bassMultWanted_ = 0.2f + value * 2.3f;
+		updateBassClamp();
 		bassDampCoeff_ = static_cast<q31_t>(0.15f * ONE_Q31f); // ~300 Hz crossover
 	}
 	[[nodiscard]] float getBassDecay() const override { return bass_decay_val_; }
@@ -212,6 +218,15 @@ private:
 	static constexpr size_t kPreBufSize = 16384;
 	static constexpr size_t kMinLine = 128;
 	static constexpr size_t kPrimeLen[4] = {1087, 1453, 1789, 2137};
+
+	/// The low-band loop gain is bassFactor x decay where bassFactor reaches
+	/// (mult + 1) / 2 — up to 1.75 with the multiplier at 2.5x, which pushed the
+	/// product past unity and made the reverb build up. Clamp the factor so the
+	/// product stays below 1; high decay settings eat into the available boost.
+	void updateBassClamp() {
+		float factor = std::min((bassMultWanted_ + 1.0f) * 0.5f, 0.99f / decayFloat_);
+		bassDecayMultQ31_ = static_cast<q31_t>((factor - 1.0f) * ONE_Q31f);
+	}
 
 	// Deliberately uninitialized (see kdfx_util.hpp circReadCapped); reads are age-capped.
 	std::array<std::array<q31_t, kBufSize>, 4> buf_;
@@ -240,6 +255,8 @@ private:
 	q31_t bassDampCoeff_ = static_cast<q31_t>(0.15f * ONE_Q31f);
 	q31_t bassDecayMultQ31_ = 0;
 	q31_t decay_ = static_cast<q31_t>(0.85f * ONE_Q31f);
+	float decayFloat_ = 0.85f;
+	float bassMultWanted_ = 1.35f;
 	q31_t erLevelQ31_ = static_cast<q31_t>(0.4f * ONE_Q31f);
 
 	// DC HPF

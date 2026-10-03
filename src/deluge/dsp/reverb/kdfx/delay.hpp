@@ -43,7 +43,12 @@ public:
 			kdfx::smoothDamp(dampL_, tap1, dampCoeff_);
 			kdfx::smoothDamp(dampR_, tap2, dampCoeff_);
 
-			// Tape saturation drive on feedback path: y = 1.5 * x - 0.5 * x^3
+			// Tape saturation drive on feedback path: y = 1.5 * x - 0.5 * x^3, then
+			// renormalized by 1/(1.5 * gain) so the shaper's small-signal slope is
+			// unity. The raw polynomial slope is 1.5 x gain (up to x11.9 at +18 dB),
+			// which inside the feedback loop made repeats build up without bound;
+			// normalized, drive compresses hot repeats (tape squash) and the loop
+			// gain is exactly the feedback setting, which tops out below 1.
 			auto applyTapeDrive = [this](q31_t x) -> q31_t {
 				if (tapeDriveGain_ <= 4096) {
 					return x;
@@ -53,7 +58,7 @@ public:
 				int64_t x_sq = (static_cast<int64_t>(c) * c) >> 31;
 				int64_t x_cu = (x_sq * c) >> 31;
 				int64_t y = ((3LL * c) >> 1) - (x_cu >> 1);
-				return kdfx::shaperClamp(y);
+				return kdfx::q31_mul(kdfx::shaperClamp(y), invDriveQ31_);
 			};
 
 			q31_t satL = applyTapeDrive(dampL_);
@@ -153,6 +158,7 @@ public:
 		// 0.0 dB (4096) to +18.0 dB (~32488 in Q12 = 7.94x)
 		float linearGain = std::pow(10.0f, (value * 18.0f) / 20.0f);
 		tapeDriveGain_ = static_cast<int32_t>(linearGain * 4096.0f);
+		invDriveQ31_ = static_cast<q31_t>((1.0f / (1.5f * linearGain)) * ONE_Q31f);
 	}
 	[[nodiscard]] float getDelayDrive() const override { return drive_val_; }
 
@@ -180,6 +186,7 @@ private:
 	q31_t dampCoeff_ = static_cast<q31_t>(0.8f * ONE_Q31f);
 	q31_t crossfeed_ = 0;
 	int32_t tapeDriveGain_ = 4096;
+	q31_t invDriveQ31_ = static_cast<q31_t>(1.0f * ONE_Q31f);
 	bool phaseInvert_ = false;
 
 	q31_t dampL_ = 0, dampR_ = 0;

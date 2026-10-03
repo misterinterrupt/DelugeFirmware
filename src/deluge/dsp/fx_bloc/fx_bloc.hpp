@@ -171,13 +171,15 @@ public:
 			         {Param::ERLevel, "ER"},
 			         {Param::BassDecay, "BASS", false, 0, 1, nullptr, "X", 0.2f, 2.5f, 2, false}}};
 		case Model::KDFX_DELAY:
-			return {{{ms(Param::RoomSize, "TIME", 1.f, 1480.f, 0)},
+			// Both delay lines and the feedback live on the Slot page together —
+			// they are the primary controls of the effect.
+			return {{{ms(Param::RoomSize, "TIM L", 1.f, 1480.f, 0)},
+			         {ms(Param::DelayTimeR, "TIM R", 1.f, 1480.f, 0)},
 			         {Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 99.f, 0, false},
-			         {Param::Damping, "TONE"},
 			         LEVEL_DEF(),
+			         {Param::Damping, "TONE"},
 			         {Param::Diffusion, "XFEED"},
-			         ms(Param::DelayTimeR, "TIM R", 1.f, 1480.f, 0),
-			         db(Param::DelayDrive, "DRV", 0.f, 18.f),
+			         {db(Param::DelayDrive, "DRV", 0.f, 18.f)},
 			         {Param::HPF, "HPF", false, 0, 1, nullptr, "HZ", 20.f, 1000.f, 0, false}}};
 		case Model::KDFX_CHORUS:
 			return {{{hz(Param::RoomSize, "RATE", 0.05f, 15.f)},
