@@ -1,29 +1,31 @@
 #!/usr/bin/env bash
-# Watchpoint trap for the memory-poisoning scribbler (v3: un-killable).
+# Watchpoint trap for the memory-poisoning scribbler (v4: interactive, clean exits).
 #
 # Captures so far:
 #  - round 6/7: currentSong/currentParamManager poisoned with Q31 products
 #    (currentSong=0x0f8110a0, deterministic across reboots); watchpoints on those
 #    globals never fired -> writer stores THROUGH poisoned pointers.
 #  - round 10: "Exported -1 of -1 clips" -> counters sprayed with 0xFFFFFFFF.
-#  - round 12: processStarted byte = 255 (0xFF) with counters 0/0, audio task
-#    captured live stuck in renderAudioForStemExport (the freeze). NO export was
-#    started by the user; the state was forged by the spray.
+#  - round 12: processStarted byte = 255 with counters 0/0, audio task caught live
+#    stuck in renderAudioForStemExport (the freeze). No export was started.
 #
-# This version:
-#  - watches stemExport.processStarted (the byte the round-12 spray hit) and
-#    stemExport.numStemsExported - code only ever writes 0/1 and 0/positive there.
-#  - resolves all addresses up front from the on-disk elf and inlines raw hex into
-#    the gdb script, so a missing/renamed symbol can no longer abort the capture
-#    (that killed rounds 7 and 12 after their first stop).
-#  - dumps pc/instruction/backtrace/breakpoint-hit-counts at EVERY stop, up to 60.
+# v4 changes: the old batch loop blocked inside `continue`, so Ctrl+C just became
+# another stop and the loop resumed the target again - nearly impossible to stop,
+# and a hard kill could orphan the JLink server (port 2331) or leave the Deluge
+# halted. This version drops you into a live gdb session: every stop is logged
+# automatically (hook-stop) to the report AND shown live; you stay in control.
 #
 # How to use:
 #   1. Power-cycle the Deluge, load your song, start it.
-#   2. Run:  ./scripts/watch_scribble.sh   (attaches, arms, resumes)
-#   3. Reproduce: visual menu -> FILTERS > LPF -> hold KIT -> turn SELECT;
-#      also audition a kit row with the menu open, then edit a slot.
-#   4. Send back scripts/watch_report.txt
+#   2. Run:  ./scripts/watch_scribble.sh
+#      It attaches, arms watchpoints, resumes the target, and leaves you at a
+#      (gdb) prompt.
+#   3. Reproduce on the device: visual menu -> FILTERS > LPF -> hold KIT ->
+#      turn SELECT; also audition a kit row with the menu open, then edit a slot.
+#      Every watchpoint hit stops the CPU, logs pc/instruction/backtrace/
+#      watchpoint old/new values, and shows them live.
+#   5. To finish: type  q  then Enter (detaches and RESUMES the Deluge), or
+#      Ctrl+C then q if mid-stop. The report is at scripts/watch_report.txt.
 #
 set -u
 
@@ -41,8 +43,19 @@ REPORT="scripts/watch_report.txt"
 [ -x "$GDBSERVER" ] || { echo "JLinkGDBServer not found: $GDBSERVER" >&2; exit 1; }
 [ -f "$ELF" ] || { echo "elf not found: $ELF" >&2; exit 1; }
 
+# Kill any stale server from a previous hard exit so port 2331 is free.
+if pkill -f JLinkGDBServer 2>/dev/null; then
+	echo "Killed a stale JLinkGDBServer from a previous run."
+	sleep 1
+fi
+
+cleanup() {
+	[ -n "${SERVER_PID:-}" ] && kill "$SERVER_PID" 2>/dev/null
+}
+trap cleanup EXIT INT TERM
+
 # Resolve addresses from the on-disk elf up front. A missing symbol resolves to
-# the string "SKIP" and every use of it is omitted from the generated gdb script.
+# "SKIP" and every use of it is omitted from the generated gdb script.
 resolve() {
 	local expr="$1"
 	local out
@@ -71,17 +84,18 @@ GDBCMD=$(mktemp)
 {
 	echo "set pagination off"
 	echo "set confirm off"
-	echo "set can-use-hw-watchpoints 1"
+	echo "set print thread-events off"
+	echo "set logging file $REPORT"
+	echo "set logging overwrite off"
+	echo "set logging on"
 	echo "target remote :2331"
 	echo 'echo \n\n=== ARMING WATCHPOINTS ===\n'
 	[ "$ADDR_PS" != SKIP ] && echo "watch *(unsigned char *)$ADDR_PS"
 	[ "$ADDR_NUM" != SKIP ] && echo "watch *(unsigned int *)$ADDR_NUM"
-	echo 'echo \nWatchpoints armed. Reproduce on the device now.\n'
-	echo "set \$n = 0"
-	echo "while \$n < 60"
-	echo "  continue"
-	echo "  set \$n = \$n + 1"
-	echo '  echo \n\n=== WATCHPOINT STOP ===\n'
+	echo 'echo \nWatchpoints armed. Resuming target - reproduce on the device now.\n'
+	# Log everything at every stop, live and into the report file.
+	echo "define hook-stop"
+	echo '  echo \n\n=== STOP ===\n'
 	echo "  p/x \$pc"
 	echo "  x/i \$pc"
 	echo "  info breakpoints"
@@ -91,46 +105,31 @@ GDBCMD=$(mktemp)
 	[ "$ADDR_TOTAL" != SKIP ] && echo "  x/wx $ADDR_TOTAL"
 	[ "$ADDR_CANARY" != SKIP ] && echo "  x/wx $ADDR_CANARY"
 	[ "$ADDR_SONG" != SKIP ] && echo "  x/wx $ADDR_SONG"
-	# Catch condition uses raw addresses only - no symbol resolution to fail on.
-	if [ "$ADDR_NUM" != SKIP ] && [ "$ADDR_TOTAL" != SKIP ]; then
-		echo "  if (*(int *)$ADDR_NUM == -1) || (*(int *)$ADDR_TOTAL == -1)"
-		echo '    echo \n\n=== SCRIBBLER CAUGHT WRITING -1 ===\n'
-		echo "    bt"
-		echo "    info registers"
-		echo "    x/12iw \$pc-8"
-		echo "    p/x \$cpsr"
-		echo "    loop_break"
-		echo "  end"
-	fi
-	if [ "$ADDR_PS" != SKIP ]; then
-		echo "  if (*(unsigned char *)$ADDR_PS == 255)"
-		echo '    echo \n\n=== SCRIBBLER CAUGHT WRITING 0xFF TO processStarted ===\n'
-		echo "    bt"
-		echo "    info registers"
-		echo "    x/12iw \$pc-8"
-		echo "    p/x \$cpsr"
-		echo "    loop_break"
-		echo "  end"
-	fi
 	echo "end"
-	echo 'echo \n\n=== FINAL STATE (hit limit or catch) ===\n'
-	echo "bt"
-	echo "info registers"
-	echo "x/12iw \$pc-8"
-	echo "detach"
-	echo "quit"
+	echo "continue"
+	echo 'echo \n\ngdb script finished (target was stopped or interrupted).\nType  c  + Enter to resume the Deluge and keep watching, or  q  + Enter to detach and resume.\n'
 } >"$GDBCMD"
 
 "$GDBSERVER" -device "$DEVICE" -if "$IFACE" -speed "$SPEED" -port 2331 -nogui >/dev/null 2>&1 &
 SERVER_PID=$!
 sleep 2
 
-echo "Reproduce on the device now (visual menu -> FILTERS > LPF -> hold KIT -> turn SELECT; or audition a row then edit)..."
-"$GDB" -q -x "$GDBCMD" "$ELF" >>"$REPORT" 2>&1
+cat <<'BANNER'
+
+  Live watch session starting. On the device, reproduce now:
+    visual menu -> FILTERS > LPF -> hold KIT -> turn SELECT
+    (or audition a kit row with the menu open, then edit a slot)
+
+  Every stop logs pc / instruction / watchpoint old+new / backtrace live
+  and to scripts/watch_report.txt.
+  - c + Enter  : resume the Deluge after a stop (keep watching)
+  - Ctrl+C, then q + Enter : detach and resume the Deluge, finish up
+
+BANNER
+
+"$GDB" -q -x "$GDBCMD" "$ELF"
 STATUS=$?
 
-kill "$SERVER_PID" 2>/dev/null
-rm -f "$GDBCMD"
-
+echo
 echo "Done. Report: $REPORT"
 exit $STATUS

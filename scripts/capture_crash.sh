@@ -26,6 +26,18 @@ REPORT="scripts/crash_report.txt"
 [ -x "$GDBSERVER" ] || { echo "JLinkGDBServer not found: $GDBSERVER" >&2; exit 1; }
 [ -f "$ELF" ] || { echo "elf not found: $ELF" >&2; exit 1; }
 
+# Kill any stale server from a previous hard exit so port 2331 is free.
+if pkill -f JLinkGDBServer 2>/dev/null; then
+	echo "Killed a stale JLinkGDBServer from a previous run."
+	sleep 1
+fi
+
+SERVER_PID=""
+cleanup() {
+	[ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null
+}
+trap cleanup EXIT INT TERM
+
 GDBCMD=$(mktemp)
 cat >"$GDBCMD" <<'EOF'
 set pagination off
