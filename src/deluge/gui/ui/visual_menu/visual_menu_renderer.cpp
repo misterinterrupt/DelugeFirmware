@@ -125,10 +125,16 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 			int32_t btnX = colCenter - (btnWidth / 2);
 			canvas.drawString(btnLabel, btnX, 52, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
 
-			// Invert active held slot box for clear feedback
-			if (s == activeHeldSlot) {
-				canvas.invertArea(colLeft + 1, 30, 11, 63);
-			}
+			// Active highlight: invertArea()'s byte walk (image_[rowY][xMin] + width bytes)
+				// runs past the end of the canvas image for these coordinates and XORs
+				// display masks over adjacent .bss (stemExport, AudioEngine::reverb, ...),
+				// which is what crashed the audio task. Use bounded line primitives instead.
+				if (s == activeHeldSlot) {
+					canvas.drawVerticalLine(colLeft + 1, 11, 63);
+					canvas.drawVerticalLine(colLeft + 30, 11, 63);
+					canvas.drawHorizontalLine(11, colLeft + 1, colLeft + 30);
+					canvas.drawHorizontalLine(63, colLeft + 1, colLeft + 30);
+				}
 		}
 		else {
 			// Empty slot indicator
