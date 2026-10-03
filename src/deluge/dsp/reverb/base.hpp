@@ -10,6 +10,13 @@ struct Base {
 
 	virtual void process(std::span<int32_t> input, std::span<StereoSample> output) = 0;
 
+	/// Insert-style engines transform the stereo buffer in place instead of adding a
+	/// mono-summed wet output — required by effects that must act on the dry signal
+	/// (tremolo, auto-pan; later the compressor/filter adapters). The host branches
+	/// on isInsert() and never calls process() for them.
+	[[nodiscard]] virtual bool isInsert() const { return false; }
+	virtual void processInsert(std::span<StereoSample> buffer) {}
+
 	constexpr void setPanLevels(const int32_t amplitude_left, const int32_t amplitude_right) {
 		amplitude_right_ = amplitude_right;
 		amplitude_left_ = amplitude_left;

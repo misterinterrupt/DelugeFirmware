@@ -22,10 +22,14 @@
 
 #include "dsp/reverb/base.hpp"
 #include "dsp/reverb/freeverb/freeverb.hpp"
+#include "dsp/reverb/kdfx/autopanner.hpp"
 #include "dsp/reverb/kdfx/chorus.hpp"
 #include "dsp/reverb/kdfx/delay.hpp"
+#include "dsp/reverb/kdfx/flanger.hpp"
+#include "dsp/reverb/kdfx/phaser.hpp"
 #include "dsp/reverb/kdfx/reverb.hpp"
 #include "dsp/reverb/kdfx/tone.hpp"
+#include "dsp/reverb/kdfx/tremolo.hpp"
 #include "dsp/reverb/mutable/reverb.hpp"
 #include "dsp/stereo_sample.h"
 #include "memory/general_memory_allocator.h"
@@ -50,6 +54,10 @@ public:
 		KDFX_DELAY,
 		KDFX_CHORUS,
 		KDFX_TONE,
+		KDFX_FLANGER,
+		KDFX_PHASER,
+		KDFX_TREMOLO,
+		KDFX_AUTOPAN,
 	};
 
 	static constexpr size_t kMaxChunk = 64;
@@ -104,6 +112,14 @@ public:
 			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "DEPTH"}, {Param::Damping, "FDBK"}}};
 		case Model::KDFX_TONE:
 			return {{{Param::RoomSize, "DRIVE"}, {Param::Diffusion, "LEVEL"}, {Param::None, nullptr}}};
+		case Model::KDFX_FLANGER:
+			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "DEPTH"}, {Param::Damping, "FDBK"}}};
+		case Model::KDFX_PHASER:
+			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "DEPTH"}, {Param::Damping, "FDBK"}}};
+		case Model::KDFX_TREMOLO:
+			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "DEPTH"}, {Param::None, nullptr}}};
+		case Model::KDFX_AUTOPAN:
+			return {{{Param::RoomSize, "RATE"}, {Param::Decay, "WIDTH"}, {Param::None, nullptr}}};
 		case Model::EMPTY:
 		case Model::COMPRESSOR:
 		case Model::FILTER:
@@ -140,6 +156,9 @@ public:
 		// the user touches a param. pendingEngine_ is still UI-private here, so calling
 		// its getters is safe.
 		if (replacement != nullptr) {
+			// mixWet() scales by panLevel << 5; Base's pan defaults to 0, which mutes
+			// every send-style engine — blocs were silently passthrough until this.
+			replacement->setPanLevels(reverb::kdfx::unityWetPan(), reverb::kdfx::unityWetPan());
 			params_.roomSize = replacement->getRoomSize();
 			params_.damping = replacement->getDamping();
 			params_.width = replacement->getWidth();
@@ -258,10 +277,16 @@ public:
 	}
 
 	/// In-place stereo processing. Returns false for passthrough blocs (EMPTY, or an
-	/// adapter that has not landed yet) — the router then skips them entirely.
+	/// adapter that has not landed yet) — the router then skips them entirely. Insert
+	/// engines (tremolo, auto-pan) transform the buffer directly; send engines consume
+	/// a mono input and wet-add into the stereo buffer.
 	bool process(StereoSample* buffer, size_t numSamples) {
 		if (engine_ == nullptr) {
 			return false;
+		}
+		if (engine_->isInsert()) {
+			engine_->processInsert(std::span<StereoSample>{buffer, numSamples});
+			return true;
 		}
 		// Reverb-class engines consume a mono input and add wet output into the stereo
 		// buffer (send-style wet-add). Bounded chunks; scratch lives in the chain.
@@ -297,6 +322,18 @@ private:
 		case Model::KDFX_TONE:
 			size = sizeof(reverb::KdfxTone);
 			break;
+		case Model::KDFX_FLANGER:
+			size = sizeof(reverb::KdfxFlanger);
+			break;
+		case Model::KDFX_PHASER:
+			size = sizeof(reverb::KdfxPhaser);
+			break;
+		case Model::KDFX_TREMOLO:
+			size = sizeof(reverb::KdfxTremolo);
+			break;
+		case Model::KDFX_AUTOPAN:
+			size = sizeof(reverb::KdfxAutoPanner);
+			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
 			break;
@@ -318,6 +355,14 @@ private:
 			return new (memory) reverb::KdfxChorus();
 		case Model::KDFX_TONE:
 			return new (memory) reverb::KdfxTone();
+		case Model::KDFX_FLANGER:
+			return new (memory) reverb::KdfxFlanger();
+		case Model::KDFX_PHASER:
+			return new (memory) reverb::KdfxPhaser();
+		case Model::KDFX_TREMOLO:
+			return new (memory) reverb::KdfxTremolo();
+		case Model::KDFX_AUTOPAN:
+			return new (memory) reverb::KdfxAutoPanner();
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:

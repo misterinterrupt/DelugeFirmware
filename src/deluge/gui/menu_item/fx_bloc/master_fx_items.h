@@ -27,9 +27,11 @@ namespace deluge::gui::menu_item::fx_bloc {
 class MasterSlotBloc final : public Selection {
 public:
 	static constexpr dsp::FxBloc::Model kOptions[] = {
-	    dsp::FxBloc::Model::EMPTY,      dsp::FxBloc::Model::FREEVERB, dsp::FxBloc::Model::MUTABLE,
+	    dsp::FxBloc::Model::EMPTY,       dsp::FxBloc::Model::FREEVERB, dsp::FxBloc::Model::MUTABLE,
 	    dsp::FxBloc::Model::KDFX_REVERB, dsp::FxBloc::Model::KDFX_DELAY,
 	    dsp::FxBloc::Model::KDFX_CHORUS, dsp::FxBloc::Model::KDFX_TONE,
+	    dsp::FxBloc::Model::KDFX_FLANGER, dsp::FxBloc::Model::KDFX_PHASER,
+	    dsp::FxBloc::Model::KDFX_TREMOLO, dsp::FxBloc::Model::KDFX_AUTOPAN,
 	};
 
 	MasterSlotBloc(int32_t slotIndex) : Selection(l10n::String::EMPTY_STRING), slot_(slotIndex) {}
@@ -55,7 +57,9 @@ public:
 	}
 
 	deluge::vector<std::string_view> getOptions() override {
-		return {"EMPTY", "FREEVERB", "MUTABLE", "KDFX REV", "KDFX DLY", "KDFX CHO", "KDFX TONE"};
+		// Shown on the full-width Bloc pages, so longer names fit.
+		return {"EMPTY",    "FREEVERB", "MUTABLE",    "KDFX REV",    "KDFX DLY",  "KDFX CHO",
+		        "KDFX TONE", "KDFX FLANGER", "KDFX PHASER", "KDFX TREMOLO", "KDFX PAN"};
 	}
 
 private:

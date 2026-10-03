@@ -143,4 +143,21 @@ constexpr inline void mixWet(int32_t& channel, q31_t wet, int32_t panLevel) {
 	channel = add_saturation(channel, scaled);
 }
 
+/// Pan level that makes mixWet() a unity wet-add (pan << 5 == 1.0).
+constexpr inline int32_t unityWetPan() {
+	return 0x04000000;
+}
+
+/// Parabolic bipolar LFO over a full Q31 phase turn — the same approximation
+/// the chorus engine uses for its sine waveform. At phase 0 the output is at a
+/// negative extreme, so treat it as a phase-shifted sine; tremolo/pan gain
+/// mappings only care that it is smooth and periodic.
+inline q31_t parabolicLfo(uint32_t phase) {
+	int32_t x = static_cast<int32_t>(phase) - 0x40000000;
+	int64_t absX = std::abs(static_cast<int64_t>(x));
+	int64_t oneMinusAbsX = 0x7FFFFFFF - absX;
+	int64_t y = (static_cast<int64_t>(x) * oneMinusAbsX) >> 29;
+	return qcollapse(y);
+}
+
 } // namespace deluge::dsp::reverb::kdfx
