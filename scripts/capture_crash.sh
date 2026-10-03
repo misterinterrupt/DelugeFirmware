@@ -83,8 +83,15 @@ EOF
 SERVER_PID=$!
 sleep 2
 
-"$GDB" -q -x "$GDBCMD" "$ELF" >"$REPORT" 2>&1
+# --batch: without it, gdb waits at an interactive prompt after the script ends
+# (or after a symbol-error abort) and the capture never finishes on its own.
+# </dev/null: belt and braces - no command source left to wait on.
+# timeout: even a wedged J-Link attach cannot hang the script (override: CAPTURE_TIMEOUT).
+timeout --foreground --signal=INT "${CAPTURE_TIMEOUT:-120}" "$GDB" --batch -q -x "$GDBCMD" "$ELF" >"$REPORT" 2>&1 </dev/null
 STATUS=$?
+if [ "$STATUS" -eq 124 ]; then
+	echo "Capture timed out after ${CAPTURE_TIMEOUT}s (wedged J-Link attach?). Partial report: $REPORT" >&2
+fi
 
 kill "$SERVER_PID" 2>/dev/null
 rm -f "$GDBCMD"
