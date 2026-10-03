@@ -599,15 +599,21 @@ void VisualMenuUI::selectEncoderAction(int8_t offset) {
 				pushSlotContext(slot, ctx);
 				if (slot.item->supportsFineEdit()) {
 					// FX-bloc fine controls (user directive; stock items are untouched):
-					// shift doubles the step speed, and the select-click decimal
-					// position scales the step (0 = whole display steps, 1 = tenths,
-					// 2 = hundredths — items hold values at 1/100 of a display step).
-					int32_t scale = 1;
-					for (int32_t i = decimalEditPos_; i < 2; i++) {
-						scale *= 10;
+					// unshifted = coarse stepping (nice-number jumps sized to the range),
+					// shift held = fine stepping at the base display step, further
+					// subdivided by the select-click decimal position (items hold
+					// values at 1/100 of a display step).
+					int32_t scale;
+					if (Buttons::isShiftButtonPressed()) {
+						scale = 1;
+						for (int32_t i = decimalEditPos_; i < 2; i++) {
+							scale *= 10;
+						}
 					}
-					int32_t speed = Buttons::isShiftButtonPressed() ? 2 : 1;
-					slot.item->selectEncoderAction(offset * scale * speed);
+					else {
+						scale = slot.item->coarseEditStep();
+					}
+					slot.item->selectEncoderAction(offset * scale);
 				}
 				else {
 					slot.item->selectEncoderAction(offset);

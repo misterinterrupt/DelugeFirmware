@@ -201,7 +201,7 @@ public:
 	static constexpr const char* kShaperOptionStrings[] = {"SOFT", "TAPE", "HARD", "FOLD"};
 	static constexpr const char* kPhaseOptionStrings[] = {"OFF", "ON"};
 
-	static constexpr ParamDef LEVEL_DEF() { return {Param::Level, "LEVEL"}; }
+	static constexpr ParamDef LEVEL_DEF() { return {Param::Level, "LEVEL", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false}; }
 	static constexpr const char* const* kWaveformOptions() { return kWaveformOptionStrings; }
 	static constexpr const char* const* kShaperOptions() { return kShaperOptionStrings; }
 	static constexpr const char* const* kPhaseOptions() { return kPhaseOptionStrings; }
@@ -216,7 +216,11 @@ public:
 	static constexpr ParamDef db(Param p, const char* label, float minDb, float maxDb, bool bipolar = false) {
 		return {p, label, false, 0, 1, nullptr, "DB", minDb, maxDb, 1, bipolar};
 	}
-	static constexpr ParamDef pct(Param p, const char* label) { return {p, label}; }
+	/// Plain percent, 0-100 in display units (a null-unit def would read as a 0-1
+	/// range in the fine value space — always go through this or an explicit range).
+	static constexpr ParamDef pct(Param p, const char* label) {
+		return {p, label, false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false};
+	}
 	/// Bipolar percent (feedback): t=0.5 ↔ 0%, ends ±maxPercent.
 	static constexpr ParamDef bipolarPct(Param p, const char* label, float maxPercent) {
 		return {p, label, false, 0, 1, nullptr, "%", 0.f, maxPercent, 0, true};

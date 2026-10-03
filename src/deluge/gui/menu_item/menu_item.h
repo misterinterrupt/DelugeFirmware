@@ -201,9 +201,13 @@ public:
 	virtual void syncValueForVisualMenu() {}
 
 	/// @brief Whether this item participates in the FX-bloc fine-edit controls: shift
-	/// doubles encoder speed and select-click steps the decimal position. False for
-	/// everything stock, so only items that opt in change behaviour.
+	/// switches the select encoder to fine stepping and select-click steps the decimal
+	/// position. False for everything stock, so only items that opt in change behaviour.
 	virtual bool supportsFineEdit() const { return false; }
+
+	/// @brief Coarse (unshifted) encoder step for fine-edit items, in units of
+	/// 1/100 of the item's display step. Default = one whole display step.
+	virtual int32_t coarseEditStep() const { return 100; }
 
 	/// @}
 	///

@@ -23,6 +23,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string_view>
 
 namespace deluge::gui::menu_item::fx_bloc {
@@ -120,6 +121,25 @@ public:
 		return d.param != dsp::FxBloc::Param::None && !d.isInt;
 	}
 
+	/// Coarse (unshifted) step: a nice number (1/2/5 x 10^k) that spans the range
+	/// in roughly a hundred detents — wide Hz/MS ranges jump by tens/hundreds/
+	/// thousands instead of demanding a thousand turns. Shifted turning uses the
+	/// base display step (plus the select-click decimal position).
+	[[nodiscard]] int32_t coarseEditStep() const override {
+		auto d = def();
+		if (d.isInt) {
+			return 1;
+		}
+		float target = spanSteps(d) / 100.0f;
+		if (target <= 1.0f) {
+			return kFineScale; // narrow ranges: coarse is still one whole step
+		}
+		float mag = std::pow(10.0f, std::floor(std::log10(target)));
+		float n = target / mag;
+		float nice = (n <= 1.0f) ? 1.0f : (n <= 2.0f) ? 2.0f : (n <= 5.0f) ? 5.0f : 10.0f;
+		return static_cast<int32_t>(std::max<float>(1.0f, std::lround(nice * mag))) * kFineScale;
+	}
+
 	[[nodiscard]] std::string_view getName() const override {
 		dsp::FxBloc::ParamDef d = def();
 		return d.param != dsp::FxBloc::Param::None ? std::string_view{d.label} : std::string_view{"--"};
@@ -180,9 +200,25 @@ public:
 			Integer::formatValueForVisualMenu(outBuffer, bufferSize);
 			return;
 		}
-		// Real-unit readout from the fine value space.
+		// Real-unit readout from the fine value space, compacted to fit a 32px
+		// column (~5 chars): shed a decimal, then switch to K-notation for large
+		// values, then drop the unit rather than truncate ("7.0K", "-24DB").
 		float real = dispMin(d) + this->getValue() / static_cast<float>(kFineScale) * stepOf(d);
-		snprintf(outBuffer, bufferSize, "%.*f%s", d.decimals, real, d.unit != nullptr ? d.unit : "%");
+		const char* unit = d.unit != nullptr ? d.unit : "%";
+		char num[12];
+		snprintf(num, sizeof(num), "%.*f%s", d.decimals, real, unit);
+		if (strlen(num) > 5) {
+			snprintf(num, sizeof(num), "%.*f%s", std::max(0, d.decimals - 1), real, unit);
+			if (strlen(num) > 5) {
+				if (std::fabs(real) >= 995.0f) {
+					snprintf(num, sizeof(num), "%.*fK", 1, real / 1000.0f);
+				}
+				if (strlen(num) > 5) {
+					snprintf(num, sizeof(num), "%.0f", real);
+				}
+			}
+		}
+		snprintf(outBuffer, bufferSize, "%s", num);
 	}
 
 private:
