@@ -42,6 +42,8 @@ defines it but our engine does not implement it yet (never list those — rule 3
 | KDFX PHASER | 156–160 (LFO Phaser family) | 4× one-pole allpass cascade, swept coeff, feedback |
 | KDFX TREMOLO | 961 Tremolo, 962 Tremolo BPM | Insert-style; BPM sync later |
 | KDFX PAN | 963 AutoPanner, 964 Dual AutoPanner | Insert-style; linear crossfade v1 |
+| KDFX DIST | Distortion 724–728 (Mono/Stereo Distort, +Cab, +EQ) | Insert-style: LOCUT/DRIVE/4 shaper modes/CAB/HCUT; "+EQ" = chain KDFX TONE after it |
+| COMPRESSOR | Comp/gate family 950–957 stand-in | Stock engine wrapped insert-style; THRSH/RATIO/ATK/REL/SIDE/BLEND |
 
 Send-style blocs wet-add (reverb-class); tremolo/panner are insert engines via
 `Base::isInsert()/processInsert()` — the same path the COMPRESSOR/FILTER adapters will use.
@@ -50,11 +52,10 @@ Send-style blocs wet-add (reverb-class); tremolo/panner are insert engines via
 
 - **Reverb variants** 1–15 as distinct voicings (MiniVerb, gated, plate/room/hall presets)
 - **Combination chains** 700–723 (Chorus+Delay, Flange<>Reverb, Pitcher+Chor+Dly, LaserVerb …)
-- **Distortion** 724–732 (Mono/Poly/Stereo Distort, TubeAmp chains, cabinet)
+- **TubeAmp chains** 729–732 (TubeAmp<>MD>Chor class — distortion + chorus compositions)
 - **Tone wheel organ** 733–737 (VibChor+Rotor, KB3)
 - **Filters** 900–906 (Env Follow, Trig Envelope, LFO Sweep, Resonant, EQ Morpher)
-- **Special FX** 907–913 (Ring Modulator, Pitcher, shapers, LaserVerb family)
-- **Comp/gate** 950–957 (Hard/Soft Knee, Expander, sidechain EQ, 3-band comp, Gate) — the
-  planned COMPRESSOR bloc adapter lands here
+- **Special FX** 907–913 (Ring Modulator, Pitcher, LaserVerb family)
+- **Comp/gate refinements** on the adapter (manual attack range 0-228 MS, release 0-3000 MS, makeup gain)
 - **Studio/mixdown** 958–967 (Super Gate, enhancers, SRS)
 - **Tools** 966–970, 998–999 (Stereo Image, Mono→Stereo, Graphic EQs, 5 Band EQ)
