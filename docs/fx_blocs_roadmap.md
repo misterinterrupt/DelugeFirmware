@@ -27,10 +27,12 @@ Stock wrapping is a convenience; the manual's algorithms are the product.
 | 785fd9096 | **param flush off-by-one fixed** — every edit had pushed the NEXT param id's cached value (the "edits do nothing, then snap" report); song-load apply had the same bug |
 | 380bd4268 | **reverb trio in real units** (SIZE metres, DECAY RT60 seconds, DAMP Hz) + **dynamic param pages**: tables variable-length (no 8 cap), pages = ceil(params/4) per bloc, rebuilt on selection; reverb gains AIR, delay gains WIDTH + PHASE, tone gains MFREQ/TFREQ, chorus gains HPF |
 | 98a55adfe | **fine controls (FX items only, stock untouched)**: pads forwarded in song view (panel stays live), select-click cycles decimal position, value space at 1/100 display step; FxBloc::tFromReal inverse curves |
+| afbac6d06 / e4dc480b7 | **KDFX DIST** (724-728) and **KDFX TUBEAMP** (729-732, first combination, CFG order swap; Mod* ids + uint64 dirty mask) |
+| 6d6f433f1 | bloc selector auto-deselect after one change fixed (rebuild no longer wipes held slots); RT60 DECAY capped at ~1 S and compressor RATIO at 1.0 fixed — ParamDef ranges are display units, engine conversions live in the curves |
 | d404bfa66 | **regression fixes + coarse/fine swap**: percent params had collapsed to 0-1 (LEVEL read 0%/1%) — explicit 0-100 ranges; unshifted = coarse nice-number steps (span in ~100 detents), shift = fine; compact readouts (7.0K, 1480) never truncated; manual ch.5 parameter audit table in docs/kdfx_coverage.md |
 
 **Not yet hardware-verified:** everything from ecd715ad9 onward. Flash
-`build/Release/deluge.bin` (13:27 or later).
+`build/Release/deluge.bin` (14:54 or later).
 
 ## Push order (KDFX first)
 
