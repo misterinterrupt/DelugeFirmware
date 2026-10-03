@@ -17,6 +17,7 @@
 
 #include "processing/engines/audio_engine.h"
 #include "definitions_cxx.hpp"
+#include "dsp/fx_bloc/master_fx_chain.hpp"
 #include "dsp/reverb/reverb.hpp"
 #include "dsp/timestretch/time_stretcher.h"
 #include "extern.h"
@@ -133,6 +134,12 @@ constexpr int32_t direnessThreshold = numSamplesLimit - 30;
 constexpr int MIN_VOICES = 7;
 
 dsp::Reverb reverb{};
+
+// Modular master FX chain (three FxBloc slots + selectable routing topology). Placed in
+// SDRAM — the per-slot engine variants are ~715KB each. Not yet wired into the render
+// path; integration lands with the master-stage milestone (defaults preserve today's
+// comp -> filter -> send-reverb behaviour).
+PLACE_SDRAM_BSS dsp::MasterFxChain masterFxChain{};
 // Incremented whenever the stem-export state fails its impossible-value check in the audio
 // routine — a live counter of memory-scribbler hits on that global (dumped by capture scripts).
 uint32_t scribbleCanaryTrips = 0;
