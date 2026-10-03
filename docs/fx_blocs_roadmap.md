@@ -59,6 +59,11 @@ algorithms 700–723 (Chorus+Delay class macros) → filter bank 900–906 → E
 
 ## Rules for every new engine (hard-won)
 
+0. **Freeverb and Mutable are stock code — never edit the engines themselves.**
+   They integrate only through the `reverb::Base` setters they already implement
+   (freeverb: SIZE/DAMP/WIDTH; mutable: SIZE/DAMP/WIDTH/HPF); exposure is menu-side
+   only (ParamDef tables).
+
 1. **Loop gain < 1 always**, and equal to the feedback control the user can see.
    No nonlinearity inside a feedback loop may raise small-signal gain above unity
    (delay tape drive bug). Multiplied path gains count (reverb bass bug).
