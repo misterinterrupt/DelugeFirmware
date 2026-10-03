@@ -32,7 +32,10 @@
 
 namespace deluge::gui::ui::visual_menu {
 
-static const char* kSlotButtonLabels[4] = {"SYNTH", "KIT", "MIDI", "CV"};
+// The per-column slot button labels (SYNTH/KIT/MIDI/CV) from the original
+// 64-row draft never fit the 48-row panel — the row lived at y=52+ on every
+// build, so it was always invisible — and no 7px row remains below the value
+// and caret. Dropped rather than drawn out of bounds.
 
 void VisualMenuRenderer::formatSlotValue(MenuItem* item, int8_t sourceIndexOverride, char* outBuffer,
                                          size_t bufferSize) {
@@ -60,17 +63,23 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
                                     int8_t activeHeldSlot, int8_t decimalCursorSlot, int8_t decimalEditPos) {
 	canvas.clear();
 
+	// Every row below is derived from the panel macros and stays inside
+	// [top, OLED_MAIN_HEIGHT_PIXELS - 1]. Canvas primitives do NOT clamp Y —
+	// image_ is only OLED_MAIN_HEIGHT_PIXELS/8 pages, so any row past the
+	// bottom writes over adjacent .bss (needsSending, saveSongOrInstrument,
+	// stemExport, dxBrowser — the spray that wedged bloc-select).
+	int32_t top = OLED_MAIN_TOPMOST_PIXEL;
+	int32_t bottom = OLED_MAIN_HEIGHT_PIXELS - 1;
+
 	// Two-line header so the page counter never collides with long titles:
 	//   line 1: category name
 	//   line 2: page title (left) + [n/m] (right-aligned)
-	int32_t top = OLED_MAIN_TOPMOST_PIXEL;
-
 	std::string_view catName = category.getName();
 	canvas.drawString(catName, 2, top + 0, kTextSpacingX, kTextSizeYUpdated, 0, 95);
 
 	std::string_view pageTitle = page.getTitle();
 	if (!pageTitle.empty()) {
-		canvas.drawString(pageTitle, 2, top + 10, kTextSpacingX, kTextSizeYUpdated, 0, 90);
+		canvas.drawString(pageTitle, 2, top + 8, kTextSpacingX, kTextSizeYUpdated, 0, 90);
 	}
 
 	char pageCounterBuf[12];
@@ -83,10 +92,10 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 	strcat(pageCounterBuf, numBuf);
 	strcat(pageCounterBuf, "]");
 	int32_t counterWidth = static_cast<int32_t>(strlen(pageCounterBuf)) * kTextSpacingX;
-	canvas.drawString(pageCounterBuf, 126 - counterWidth, top + 10, kTextSpacingX, kTextSizeYUpdated);
+	canvas.drawString(pageCounterBuf, 126 - counterWidth, top + 8, kTextSpacingX, kTextSizeYUpdated);
 
 	// Header separator
-	canvas.drawHorizontalLine(top + 20, 0, 127);
+	canvas.drawHorizontalLine(top + 15, 0, 127);
 
 	// 2. Render 4 Columns (32 pixels each)
 	for (int32_t s = 0; s < kSlotsPerPage; ++s) {
@@ -97,7 +106,7 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 
 		// Vertical separator line
 		if (s > 0) {
-			canvas.drawVerticalLine(colLeft, top + 21, top + 63);
+			canvas.drawVerticalLine(colLeft, top + 16, bottom);
 		}
 
 		if (slot.item != nullptr) {
@@ -106,7 +115,7 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 			int32_t nameWidth = static_cast<int32_t>(name.length()) * kTextSpacingX;
 			int32_t nameX = colCenter - (nameWidth / 2);
 			if (nameX < colLeft + 1) nameX = colLeft + 1;
-			canvas.drawString(name, nameX, top + 24, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
+			canvas.drawString(name, nameX, top + 17, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
 
 			// Row 2: Live Value
 			char valBuf[16];
@@ -115,33 +124,27 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 			int32_t valWidth = valLen * kTextSpacingX;
 			int32_t valX = colCenter - (valWidth / 2);
 			if (valX < colLeft + 1) valX = colLeft + 1;
-			canvas.drawString(valBuf, valX, top + 36, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
+			canvas.drawString(valBuf, valX, top + 27, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
 
 			// Decimal cursor if active
 			if (s == decimalCursorSlot && decimalEditPos >= 0) {
-				canvas.drawString("^", colCenter - 3, top + 47, kTextSpacingX, kTextSizeYUpdated);
+				canvas.drawString("^", colCenter - 3, top + 34, kTextSpacingX, kTextSizeYUpdated);
 			}
-
-			// Row 3: Button Label / Slot Indicator
-			const char* btnLabel = kSlotButtonLabels[s];
-			int32_t btnWidth = static_cast<int32_t>(strlen(btnLabel)) * kTextSpacingX;
-			int32_t btnX = colCenter - (btnWidth / 2);
-			canvas.drawString(btnLabel, btnX, top + 54, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
 
 			// Active highlight: invertArea()'s byte walk (image_[rowY][xMin] + width bytes)
 				// runs past the end of the canvas image for these coordinates and XORs
 				// display masks over adjacent .bss (stemExport, AudioEngine::reverb, ...),
 				// which is what crashed the audio task. Use bounded line primitives instead.
 				if (s == activeHeldSlot) {
-					canvas.drawVerticalLine(colLeft + 1, top + 21, top + 63);
-					canvas.drawVerticalLine(colLeft + 30, top + 21, top + 63);
-					canvas.drawHorizontalLine(top + 21, colLeft + 1, colLeft + 30);
-					canvas.drawHorizontalLine(top + 63, colLeft + 1, colLeft + 30);
+					canvas.drawVerticalLine(colLeft + 1, top + 16, bottom);
+					canvas.drawVerticalLine(colLeft + 30, top + 16, bottom);
+					canvas.drawHorizontalLine(top + 16, colLeft + 1, colLeft + 30);
+					canvas.drawHorizontalLine(bottom, colLeft + 1, colLeft + 30);
 				}
 		}
 		else {
 			// Empty slot indicator
-			canvas.drawString("--", colCenter - 6, top + 36, kTextSpacingX, kTextSizeYUpdated);
+			canvas.drawString("--", colCenter - 6, top + 27, kTextSpacingX, kTextSizeYUpdated);
 		}
 	}
 }
