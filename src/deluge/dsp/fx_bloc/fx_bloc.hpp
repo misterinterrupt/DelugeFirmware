@@ -165,8 +165,8 @@ public:
 			float eMax = std::exp(d.expK) - 1.0f;
 			return d.realMin + (e / eMax) * (d.realMax - d.realMin);
 		}
-		case 5: { // RT60 seconds: realMin/realMax hold the per-pass decay range
-			float g = std::clamp(d.realMin + t * (d.realMax - d.realMin), 0.05f, 0.999f);
+		case 5: { // RT60 seconds (KdfxReverb decay mapping: g = 0.40 + t x 0.57)
+			float g = std::clamp(0.40f + t * 0.57f, 0.05f, 0.999f);
 			return 0.594f / -std::log(g);
 		}
 		default:
@@ -192,8 +192,8 @@ public:
 			break;
 		}
 		case 5: {
-			float g = std::exp(-0.594f / std::max(r, 0.01f));
-			t = (g - d.realMin) / (d.realMax - d.realMin);
+			float g = std::exp(-0.594f / std::max(r, 0.05f));
+			t = (g - 0.40f) / 0.57f;
 			break;
 		}
 		default:
@@ -238,11 +238,11 @@ public:
 	static constexpr ParamDef bipolarPct(Param p, const char* label, float maxPercent) {
 		return {p, label, false, 0, 1, nullptr, "%", 0.f, maxPercent, 0, true};
 	}
-	/// RT60 seconds: realMin/realMax hold the engine's per-pass decay range and the
-	/// readout converts to approximate reverb time (0.594 = nominal line-set time ×
-	/// 6.91 dB-to-nepers).
-	static constexpr ParamDef rt60(Param p, const char* label, float gMin, float gMax) {
-		return {p, label, false, 0, 1, nullptr, "S", gMin, gMax, 1, false, 5, 1.5f};
+	/// RT60 seconds, approximate (0.594 = nominal line-set time × 6.91 nepers over
+	/// the engine's per-pass decay 0.40..0.97 — baked into the curve conversion).
+	/// realMin/realMax are DISPLAY seconds, like every other def.
+	static constexpr ParamDef rt60(Param p, const char* label, float minS, float maxS) {
+		return {p, label, false, 0, 1, nullptr, "S", minS, maxS, 1, false, 5, 1.5f};
 	}
 
 	/// Per-model menu/persistence table, variable length. Index 3 is always LEVEL;
@@ -672,7 +672,7 @@ constexpr FxBloc::ParamDef kDefsMutable[5] = {
 };
 constexpr FxBloc::ParamDef kDefsKdfxReverb[9] = {
     {FxBloc::Param::RoomSize, "SIZE", false, 0, 1, nullptr, "M", 3.f, 48.f, 0, false}, // tank scale 1x-3.7x
-    FxBloc::rt60(FxBloc::Param::Decay, "DCAY", 0.40f, 0.97f),
+    FxBloc::rt60(FxBloc::Param::Decay, "DCAY", 0.6f, 19.5f),
     FxBloc::hz(FxBloc::Param::Damping, "DAMP", 351.f, 7019.f, 0), // one-pole cutoff, coeff 0.05-1.0
     FxBloc::LEVEL_DEF(),
     FxBloc::pct(FxBloc::Param::Width, "WIDTH"),
@@ -769,7 +769,7 @@ constexpr FxBloc::ParamDef kDefsKdfxDist[6] = {
 /// hpf=sidechain HPF, width=wet/dry blend — curves match the engine's setters.
 constexpr FxBloc::ParamDef kDefsCompressor[7] = {
     {FxBloc::Param::RoomSize, "THRSH", false, 0, 1, nullptr, "DB", 0.f, -48.f, 1, false},
-    {FxBloc::Param::Decay, "RATIO", false, 0, 1, nullptr, "", 0.f, 1.f, 1, false, 3, 1.5f},
+    {FxBloc::Param::Decay, "RATIO", false, 0, 1, nullptr, "", 0.1f, 128.f, 1, false, 3, 1.5f},
     {FxBloc::Param::Damping, "ATK", false, 0, 1, nullptr, "MS", 0.5f, 100.f, 1, false, 2, 1.5f},
     FxBloc::LEVEL_DEF(),
     {FxBloc::Param::Diffusion, "REL", false, 0, 1, nullptr, "MS", 10.f, 1000.f, 0, false, 2, 1.5f},

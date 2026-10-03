@@ -687,12 +687,10 @@ void VisualMenuUI::fxBlocPagesRebuilt() {
 	if (currentPageIndex_ >= static_cast<int32_t>(pages.size())) {
 		currentPageIndex_ = static_cast<int32_t>(pages.size()) - 1;
 	}
-	selectedSlot_ = -1;
-	decimalCursorSlot_ = -1;
-	for (size_t i = 0; i < 4; ++i) {
-		slotHeld_[i] = false;
-		turnedWhileHeld_[i] = false;
-	}
+	// Deliberately NOT clearing slotHeld_/selectedSlot_: the rebuild fires on every
+	// detent of a bloc selector while its slot button is still physically held —
+	// wiping the selection there auto-deselected the item after one change. The
+	// held slot stays valid across the reflow (columns are per-page positions).
 }
 
 void VisualMenuUI::renderOLED(deluge::hid::display::oled_canvas::Canvas& canvas) {
