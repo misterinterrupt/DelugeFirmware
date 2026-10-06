@@ -22,6 +22,7 @@
 #include "dsp/reverb/kdfx/flanger.hpp"
 #include "dsp/reverb/kdfx/kdfx_util.hpp"
 #include "dsp/reverb/kdfx/laser.hpp"
+#include "dsp/reverb/kdfx/quantize.hpp"
 #include "dsp/reverb/kdfx/reverb.hpp"
 #include "dsp/reverb/kdfx/tone.hpp"
 #include <algorithm>
@@ -34,9 +35,9 @@ namespace deluge::dsp::reverb {
 
 /// One slot of a pair: owns whichever engine the combination needs.
 struct PairEngine {
-	std::variant<std::monostate, KdfxChorus, KdfxFlanger, KdfxDelay, KdfxReverb, KdfxLaserVerb, KdfxTone> engine;
+	std::variant<std::monostate, KdfxChorus, KdfxFlanger, KdfxDelay, KdfxReverb, KdfxLaserVerb, KdfxTone, KdfxQuantize> engine;
 
-	enum class Kind : uint8_t { NONE, CHORUS, FLANGER, DELAY, REVERB, LASER, TONE };
+	enum class Kind : uint8_t { NONE, CHORUS, FLANGER, DELAY, REVERB, LASER, TONE, QUANT };
 
 	void emplace(Kind k) {
 		switch (k) {
@@ -46,6 +47,7 @@ struct PairEngine {
 		case Kind::REVERB: engine.emplace<KdfxReverb>(); break;
 		case Kind::LASER: engine.emplace<KdfxLaserVerb>(); break;
 		case Kind::TONE: engine.emplace<KdfxTone>(); break;
+		case Kind::QUANT: engine.emplace<KdfxQuantize>(); break;
 		default: engine.emplace<std::monostate>(); break;
 		}
 		if (Base* b = base()) {

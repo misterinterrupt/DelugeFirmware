@@ -83,6 +83,7 @@ public:
 		KDFX_LFOFILT,
 		KDFX_RINGMOD,
 		KDFX_QUANT,
+		KDFX_QNT_FLG,
 		GLOBAL_SEND,
 	};
 
@@ -803,6 +804,9 @@ private:
 		case Model::KDFX_QUANT:
 			size = sizeof(reverb::KdfxQuantize);
 			break;
+		case Model::KDFX_QNT_FLG:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::QUANT, reverb::PairEngine::Kind::FLANGER, false>);
+			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
 			break;
@@ -862,6 +866,8 @@ private:
 			return new (memory) reverb::KdfxRingMod();
 		case Model::KDFX_QUANT:
 			return new (memory) reverb::KdfxQuantize();
+		case Model::KDFX_QNT_FLG:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::QUANT, reverb::PairEngine::Kind::FLANGER, false>();
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:
@@ -1134,6 +1140,18 @@ constexpr FxBloc::ParamDef kDefsKdfxQuant[4] = {
     FxBloc::db(FxBloc::Param::Decay, "HEAD", 0.f, 144.f),
     FxBloc::db(FxBloc::Param::Diffusion, "DC", -79.f, 0.f, true),
 };
+// Quantize+Flange (manual 714, "+" = fixed order: quantize then flange).
+constexpr FxBloc::ParamDef kDefsKdfxQntFlg[10] = {
+    FxBloc::db(FxBloc::Param::RoomSize, "DYN", 0.f, 144.f),
+    FxBloc::db(FxBloc::Param::Decay, "HEAD", 0.f, 144.f),
+    FxBloc::db(FxBloc::Param::Diffusion, "DC", -79.f, 0.f, true),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+    FxBloc::ms(FxBloc::Param::BaseDelay, "BASE", 0.1f, 7.f),
+};
 constexpr FxBloc::ParamDef kDefsKdfxRingMod[16] = {
     {FxBloc::Param::RmMode, "MODE", true, 0, 1, FxBloc::kRmModeOptions()},
     FxBloc::LEVEL_DEF(),
@@ -1209,6 +1227,7 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_LFOFILT: return kDefsKdfxLfoFilt;
 	case Model::KDFX_RINGMOD: return kDefsKdfxRingMod;
 	case Model::KDFX_QUANT: return kDefsKdfxQuant;
+	case Model::KDFX_QNT_FLG: return kDefsKdfxQntFlg;
 	case Model::GLOBAL_SEND: return kDefsGlobalSend;
 	case Model::EMPTY:
 	case Model::FILTER:
