@@ -29,6 +29,8 @@ Stock wrapping is a convenience; the manual's algorithms are the product.
 | 98a55adfe | **fine controls (FX items only, stock untouched)**: pads forwarded in song view (panel stays live), select-click cycles decimal position, value space at 1/100 display step; FxBloc::tFromReal inverse curves |
 | afbac6d06 / e4dc480b7 | **KDFX DIST** (724-728) and **KDFX TUBEAMP** (729-732, first combination, CFG order swap; Mod* ids + uint64 dirty mask) |
 | ebf8fd6ad | track-send FxChain groundwork banked (in flight, unverified) + manual-faithfulness: reverb DECAY = exponential RT60 0.2-20.0 S with INF only at the top detent (engine g = e^(-0.594/RT60)); delay FDBK reaches a true 100% (manual: sustains); KDFX manual PDF tracked |
+| 28a5af24b / 19b290a77 | **KDFX LASER** (911-913: widening-spaces impulse train, TIME 0-2S/SPAC/CONT incl. reverse, FDBK 100%) + **six pair combinations** via one generic pair engine (CHO+DLY, CHO+REV, FLG+DLY, FLG+REV, FLG+LASER, SHPR+REV; CFG where the manual's <> allows) |
+| ebf8fd6ad | reverb DECAY = exponential RT60 0.2-20.0 S with INF at top detent (engine g = e^(-0.594/RT60)); delay FDBK true 100% (manual: sustains); track-send FxChain groundwork banked (WIP, unverified); KDFX manual PDF tracked |
 | 6d6f433f1 | bloc selector auto-deselect after one change fixed (rebuild no longer wipes held slots); RT60 DECAY capped at ~1 S and compressor RATIO at 1.0 fixed — ParamDef ranges are display units, engine conversions live in the curves |
 | d404bfa66 | **regression fixes + coarse/fine swap**: percent params had collapsed to 0-1 (LEVEL read 0%/1%) — explicit 0-100 ranges; unshifted = coarse nice-number steps (span in ~100 detents), shift = fine; compact readouts (7.0K, 1480) never truncated; manual ch.5 parameter audit table in docs/kdfx_coverage.md |
 | (this push) | **Track reverb shortcuts removed**; **Per-bloc IN-GN (input gain)** (-96dB/-INF to +3dB, default 0dB) on all blocs; **MST SEND bloc** (`GLOBAL_SEND`) to send track audio into master FX busses (BUS 1/2/3) across all routing topologies |
@@ -61,12 +63,11 @@ Flash the latest build. In order:
 ### 1. KDFX-native engines (top priority — user directive)
 - **Distortion family 724–732**: Mono/Stereo Distortion, cabinet, TubeAmp chains —
   insert engines, no tanks; the tone engine's shaper modes are the seed.
-- **Combination algorithms 700–723**: Chorus+Delay, Flange+Reverb, LaserVerb class —
-  composed from existing engines inside one bloc.
-- **KDFX filter bank 900–906**: Resonant, LFO Sweep, Env Follow, EQ Morpher as native
-  engines (preferred over wrapping the stock FilterSet).
-- Then: special FX 907–913 (Ring Mod first; Pitcher is the hard one), comp/gate
-  refinements 950–957 on top of the adapter.
+- **KDFX filter bank 900–906**: Resonant, Envelope, Triggered, LFO Sweep filters as
+  native insert engines (Freq 16-8372 HZ, Res 0-50 DB; Env adds sweep ±100% + rates
+  0-300 DB/S per the manual).
+- Then: special FX (Ring Modulator 907, quantizer for 714, Pitcher 908 — the hard one),
+  comp/gate refinements 950-957, reverb voicings, studio tools.
 
 ### 2. Track FX — milestone 2a: blocs on tracks
 - FxBloc slots per track (kit rows are tracks; no special policy).
