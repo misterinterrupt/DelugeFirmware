@@ -46,6 +46,9 @@ defines it but our engine does not implement it yet (never list those — rule 3
 | KDFX TUBEAMP | TubeAmp/PolyAmp<>MD>Chor/Flan 729–732 | Insert-style combination: amp (distortion engine) + modulated delay; CFG swaps order (AMP>MOD / MOD>AMP) |
 | KDFX LASER | LaserVerb 911–913 (Mono/Lite/full) | Widening-spaces impulse train: TIME 0–2 S, SPAC 0–40 SMP, CONT (0=delay, 34%=reverse), FDBK to 100% |
 | CHO+DLY / CHO+REV | 700 / 703–704 class combinations | Generic pair engine; Mod* trio for the chorus half; CFG where the manual's <> allows |
+| KDFX RESFILT / ENVFILT / LFOSWP | 903 / 900 / 902 | TPT SVF bank: TYPE LP/HP/BP/NOTCH, RES 0-50 DB (self-ring only at top); ENVFILT adds MINF + bipolar SWEEP + ATK/REL 0-300 DB/S; LFOSWP adds BPM+beats LFO (FIX/SYS clock via per-block tempo push), MIN/MAX limits (inverting allowed), 5 shapes + width + smoothing |
+| KDFX RINGMOD | 907 | MODE L*R (only LEFT passes dry) / OSC: Osc1 shape+width+smooth + 4 sines, each Lvl + Freq 16-25088 HZ; one generic setRmOsc(osc, which, v) virtual |
+| KDFX QUANT / QNT+FLG | (714 partner / 714) | DYN 0-144 DB (31-bit cap = transparent top), HEAD 0-144 DB, DC Off/-79-0 DB; QNT+FLG fixed-order pair |
 | FLG+DLY / FLG+REV / FLG+LASER | 706 / 710 / 711 | Pair engine, fixed order (manual "+") |
 | SHPR+REV | 718 Shaper<>Reverb | Pair engine; tone drive/EQ + full reverb suite; CFG |
 | COMPRESSOR | Comp/gate family 950–957 stand-in | Stock engine wrapped insert-style; THRSH/RATIO/ATK/REL/SIDE/BLEND |
@@ -53,13 +56,26 @@ defines it but our engine does not implement it yet (never list those — rule 3
 Send-style blocs wet-add (reverb-class); tremolo/panner are insert engines via
 `Base::isInsert()/processInsert()` — the same path the COMPRESSOR/FILTER adapters will use.
 
+## Track FX (milestone 2, banked + pending device verification)
+
+Each ModControllable owns a full FxChain (3 slots, same engines/bloc UI, same XML
+idiom — `<fxChain>` inside the track's tags). The menu resolves the chain by
+context (`getCurrentFxChain()`: sound/kit/audio clip in clip view, master at song
+level). Send architecture: a track chain slot can hold a **GLOBAL_SEND** bloc
+(BUS 0-2 / PAN / IN-GN / LEVEL) which accumulates the track's post-chain audio
+into the master chain's per-slot send buses; the master chain mixes bus audio
+into each slot's input at render time (parallel into one slot = send semantics).
+Buses clear per block before track rendering. The stock reverb send is
+superseded: legacy songs regain reverb by placing a reverb bloc in a master
+slot. NOT YET DEVICE-VERIFIED.
+
 ## Not yet implemented (manual backlog, by category)
 
 - **Reverb variants** 1–15 as distinct voicings (MiniVerb, gated, plate/room/hall presets)
 - **Combination chains** 700–723 remainder: Pitcher-dependent combos (720–723) blocked on a pitch engine; quantize/flange (714) pending the quantizer
 - **Tone wheel organ** 733–737 (VibChor+Rotor, KB3)
-- **Filters** 900–906 (Env Follow, Trig Envelope, LFO Sweep, Resonant, EQ Morpher)
-- **Special FX** 907–913 (Ring Modulator, Pitcher, LaserVerb family)
+- **Filters 904/905/906** (Dual Res, EQ Morpher 4-PAU, Mono EQ Morpher) + 901 Trig Envelope Filt
+- **Special FX remainder**: Pitcher (908) and its combos (720-723) — blocked on a pitch engine
 - **Comp/gate refinements** on the adapter (manual attack range 0-228 MS, release 0-3000 MS, makeup gain)
 - **Studio/mixdown** 958–967 (Super Gate, enhancers, SRS)
 - **Tools** 966–970, 998–999 (Stereo Image, Mono→Stereo, Graphic EQs, 5 Band EQ)

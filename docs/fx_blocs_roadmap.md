@@ -31,6 +31,9 @@ Stock wrapping is a convenience; the manual's algorithms are the product.
 | ebf8fd6ad | track-send FxChain groundwork banked (in flight, unverified) + manual-faithfulness: reverb DECAY = exponential RT60 0.2-20.0 S with INF only at the top detent (engine g = e^(-0.594/RT60)); delay FDBK reaches a true 100% (manual: sustains); KDFX manual PDF tracked |
 | 28a5af24b / 19b290a77 | **KDFX LASER** (911-913: widening-spaces impulse train, TIME 0-2S/SPAC/CONT incl. reverse, FDBK 100%) + **six pair combinations** via one generic pair engine (CHO+DLY, CHO+REV, FLG+DLY, FLG+REV, FLG+LASER, SHPR+REV; CFG where the manual's <> allows) |
 | ebf8fd6ad | reverb DECAY = exponential RT60 0.2-20.0 S with INF at top detent (engine g = e^(-0.594/RT60)); delay FDBK true 100% (manual: sustains); track-send FxChain groundwork banked (WIP, unverified); KDFX manual PDF tracked |
+| 24582afb7 / 45365a05d | **filter bank whole**: RESFILT 903 + ENVFILT 900 + LFOSWP 902 complete (TPT SVF; tempo push via kSystemTempoBPM per render block; RES self-ring at 50 DB top only) + **RINGMOD 907** (L*R & 5-osc modes, generic setRmOsc) + **QUANT** (DYN/HEAD/DC) + **QNT+FLG 714** |
+| 347f6bcb7 / b2f702ed5 | quantizer + QNT+FLG pair |
+| ebf8fd6ad ( groundwork note) | **MILESTONE 2 STRUCTURALLY COMPLETE**: per-track FxChains (Sound + GlobalEffectable) render + persist XML; FX BLOCS pages resolve chain by context (getCurrentFxChain); GLOBAL_SEND track bloc (BUS/PAN/IN-GN/LEVEL) feeds master per-slot send buses; stock reverb send zeroed in favour of the new model — ALL pending device verification |
 | 6d6f433f1 | bloc selector auto-deselect after one change fixed (rebuild no longer wipes held slots); RT60 DECAY capped at ~1 S and compressor RATIO at 1.0 fixed — ParamDef ranges are display units, engine conversions live in the curves |
 | d404bfa66 | **regression fixes + coarse/fine swap**: percent params had collapsed to 0-1 (LEVEL read 0%/1%) — explicit 0-100 ranges; unshifted = coarse nice-number steps (span in ~100 detents), shift = fine; compact readouts (7.0K, 1480) never truncated; manual ch.5 parameter audit table in docs/kdfx_coverage.md |
 | (this push) | **Track reverb shortcuts removed**; **Per-bloc IN-GN (input gain)** (-96dB/-INF to +3dB, default 0dB) on all blocs; **MST SEND bloc** (`GLOBAL_SEND`) to send track audio into master FX busses (BUS 1/2/3) across all routing topologies |
@@ -69,15 +72,19 @@ Flash the latest build. In order:
 - Then: special FX (Ring Modulator 907, quantizer for 714, Pitcher 908 — the hard one),
   comp/gate refinements 950-957, reverb voicings, studio tools.
 
-### 2. Track FX — milestone 2a: blocs on tracks
-- FxBloc slots per track (kit rows are tracks; no special policy).
-- PAU budget: global concurrent-tank cap (CPU is the real gate), optional per-track
-  fairness cap, OOM → INSUFFICIENT_RAM popup + revert, EMPTY default = zero cost.
-- UI: reuse the FX BLOCS pages, items target the context track instead of master.
+### 2. Track FX — milestone 2a/2b: BANKED, awaiting device verification
+Per-track FxChains (3 slots each, all engines), FX BLOCS pages resolving the chain
+by context, per-track `<fxChain>` XML, and the GLOBAL_SEND track bloc feeding the
+master chain's per-slot send buses. What remains: device verification of the whole
+send path, then the PAU budget gate (OOM → popup when the tank pool is spent) —
+the accounting was designed, not yet enforced at the track layer.
 
-### 3. Track FX — milestone 2b: track XML
-- Per-output `<slot>` blocks in the song (same idiom as master).
-- Load degrades silently to EMPTY when the budget can't fit; shown as EMPTY in menu.
+### 3. Verification-gate additions for track FX
+- Track chain: synth/kit/audio track → FX BLOCS pages now edit THAT track; song
+  level still edits master.
+- GLOBAL_SEND bloc in a track slot + reverb bloc in a master slot → track audio
+  reaches the master reverb; BUS/PAN/LEVEL behave.
+- Save/load round-trips a track chain (per-track `<fxChain>`).
 
 ### 4. Grid-shortcut removal
 Only meaningful at track integration: static gold-knob/grid mappings for stock FX
