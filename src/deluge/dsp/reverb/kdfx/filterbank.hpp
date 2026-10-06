@@ -1,9 +1,25 @@
 /*
- * KDFX resonant filter bank (manual algorithms 900 Env Follow Filt and 903
- * Resonant Filter; 2 PAU each). The 902 LFO Sweep Filter is PARKED, not
- * approximated: the manual drives it from tempo (BPM/beats) with MIN/MAX
- * limits, five shapes, pulse width and smoothing — it lands when engines can
- * see song tempo. The Sweep::LFO scaffolding below stays for that day.
+ * KDFX resonant filter bank (manual algorithms 900 Env Follow Filt, 902 LFO
+ * Sweep Filter, 903 Resonant Filter; 2 PAU each).
+ *
+ * Common manual spec: Filter Type = Lowpass / Highpass / Bandpass / Notch,
+ * Freq 16..8372 Hz, Resonance 0..50 dB. The variants differ only in what
+ * moves the frequency:
+ *   - Resonant (903): fixed frequency.
+ *   - Env Follow (900): follows the input level — SWEEP ±100% sets how far the
+ *     resonant frequency travels (up toward 8372 Hz at positive settings, down
+ *     toward 16 Hz at negative), ATK/REL slew the envelope in dB/second.
+ *   - LFO Sweep (902): LFO expressed in BPM and beats — clock FIXED (own BPM
+ *     1-255) or SYSTEM (follows song tempo via the per-block tempo push);
+ *     cycle length 1-16 beats; sweep runs between MIN and MAX limits
+ *     (16-8372 Hz each — set MIN above MAX to sweep upside down); shape
+ *     Sine/Saw+/Saw-/Pulse/Tri with pulse width and smoothing.
+ *
+ * Topology: per-channel TPT state-variable filter (Simper) — unconditionally
+ * stable, no feedback loop, so the loop-gain rule holds trivially. Resonance
+ * self-oscillates only at the 50 dB extreme (poles on the unit circle —
+ * sustained ringing, the same "INF at the top detent" behaviour as the
+ * reverb). A 1/sqrt(Q) makeup keeps the near-cutoff peak from blowing up.
  *
  * Common manual spec: Filter Type = Lowpass / Highpass / Bandpass / Notch,
  * Freq 16..8372 Hz, Resonance 0..50 dB. The variants differ only in what
@@ -48,6 +64,12 @@ public:
 
 	void processInsert(std::span<StereoSample> buffer) override {
 		const float dt = 1.0f / float(kSampleRate);
+		// LFO clock (manual: BPM and beats, FIXED or follow System tempo).
+		float bpm = (lfoClock_ != 0) ? std::max(1.0f, systemTempoBpm()) : lfoBpm_;
+		{
+			float hz = bpm / (60.0f * std::max(1.0f, lfoBeats_)); // cycle = beats x (60/BPM)
+			lfoInc_ = static_cast<uint32_t>((hz / float(kSampleRate)) * 4294967296.0f);
+		}
 		for (auto& s : buffer) {
 			// Shared mono envelope from the loudest channel (manual: "the level of
 			// the incoming signal").
@@ -102,7 +124,23 @@ public:
 	void setDecay(float v) override { rel_val_ = std::clamp(v, 0.0f, 1.0f); }
 	[[nodiscard]] float getDecay() const override { return rel_val_; }
 
-	// ---- LFO Sweep params (902): ModRate/ModDepth ----
+	// ---- LFO Sweep params (902), full manual set ----
+	void setFiltClk(int32_t v) override { lfoClock_ = (v != 0) ? 1 : 0; }
+	[[nodiscard]] int32_t getFiltClk() const override { return lfoClock_; }
+	void setFiltBpm(float v) override { lfoBpm_ = 1.0f + std::clamp(v, 0.0f, 1.0f) * 254.0f; }
+	[[nodiscard]] float getFiltBpm() const override { return (lfoBpm_ - 1.0f) / 254.0f; }
+	void setFiltBeats(float v) override { lfoBeats_ = 1.0f + std::round(std::clamp(v, 0.0f, 1.0f) * 15.0f); }
+	[[nodiscard]] float getFiltBeats() const override { return (lfoBeats_ - 1.0f) / 15.0f; }
+	void setFiltShape(int32_t v) override { lfoShape_ = std::clamp<int32_t>(v, 0, 4); }
+	[[nodiscard]] int32_t getFiltShape() const override { return lfoShape_; }
+	void setFiltPlsw(float v) override { lfoPlsw_ = std::clamp(v, 0.0f, 1.0f); }
+	[[nodiscard]] float getFiltPlsw() const override { return lfoPlsw_; }
+	void setFiltSmooth(float v) override { lfoSmooth_ = std::clamp(v, 0.0f, 1.0f); }
+	[[nodiscard]] float getFiltSmooth() const override { return lfoSmooth_; }
+
+	static float systemTempoBpm() { return kSystemTempoBPM.load(std::memory_order_relaxed); }
+
+	// ---- LFO Sweep params (902): ModRate/ModDepth (unused by this engine) ----
 	void setModRate(float v) override {
 		modRate_val_ = std::clamp(v, 0.0f, 1.0f);
 		float hz = 0.01f + modRate_val_ * 9.99f; // manual LFO range 0.01..10 HZ
@@ -137,9 +175,15 @@ private:
 			break;
 		}
 		case Sweep::LFO: {
-			q31_t lfo = kdfx::parabolicLfo(lfoPhase_);
-			float l = static_cast<float>(lfo) / 2147483647.0f;
-			freqHz = centreHz_ * std::pow(2.0f, l * 6.0f * modDepth_val_);
+			// Manual: sweep between MIN and MAX limits in the log domain (MIN
+			// above MAX = upside-down sweep). The LFO runs in beats: cycle =
+			// beats x (60/BPM), BPM from the clock setting.
+			float lfoN = 0.5f + 0.5f * kdfx::oscWave(lfoShape_, lfoPhase_, lfoPlsw_, lfoSmooth_);
+			float minHz = freqFromNorm(minHz_val_);
+			float maxHz = freqFromNorm(centre_val_);
+			float lo = std::log(std::min(minHz, maxHz));
+			float hi = std::log(std::max(minHz, maxHz));
+			freqHz = std::exp(lo + lfoN * (hi - lo));
 			break;
 		}
 		case Sweep::FIXED:
@@ -194,6 +238,12 @@ private:
 
 	SvfState chL_{}, chR_{};
 	float freqL_ = 1000.0f, freqR_ = 1000.0f;
+
+	int32_t lfoClock_ = 1; // 0 FIXED, 1 SYSTEM (manual default: follow tempo)
+	float lfoBpm_ = 120.0f;
+	float lfoBeats_ = 1.0f;
+	int32_t lfoShape_ = 0;
+	float lfoPlsw_ = 0.5f, lfoSmooth_ = 0.0f;
 };
 
 } // namespace deluge::dsp::reverb

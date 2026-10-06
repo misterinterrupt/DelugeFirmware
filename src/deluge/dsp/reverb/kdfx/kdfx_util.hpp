@@ -161,4 +161,43 @@ inline q31_t parabolicLfo(uint32_t phase) {
 	return qcollapse(y);
 }
 
+/// The KDFX oscillator bank's waveforms (manual: Sine, Saw+, Saw-, Pulse, Tri).
+/// plsw is the pulse width fraction (0.5 = square, only affects Pulse); smooth
+/// pulls Saw toward Tri and Pulse toward Sine ("removes the higher harmonics").
+/// Phase is a full turn in 32 bits; output is -1..1.
+inline float oscWave(int32_t shape, uint32_t phase, float plsw, float smooth) {
+	float p = static_cast<float>(phase) / 4294967296.0f; // 0..1
+	// Sine via the shared parabolic approximation, zero-crossing at phase 0.
+	float sine = static_cast<float>(parabolicLfo(phase + 0x40000000u)) / 2147483648.0f;
+	float w;
+	switch (shape) {
+	case 1: { // Saw+ : rising 0..1 -> -1..1
+		float saw = 2.0f * p - 1.0f;
+		float tri = 1.0f - 4.0f * std::fabs(p - 0.5f);
+		w = saw + (tri - saw) * smooth;
+		break;
+	}
+	case 2: { // Saw- : falling
+		float saw = 1.0f - 2.0f * p;
+		float tri = 1.0f - 4.0f * std::fabs(p - 0.5f);
+		w = saw + (tri - saw) * smooth;
+		break;
+	}
+	case 3: { // Pulse (width % of period; 50% = square), smooth -> toward sine
+		float pw = std::clamp(plsw, 0.01f, 0.99f);
+		float pulse = (p < pw) ? 1.0f : -1.0f;
+		w = pulse + (sine - pulse) * smooth;
+		break;
+	}
+	case 4: // Tri
+		w = 1.0f - 4.0f * std::fabs(p - 0.5f);
+		break;
+	case 0:
+	default: // Sine
+		w = sine;
+		break;
+	}
+	return std::clamp(w, -1.0f, 1.0f);
+}
+
 } // namespace deluge::dsp::reverb::kdfx

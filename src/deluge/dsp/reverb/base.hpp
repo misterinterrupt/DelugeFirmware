@@ -1,9 +1,15 @@
 #pragma once
+
+#include <atomic>
 #include "dsp/stereo_sample.h"
 #include <cmath>
 #include <span>
 
 namespace deluge::dsp::reverb {
+
+/// Song tempo in BPM, pushed by the audio routine once per block so engines
+/// can follow System tempo (the KDFX LFO clock's "System" setting).
+inline std::atomic<float> kSystemTempoBPM{120.0f};
 struct Base {
 	Base() = default;
 	virtual ~Base() = default;
@@ -118,6 +124,24 @@ struct Base {
 	[[nodiscard]] virtual int32_t getFiltType() const { return 0; }
 	virtual void setFiltRes(float value) {}
 	[[nodiscard]] virtual float getFiltRes() const { return 0.0f; }
+	virtual void setFiltClk(int32_t value) {}
+	[[nodiscard]] virtual int32_t getFiltClk() const { return 0; }
+	virtual void setFiltBpm(float value) {}
+	[[nodiscard]] virtual float getFiltBpm() const { return 0.0f; }
+	virtual void setFiltBeats(float value) {}
+	[[nodiscard]] virtual float getFiltBeats() const { return 0.0f; }
+	virtual void setFiltShape(int32_t value) {}
+	[[nodiscard]] virtual int32_t getFiltShape() const { return 0; }
+	virtual void setFiltPlsw(float value) {}
+	[[nodiscard]] virtual float getFiltPlsw() const { return 0.5f; }
+	virtual void setFiltSmooth(float value) {}
+	[[nodiscard]] virtual float getFiltSmooth() const { return 0.0f; }
+
+	// KDFX Ring Modulator (907): mode + per-oscillator access.
+	virtual void setRmMode(int32_t value) {}
+	[[nodiscard]] virtual int32_t getRmMode() const { return 0; }
+	virtual void setRmOsc(int32_t osc, int32_t which, float value) {}
+	[[nodiscard]] virtual float getRmOsc(int32_t osc, int32_t which) const { return 0.0f; }
 	virtual void setShaperMode(int32_t value) {}
 	[[nodiscard]] virtual int32_t getShaperMode() const { return 0; }
 

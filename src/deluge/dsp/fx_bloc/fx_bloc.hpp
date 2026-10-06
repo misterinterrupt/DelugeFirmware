@@ -32,6 +32,7 @@
 #include "dsp/reverb/kdfx/laser.hpp"
 #include "dsp/reverb/kdfx/pair.hpp"
 #include "dsp/reverb/kdfx/phaser.hpp"
+#include "dsp/reverb/kdfx/ringmod.hpp"
 #include "dsp/reverb/kdfx/reverb.hpp"
 #include "dsp/reverb/kdfx/tone.hpp"
 #include "dsp/reverb/kdfx/tremolo.hpp"
@@ -79,6 +80,7 @@ public:
 		KDFX_RESFILT,
 		KDFX_ENVFILT,
 		KDFX_LFOFILT,
+		KDFX_RINGMOD,
 		GLOBAL_SEND,
 	};
 
@@ -141,6 +143,26 @@ public:
 		FiltSweep,  // env-follow sweep, bipolar ±100%
 		FiltAtk,    // env attack rate 0-300 DB/S
 		FiltRel,    // env release rate 0-300 DB/S
+		FiltClk,    // LFO filter clock, int (0 FIXED / 1 SYSTEM tempo)
+		FiltBpm,    // LFO filter BPM 1-255 (fixed clock)
+		FiltBeats,  // LFO cycle length 1-16 beats
+		FiltShape,  // LFO shape, int SINE/SAW+/SAW-/PULSE/TRI
+		FiltPlsw,   // LFO pulse width 0-100%
+		FiltSmooth, // LFO smoothing 0-100%
+		RmMode,     // ring mod, int (0 L*R / 1 OSC)
+		RmO1Lvl,    // ring mod oscillator 1
+		RmO1Freq,
+		RmO1Shape,  // int SINE/SAW+/SAW-/PULSE/TRI
+		RmO1Plsw,   // pulse width 0-100%
+		RmO1Smooth, // 0-100%
+		RmO2Lvl,    // Sine 2..5: Lvl + Freq each
+		RmO2Freq,
+		RmO3Lvl,
+		RmO3Freq,
+		RmO4Lvl,
+		RmO4Freq,
+		RmO5Lvl,
+		RmO5Freq,
 		kNumParams
 	};
 	static_assert(util::to_underlying(Param::kNumParams) <= 64, "dirty bitmask is uint64");
@@ -247,6 +269,9 @@ public:
 	static constexpr const char* kPhaseOptionStrings[] = {"OFF", "ON"};
 	static constexpr const char* kCfgOptionStrings[] = {"AMP>MOD", "MOD>AMP"};
 	static constexpr const char* kFiltTypeStrings[] = {"LP", "HP", "BP", "NOTCH"};
+	static constexpr const char* kRmModeStrings[] = {"L*R", "OSC"};
+	static constexpr const char* kRmShapeStrings[] = {"SINE", "SAW+", "SAW-", "PULSE", "TRI"};
+	static constexpr const char* kFiltClkStrings[] = {"FIX", "SYS"};
 	static constexpr const char* kBusOptionStrings[] = {"BUS 1", "BUS 2", "BUS 3"};
 
 	static constexpr ParamDef LEVEL_DEF() { return {Param::Level, "LEVEL", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false}; }
@@ -256,6 +281,10 @@ public:
 	static constexpr const char* const* kPhaseOptions() { return kPhaseOptionStrings; }
 	static constexpr const char* const* kCfgOptions() { return kCfgOptionStrings; }
 	static constexpr const char* const* kFiltTypeOptions() { return kFiltTypeStrings; }
+	static constexpr const char* const* kRmModeOptions() { return kRmModeStrings; }
+	static constexpr const char* const* kRmShapeOptions() { return kRmShapeStrings; }
+	static constexpr const char* const* kFiltClkOptions() { return kFiltClkStrings; }
+	static constexpr const char* const* kFiltShapeOptions() { return kRmShapeStrings; }
 	static constexpr const char* const* kBusOptions() { return kBusOptionStrings; }
 
 	// Real-unit helpers for the tables below (defaults leave out the trailing fields).
@@ -344,6 +373,26 @@ public:
 		case Param::FiltSweep: return "filtSweep";
 		case Param::FiltAtk: return "filtAtk";
 		case Param::FiltRel: return "filtRel";
+		case Param::RmMode: return "rmMode";
+		case Param::RmO1Lvl: return "rmOsc1Lvl";
+		case Param::RmO1Freq: return "rmOsc1Freq";
+		case Param::RmO1Shape: return "rmOsc1Shape";
+		case Param::RmO1Plsw: return "rmOsc1Plsw";
+		case Param::RmO1Smooth: return "rmOsc1Smooth";
+		case Param::RmO2Lvl: return "rmOsc2Lvl";
+		case Param::RmO2Freq: return "rmOsc2Freq";
+		case Param::RmO3Lvl: return "rmOsc3Lvl";
+		case Param::RmO3Freq: return "rmOsc3Freq";
+		case Param::RmO4Lvl: return "rmOsc4Lvl";
+		case Param::RmO4Freq: return "rmOsc4Freq";
+		case Param::RmO5Lvl: return "rmOsc5Lvl";
+		case Param::RmO5Freq: return "rmOsc5Freq";
+		case Param::FiltClk: return "filtClk";
+		case Param::FiltBpm: return "filtBpm";
+		case Param::FiltBeats: return "filtBeats";
+		case Param::FiltShape: return "filtShape";
+		case Param::FiltPlsw: return "filtPlsw";
+		case Param::FiltSmooth: return "filtSmooth";
 		default: return nullptr;
 		}
 	}
@@ -592,6 +641,26 @@ private:
 		case Param::FiltSweep: e->setDiffusion(v); break;
 		case Param::FiltAtk: e->setDamping(v); break;
 		case Param::FiltRel: e->setDecay(v); break;
+		case Param::RmMode: e->setRmMode(static_cast<int32_t>(v)); break;
+		case Param::RmO1Lvl: e->setRmOsc(1, 0, v); break;
+		case Param::RmO1Freq: e->setRmOsc(1, 1, v); break;
+		case Param::RmO1Shape: e->setRmOsc(1, 2, v); break;
+		case Param::RmO1Plsw: e->setRmOsc(1, 3, v); break;
+		case Param::RmO1Smooth: e->setRmOsc(1, 4, v); break;
+		case Param::RmO2Lvl: e->setRmOsc(2, 0, v); break;
+		case Param::RmO2Freq: e->setRmOsc(2, 1, v); break;
+		case Param::RmO3Lvl: e->setRmOsc(3, 0, v); break;
+		case Param::RmO3Freq: e->setRmOsc(3, 1, v); break;
+		case Param::RmO4Lvl: e->setRmOsc(4, 0, v); break;
+		case Param::RmO4Freq: e->setRmOsc(4, 1, v); break;
+		case Param::RmO5Lvl: e->setRmOsc(5, 0, v); break;
+		case Param::RmO5Freq: e->setRmOsc(5, 1, v); break;
+		case Param::FiltClk: e->setFiltClk(static_cast<int32_t>(v)); break;
+		case Param::FiltBpm: e->setFiltBpm(v); break;
+		case Param::FiltBeats: e->setFiltBeats(v); break;
+		case Param::FiltShape: e->setFiltShape(static_cast<int32_t>(v)); break;
+		case Param::FiltPlsw: e->setFiltPlsw(v); break;
+		case Param::FiltSmooth: e->setFiltSmooth(v); break;
 		default: break;
 		}
 	}
@@ -636,6 +705,26 @@ private:
 		case Param::FiltSweep: return e->getDiffusion();
 		case Param::FiltAtk: return e->getDamping();
 		case Param::FiltRel: return e->getDecay();
+		case Param::RmMode: return static_cast<float>(e->getRmMode());
+		case Param::RmO1Lvl: return e->getRmOsc(1, 0);
+		case Param::RmO1Freq: return e->getRmOsc(1, 1);
+		case Param::RmO1Shape: return e->getRmOsc(1, 2);
+		case Param::RmO1Plsw: return e->getRmOsc(1, 3);
+		case Param::RmO1Smooth: return e->getRmOsc(1, 4);
+		case Param::RmO2Lvl: return e->getRmOsc(2, 0);
+		case Param::RmO2Freq: return e->getRmOsc(2, 1);
+		case Param::RmO3Lvl: return e->getRmOsc(3, 0);
+		case Param::RmO3Freq: return e->getRmOsc(3, 1);
+		case Param::RmO4Lvl: return e->getRmOsc(4, 0);
+		case Param::RmO4Freq: return e->getRmOsc(4, 1);
+		case Param::RmO5Lvl: return e->getRmOsc(5, 0);
+		case Param::RmO5Freq: return e->getRmOsc(5, 1);
+		case Param::FiltClk: return static_cast<float>(e->getFiltClk());
+		case Param::FiltBpm: return e->getFiltBpm();
+		case Param::FiltBeats: return e->getFiltBeats();
+		case Param::FiltShape: return static_cast<float>(e->getFiltShape());
+		case Param::FiltPlsw: return e->getFiltPlsw();
+		case Param::FiltSmooth: return e->getFiltSmooth();
 		default: return 0.f;
 		}
 	}
@@ -706,6 +795,9 @@ private:
 		case Model::KDFX_LFOFILT:
 			size = sizeof(reverb::KdfxFilter);
 			break;
+		case Model::KDFX_RINGMOD:
+			size = sizeof(reverb::KdfxRingMod);
+			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
 			break;
@@ -761,6 +853,8 @@ private:
 			return new (memory) reverb::KdfxFilter(reverb::KdfxFilter::Sweep::ENV_FOLLOW);
 		case Model::KDFX_LFOFILT:
 			return new (memory) reverb::KdfxFilter(reverb::KdfxFilter::Sweep::LFO);
+		case Model::KDFX_RINGMOD:
+			return new (memory) reverb::KdfxRingMod();
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:
@@ -1021,6 +1115,26 @@ constexpr FxBloc::ParamDef kDefsKdfxLfoFilt[7] = {
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.01f, 10.f),
     {FxBloc::Param::ModDepth, "MDEP", false, 0, 1, nullptr, "OCT", 0.f, 6.f, 1, false},
 };
+// Ring Modulator (manual 907): MODE (L*R / OSC); OSC mode = Osc1 (any shape,
+// width, smoothing) + four sines, each Lvl 0-100% / Freq 16-25088 HZ log; LEVEL
+// = Wet/Dry (in L*R it passes only the LEFT channel dry — engine handles that).
+constexpr FxBloc::ParamDef kDefsKdfxRingMod[16] = {
+    {FxBloc::Param::RmMode, "MODE", true, 0, 1, FxBloc::kRmModeOptions()},
+    FxBloc::LEVEL_DEF(),
+    FxBloc::pct(FxBloc::Param::RmO1Lvl, "O1LVL"),
+    FxBloc::logHz(FxBloc::Param::RmO1Freq, "O1FRQ", 16.f, 25088.f, 0),
+    {FxBloc::Param::RmO1Shape, "O1SHP", true, 0, 4, FxBloc::kRmShapeOptions()},
+    FxBloc::pct(FxBloc::Param::RmO1Plsw, "O1PLS"),
+    FxBloc::pct(FxBloc::Param::RmO1Smooth, "O1SMH"),
+    FxBloc::pct(FxBloc::Param::RmO2Lvl, "S2LVL"),
+    FxBloc::logHz(FxBloc::Param::RmO2Freq, "S2FRQ", 16.f, 25088.f, 0),
+    FxBloc::pct(FxBloc::Param::RmO3Lvl, "S3LVL"),
+    FxBloc::logHz(FxBloc::Param::RmO3Freq, "S3FRQ", 16.f, 25088.f, 0),
+    FxBloc::pct(FxBloc::Param::RmO4Lvl, "S4LVL"),
+    FxBloc::logHz(FxBloc::Param::RmO4Freq, "S4FRQ", 16.f, 25088.f, 0),
+    FxBloc::pct(FxBloc::Param::RmO5Lvl, "S5LVL"),
+    FxBloc::logHz(FxBloc::Param::RmO5Freq, "S5FRQ", 16.f, 25088.f, 0),
+};
 constexpr FxBloc::ParamDef kDefsKdfxDist[7] = {
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
@@ -1077,6 +1191,7 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_RESFILT: return kDefsKdfxResFilt;
 	case Model::KDFX_ENVFILT: return kDefsKdfxEnvFilt;
 	case Model::KDFX_LFOFILT: return kDefsKdfxLfoFilt;
+	case Model::KDFX_RINGMOD: return kDefsKdfxRingMod;
 	case Model::GLOBAL_SEND: return kDefsGlobalSend;
 	case Model::EMPTY:
 	case Model::FILTER:

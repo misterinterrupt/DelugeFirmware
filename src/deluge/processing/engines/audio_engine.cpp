@@ -618,6 +618,9 @@ void renderAudioForStemExport(size_t numSamples);
 void renderAudio(size_t numSamples) {
 	// Render boundary for the modular master chain: swap any pending engine selections,
 	// retire displaced engines, advance the reclamation generation.
+	dsp::reverb::kSystemTempoBPM.store(
+	    currentSong ? playbackHandler.calculateBPM(currentSong->getTimePerTimerTickFloat()) : 120.0f,
+	    std::memory_order_relaxed);
 	masterFxChain.applyPending();
 	masterFxChain.clearSendBusses(numSamples);
 
@@ -705,6 +708,9 @@ void renderAudioForStemExport(size_t numSamples) {
 	memset(&renderingBuffer, 0, numSamples * sizeof(StereoSample));
 	memset(&reverbBuffer, 0, numSamples * sizeof(StereoSample));
 
+	dsp::reverb::kSystemTempoBPM.store(
+	    currentSong ? playbackHandler.calculateBPM(currentSong->getTimePerTimerTickFloat()) : 120.0f,
+	    std::memory_order_relaxed);
 	masterFxChain.applyPending();
 	masterFxChain.clearSendBusses(numSamples);
 
