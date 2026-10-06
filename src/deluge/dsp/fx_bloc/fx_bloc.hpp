@@ -33,6 +33,7 @@
 #include "dsp/reverb/kdfx/pair.hpp"
 #include "dsp/reverb/kdfx/phaser.hpp"
 #include "dsp/reverb/kdfx/ringmod.hpp"
+#include "dsp/reverb/kdfx/quantize.hpp"
 #include "dsp/reverb/kdfx/reverb.hpp"
 #include "dsp/reverb/kdfx/tone.hpp"
 #include "dsp/reverb/kdfx/tremolo.hpp"
@@ -81,6 +82,7 @@ public:
 		KDFX_ENVFILT,
 		KDFX_LFOFILT,
 		KDFX_RINGMOD,
+		KDFX_QUANT,
 		GLOBAL_SEND,
 	};
 
@@ -798,6 +800,9 @@ private:
 		case Model::KDFX_RINGMOD:
 			size = sizeof(reverb::KdfxRingMod);
 			break;
+		case Model::KDFX_QUANT:
+			size = sizeof(reverb::KdfxQuantize);
+			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
 			break;
@@ -855,6 +860,8 @@ private:
 			return new (memory) reverb::KdfxFilter(reverb::KdfxFilter::Sweep::LFO);
 		case Model::KDFX_RINGMOD:
 			return new (memory) reverb::KdfxRingMod();
+		case Model::KDFX_QUANT:
+			return new (memory) reverb::KdfxQuantize();
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:
@@ -1118,6 +1125,15 @@ constexpr FxBloc::ParamDef kDefsKdfxLfoFilt[7] = {
 // Ring Modulator (manual 907): MODE (L*R / OSC); OSC mode = Osc1 (any shape,
 // width, smoothing) + four sines, each Lvl 0-100% / Freq 16-25088 HZ log; LEVEL
 // = Wet/Dry (in L*R it passes only the LEFT channel dry — engine handles that).
+// Quantizer (the 714 Quantize+Flange partner): DYN 0-144 DB (0 = two levels,
+// square wave; every 6 DB doubles the levels), HEAD 0-144 DB of headroom above
+// the signal, DC Off/-79..0 DB.
+constexpr FxBloc::ParamDef kDefsKdfxQuant[4] = {
+    FxBloc::db(FxBloc::Param::RoomSize, "DYN", 0.f, 144.f),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::db(FxBloc::Param::Decay, "HEAD", 0.f, 144.f),
+    FxBloc::db(FxBloc::Param::Diffusion, "DC", -79.f, 0.f, true),
+};
 constexpr FxBloc::ParamDef kDefsKdfxRingMod[16] = {
     {FxBloc::Param::RmMode, "MODE", true, 0, 1, FxBloc::kRmModeOptions()},
     FxBloc::LEVEL_DEF(),
@@ -1192,6 +1208,7 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_ENVFILT: return kDefsKdfxEnvFilt;
 	case Model::KDFX_LFOFILT: return kDefsKdfxLfoFilt;
 	case Model::KDFX_RINGMOD: return kDefsKdfxRingMod;
+	case Model::KDFX_QUANT: return kDefsKdfxQuant;
 	case Model::GLOBAL_SEND: return kDefsGlobalSend;
 	case Model::EMPTY:
 	case Model::FILTER:
