@@ -28,7 +28,11 @@
 
 namespace deluge::gui::menu_item::fx_bloc {
 
-/// Selects which bloc a master slot holds. COMPRESSOR/FILTER are excluded until their
+/// Resolves the FX chain for the active editing context: the selected track's Sound /
+/// GlobalEffectable when inside a clip, or AudioEngine::masterFxChain when at the song level.
+dsp::FxChain* getCurrentFxChain();
+
+/// Selects which bloc a master/track slot holds. COMPRESSOR/FILTER are excluded until their
 /// adapters land (selecting them today would be a silent passthrough).
 class MasterSlotBloc final : public Selection {
 public:
@@ -39,13 +43,14 @@ public:
 	    dsp::FxBloc::Model::KDFX_FLANGER, dsp::FxBloc::Model::KDFX_PHASER,
 	    dsp::FxBloc::Model::KDFX_TREMOLO, dsp::FxBloc::Model::KDFX_AUTOPAN,
 	    dsp::FxBloc::Model::KDFX_DIST, dsp::FxBloc::Model::KDFX_TUBEAMP,
-	    dsp::FxBloc::Model::COMPRESSOR,
+	    dsp::FxBloc::Model::COMPRESSOR, dsp::FxBloc::Model::GLOBAL_SEND,
 	};
 
 	MasterSlotBloc(int32_t slotIndex) : Selection(l10n::String::EMPTY_STRING), slot_(slotIndex) {}
 
 	void readCurrentValue() override {
-		auto wanted = AudioEngine::masterFxChain.slot(slot_).getModel();
+		auto* chain = getCurrentFxChain();
+		auto wanted = chain != nullptr ? chain->slot(slot_).getModel() : dsp::FxBloc::Model::EMPTY;
 		for (size_t i = 0; i < sizeof(kOptions) / sizeof(kOptions[0]); i++) {
 			if (kOptions[i] == wanted) {
 				this->setValue(static_cast<int32_t>(i));
@@ -57,11 +62,14 @@ public:
 
 	void writeCurrentValue() override {
 		auto target = kOptions[this->getValue()];
-		if (!AudioEngine::masterFxChain.slot(slot_).setModel(target)) {
-			// Pool exhausted: surface it and revert the displayed value.
-			display->displayError(Error::INSUFFICIENT_RAM);
-			readCurrentValue();
-			return;
+		auto* chain = getCurrentFxChain();
+		if (chain != nullptr) {
+			if (!chain->slot(slot_).setModel(target)) {
+				// Pool exhausted: surface it and revert the displayed value.
+				display->displayError(Error::INSUFFICIENT_RAM);
+				readCurrentValue();
+				return;
+			}
 		}
 		// The param-page layout follows the newly selected bloc's table; rebuild and
 		// rebind the open menu (page count may have changed under the cursor).
@@ -75,25 +83,30 @@ public:
 		// Shown on the full-width Bloc pages, so longer names fit.
 		return {"EMPTY",    "FREEVERB", "MUTABLE",    "KDFX REV",    "KDFX DLY",  "KDFX CHO",
 		        "KDFX TONE", "KDFX FLANGER", "KDFX PHASER", "KDFX TREMOLO", "KDFX PAN", "KDFX DIST",
-		        "KDFX TUBEAMP", "COMPRESSOR"};
+		        "KDFX TUBEAMP", "COMPRESSOR", "MST SEND"};
 	}
 
 private:
 	int32_t slot_;
 };
 
-/// Selects the master chain's routing topology algorithm.
+/// Selects the master/track chain's routing topology algorithm.
 class MasterRouting final : public Selection {
 public:
 	MasterRouting() : Selection(l10n::String::EMPTY_STRING) {}
 
 	void readCurrentValue() override {
-		this->setValue(util::to_underlying(AudioEngine::masterFxChain.getRouting()));
+		auto* chain = getCurrentFxChain();
+		if (chain != nullptr) {
+			this->setValue(util::to_underlying(chain->getRouting()));
+		}
 	}
 
 	void writeCurrentValue() override {
-		AudioEngine::masterFxChain.setRouting(
-		    static_cast<dsp::MasterFxChain::Routing>(this->getValue()));
+		auto* chain = getCurrentFxChain();
+		if (chain != nullptr) {
+			chain->setRouting(static_cast<dsp::FxChain::Routing>(this->getValue()));
+		}
 	}
 
 	deluge::vector<std::string_view> getOptions() override {
@@ -123,10 +136,54 @@ public:
 		return d.param != dsp::FxBloc::Param::None && !d.isInt;
 	}
 
-	/// Coarse (unshifted) step: a nice number (1/2/5 x 10^k) that spans the range
-	/// in roughly a hundred detents — wide Hz/MS ranges jump by tens/hundreds/
-	/// thousands instead of demanding a thousand turns. Shifted turning uses the
-	/// base display step (plus the select-click decimal position).
+	[[nodiscard]] int8_t numDecimalPositions() const override {
+		auto d = def();
+		if (d.isInt || d.param == dsp::FxBloc::Param::None) {
+			return 1;
+		}
+		if (d.decimals == 2) {
+			return 3; // ones, tenths, hundredths
+		}
+		if (d.decimals == 1) {
+			return 2; // ones, tenths
+		}
+		if (spanSteps(d) > 500) {
+			return 3; // ones, tens, hundreds
+		}
+		if (spanSteps(d) > 50) {
+			return 2; // ones, tens
+		}
+		return 1;
+	}
+
+	[[nodiscard]] int32_t stepForDecimalPos(int8_t pos) const override {
+		auto d = def();
+		if (d.isInt || d.param == dsp::FxBloc::Param::None) {
+			return 1;
+		}
+		if (d.decimals == 2) {
+			// pos 0: ones (1.00) -> 100 * kFineScale = 10000
+			// pos 1: tenths (0.10) -> 10 * kFineScale = 1000
+			// pos 2: hundredths (0.01) -> 1 * kFineScale = 100
+			if (pos == 1) return 10 * kFineScale;
+			if (pos == 2) return 1 * kFineScale;
+			return 100 * kFineScale;
+		}
+		if (d.decimals == 1) {
+			// pos 0: ones (1.0) -> 10 * kFineScale = 1000
+			// pos 1: tenths (0.1) -> 1 * kFineScale = 100
+			if (pos == 1) return 1 * kFineScale;
+			return 10 * kFineScale;
+		}
+		// d.decimals == 0
+		// pos 0: ones (1) -> 1 * kFineScale = 100
+		// pos 1: tens (10) -> 10 * kFineScale = 1000
+		// pos 2: hundreds (100) -> 100 * kFineScale = 10000
+		if (pos == 1) return 10 * kFineScale;
+		if (pos == 2) return 100 * kFineScale;
+		return 1 * kFineScale;
+	}
+
 	[[nodiscard]] int32_t coarseEditStep() const override {
 		auto d = def();
 		if (d.isInt) {
@@ -134,7 +191,7 @@ public:
 		}
 		float target = spanSteps(d) / 100.0f;
 		if (target <= 1.0f) {
-			return kFineScale; // narrow ranges: coarse is still one whole step
+			return kFineScale;
 		}
 		float mag = std::pow(10.0f, std::floor(std::log10(target)));
 		float n = target / mag;
@@ -159,7 +216,12 @@ public:
 	[[nodiscard]] const char* getUnit() override { return def().isInt ? "" : "%"; }
 
 	void readCurrentValue() override {
-		auto& bloc = AudioEngine::masterFxChain.slot(slot_);
+		auto* chain = getCurrentFxChain();
+		if (chain == nullptr) {
+			this->setValue(0);
+			return;
+		}
+		auto& bloc = chain->slot(slot_);
 		auto d = def();
 		float raw = bloc.getParam(d.param);
 		if (d.isInt) {
@@ -172,7 +234,11 @@ public:
 	}
 
 	void writeCurrentValue() override {
-		auto& bloc = AudioEngine::masterFxChain.slot(slot_);
+		auto* chain = getCurrentFxChain();
+		if (chain == nullptr) {
+			return;
+		}
+		auto& bloc = chain->slot(slot_);
 		auto d = def();
 		if (d.isInt) {
 			bloc.setParam(d.param, static_cast<float>(this->getValue()));
@@ -183,7 +249,14 @@ public:
 	}
 
 	void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) override {
-		auto& bloc = AudioEngine::masterFxChain.slot(slot_);
+		auto* chain = getCurrentFxChain();
+		if (chain == nullptr) {
+			if (outBuffer && bufferSize > 0) {
+				snprintf(outBuffer, bufferSize, "--");
+			}
+			return;
+		}
+		auto& bloc = chain->slot(slot_);
 		auto d = def();
 		if (d.param == dsp::FxBloc::Param::None || bloc.isEmpty()) {
 			if (outBuffer && bufferSize > 0) {
@@ -202,10 +275,18 @@ public:
 			Integer::formatValueForVisualMenu(outBuffer, bufferSize);
 			return;
 		}
+		float real = dispMin(d) + this->getValue() / static_cast<float>(kFineScale) * stepOf(d);
+		if (d.param == dsp::FxBloc::Param::InGain && real <= -95.0f) {
+			snprintf(outBuffer, bufferSize, "-INF");
+			return;
+		}
+		if (real >= 900.0f) {
+			snprintf(outBuffer, bufferSize, "INF"); // RT60 infinite sustain (manual ceiling)
+			return;
+		}
 		// Real-unit readout from the fine value space, compacted to fit a 32px
 		// column (~5 chars): shed a decimal, then switch to K-notation for large
 		// values, then drop the unit rather than truncate ("7.0K", "-24DB").
-		float real = dispMin(d) + this->getValue() / static_cast<float>(kFineScale) * stepOf(d);
 		const char* unit = d.unit != nullptr ? d.unit : "%";
 		char num[12];
 		snprintf(num, sizeof(num), "%.*f%s", d.decimals, real, unit);
@@ -225,7 +306,9 @@ public:
 
 private:
 	[[nodiscard]] dsp::FxBloc::ParamDef def() const {
-		auto defs = dsp::FxBloc::paramDefs(AudioEngine::masterFxChain.slot(slot_).getModel());
+		auto* chain = getCurrentFxChain();
+		auto model = chain != nullptr ? chain->slot(slot_).getModel() : dsp::FxBloc::Model::EMPTY;
+		auto defs = dsp::FxBloc::paramDefs(model);
 		if (defIndex_ < 0 || static_cast<size_t>(defIndex_) >= defs.size()) {
 			return {}; // None — inert column
 		}

@@ -53,6 +53,7 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
                                                         int32_t reverbAmountAdjust, int32_t sideChainHitPending,
                                                         bool shouldLimitDelayFeedback, bool isClipActive,
                                                         OutputType outputType, SampleRecorder* recorder) {
+	fxChain.applyPending();
 	UnpatchedParamSet* unpatchedParams = paramManagerForClip->getUnpatchedParamSet();
 
 	// Process FX and stuff. For kits, stutter happens before reverb send
@@ -154,12 +155,16 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 	}
 
 	processReverbSendAndVolume(globalEffectableBuffer, numSamples, reverbBuffer, volumePostFX, postReverbVolume,
-	                           reverbSendAmount, pan, true);
+	                           0, pan, true);
 	if (compBlend > 0) {
 		compressor.renderVolNeutral(globalEffectableBuffer, numSamples, volumePostFX);
 	}
 	else {
 		compressor.reset();
+	}
+
+	if (fxChain.isActive()) {
+		fxChain.process(globalEffectableBuffer, numSamples);
 	}
 
 	addAudio(globalEffectableBuffer, outputBuffer, numSamples);

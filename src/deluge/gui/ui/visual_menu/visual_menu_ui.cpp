@@ -478,17 +478,17 @@ ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inC
 					if (slot.item != nullptr) {
 						// Cycle decimal edit cursor if on decimal slot
 						decimalCursorSlot_ = selectedSlot_;
-						decimalEditPos_ = (decimalEditPos_ + 1) % 3;
-						if (slot.item->supportsFineEdit()) {
-							// Fine items scale their own steps from decimalEditPos_
-							// (whole → tenths → hundredths of a display step).
+						int8_t maxPos = slot.item->numDecimalPositions();
+						if (maxPos > 1) {
+							decimalEditPos_ = (decimalEditPos_ + 1) % maxPos;
 						}
 						else {
-							soundEditor.numberEditPos = decimalEditPos_;
-							soundEditor.numberEditSize = 1;
-							for (int32_t i = 0; i < decimalEditPos_; i++) {
-								soundEditor.numberEditSize *= 10;
-							}
+							decimalEditPos_ = 0;
+						}
+						soundEditor.numberEditPos = decimalEditPos_;
+						soundEditor.numberEditSize = 1;
+						for (int32_t i = 0; i < decimalEditPos_; i++) {
+							soundEditor.numberEditSize *= 10;
 						}
 					}
 				}
@@ -496,6 +496,7 @@ ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inC
 			else {
 				selectedSlot_ = 0;
 				decimalCursorSlot_ = 0;
+				decimalEditPos_ = 0;
 				updateButtonLEDs();
 			}
 			renderUIsForOled();
@@ -598,20 +599,9 @@ void VisualMenuUI::selectEncoderAction(int8_t offset) {
 				SlotSourceContext ctx;
 				pushSlotContext(slot, ctx);
 				if (slot.item->supportsFineEdit()) {
-					// FX-bloc fine controls (user directive; stock items are untouched):
-					// unshifted = coarse stepping (nice-number jumps sized to the range),
-					// shift held = fine stepping at the base display step, further
-					// subdivided by the select-click decimal position (items hold
-					// values at 1/100 of a display step).
-					int32_t scale;
+					int32_t scale = slot.item->stepForDecimalPos(decimalEditPos_);
 					if (Buttons::isShiftButtonPressed()) {
-						scale = 1;
-						for (int32_t i = decimalEditPos_; i < 2; i++) {
-							scale *= 10;
-						}
-					}
-					else {
-						scale = slot.item->coarseEditStep();
+						scale *= 10;
 					}
 					slot.item->selectEncoderAction(offset * scale);
 				}

@@ -46,6 +46,8 @@
 
 namespace deluge::dsp {
 
+void accumulateMasterSend(size_t busIdx, const StereoSample* src, size_t numSamples, float gain, float panPercent);
+
 class FxBloc {
 public:
 	enum class Model : uint8_t {
@@ -64,6 +66,7 @@ public:
 		KDFX_AUTOPAN,
 		KDFX_DIST,
 		KDFX_TUBEAMP,
+		GLOBAL_SEND,
 	};
 
 	static constexpr size_t kMaxChunk = 64;
@@ -75,8 +78,8 @@ public:
 		destroyEngine(retiredEngine_);
 	}
 
-	Model getModel() const { return model_; }
-	bool isEmpty() const { return model_ == Model::EMPTY; }
+	Model getModel() const { return pendingSwap_ ? pendingModel_ : model_; }
+	bool isEmpty() const { return getModel() == Model::EMPTY; }
 
 	/// The engine interface is reverb-shaped, and every engine aliases its real
 	/// parameters onto those setters (delay: roomSize=time-L, decay=feedback,
@@ -92,6 +95,8 @@ public:
 		Diffusion,
 		HPF,
 		Level,        // chain wet level (send blocs) / effect blend (insert blocs)
+		InGain,       // input volume: -96dB (-inf) to +3dB (default 0dB)
+		SendBus,      // global send target bus index: 0..2
 		PreDelay,     // kdfx reverb
 		ERLevel,      // kdfx reverb
 		BassDecay,    // kdfx reverb
@@ -146,7 +151,7 @@ public:
 		// tables below can brace-initialize with trailing defaults.
 		constexpr ParamDef(Param p = Param::None, const char* l = nullptr, bool isInt_ = false, int32_t iMin = 0,
 		                   int32_t iMax = 1, const char* const* opts = nullptr, const char* u = nullptr,
-		                   float rMin = 0.f, float rMax = 1.f, uint8_t dec = 0, bool bip = false, uint8_t cur = 0,
+		                   float rMin = 0.f, float rMax = 100.f, uint8_t dec = 0, bool bip = false, uint8_t cur = 0,
 		                   float ek = 1.5f)
 		    : param(p), label(l), isInt(isInt_), intMin(iMin), intMax(iMax), intOptions(opts), unit(u), realMin(rMin),
 		      realMax(rMax), decimals(dec), bipolar(bip), curve(cur), expK(ek) {}
@@ -165,8 +170,11 @@ public:
 			float eMax = std::exp(d.expK) - 1.0f;
 			return d.realMin + (e / eMax) * (d.realMax - d.realMin);
 		}
-		case 5: { // RT60 seconds (KdfxReverb decay mapping: g = 0.40 + t x 0.57)
-			float g = std::clamp(0.40f + t * 0.57f, 0.05f, 0.999f);
+		case 5: { // RT60 seconds, manual range up to Inf (KdfxReverb: g = 0.40 + t x 0.60)
+			float g = std::clamp(0.40f + t * 0.60f, 0.05f, 0.999999f);
+			if (g >= 0.9995f) {
+				return 999.0f; // INF — unity loop gain sustains
+			}
 			return 0.594f / -std::log(g);
 		}
 		default:
@@ -192,8 +200,11 @@ public:
 			break;
 		}
 		case 5: {
+			if (r >= 900.0f) {
+				return 1.0f;
+			}
 			float g = std::exp(-0.594f / std::max(r, 0.05f));
-			t = (g - 0.40f) / 0.57f;
+			t = (g - 0.40f) / 0.60f;
 			break;
 		}
 		default:
@@ -207,17 +218,20 @@ public:
 	/// the menu lays params out 4 per page, as many pages as the table needs.
 	static constexpr size_t kMaxSlotParams = 16; // menu item pool per slot
 
-	// Display option strings for the int params, and the LEVEL column definition.
+	// Display option strings for the int params, and the LEVEL / INGAIN column definitions.
 	static constexpr const char* kWaveformOptionStrings[] = {"SINE", "TRI", "S&H"};
 	static constexpr const char* kShaperOptionStrings[] = {"SOFT", "TAPE", "HARD", "FOLD"};
 	static constexpr const char* kPhaseOptionStrings[] = {"OFF", "ON"};
 	static constexpr const char* kCfgOptionStrings[] = {"AMP>MOD", "MOD>AMP"};
+	static constexpr const char* kBusOptionStrings[] = {"BUS 1", "BUS 2", "BUS 3"};
 
 	static constexpr ParamDef LEVEL_DEF() { return {Param::Level, "LEVEL", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false}; }
+	static constexpr ParamDef INGAIN_DEF() { return {Param::InGain, "IN-GN", false, 0, 1, nullptr, "DB", -96.f, 3.f, 1, false}; }
 	static constexpr const char* const* kWaveformOptions() { return kWaveformOptionStrings; }
 	static constexpr const char* const* kShaperOptions() { return kShaperOptionStrings; }
 	static constexpr const char* const* kPhaseOptions() { return kPhaseOptionStrings; }
 	static constexpr const char* const* kCfgOptions() { return kCfgOptionStrings; }
+	static constexpr const char* const* kBusOptions() { return kBusOptionStrings; }
 
 	// Real-unit helpers for the tables below (defaults leave out the trailing fields).
 	static constexpr ParamDef hz(Param p, const char* label, float minHz, float maxHz, uint8_t dec = 2) {
@@ -239,7 +253,8 @@ public:
 		return {p, label, false, 0, 1, nullptr, "%", 0.f, maxPercent, 0, true};
 	}
 	/// RT60 seconds, approximate (0.594 = nominal line-set time × 6.91 nepers over
-	/// the engine's per-pass decay 0.40..0.97 — baked into the curve conversion).
+	/// the engine's per-pass decay 0.40..1.0 — baked into the curve conversion;
+	/// 999+ renders as INF, the manual's infinite-sustain ceiling).
 	/// realMin/realMax are DISPLAY seconds, like every other def.
 	static constexpr ParamDef rt60(Param p, const char* label, float minS, float maxS) {
 		return {p, label, false, 0, 1, nullptr, "S", minS, maxS, 1, false, 5, 1.5f};
@@ -255,7 +270,7 @@ public:
 	/// ints rather than 0-100%).
 	static constexpr bool paramIsInt(Param p) {
 		return p == Param::ChorusVoices || p == Param::ChorusWaveform || p == Param::ShaperMode
-		       || p == Param::DelayPhase;
+		       || p == Param::DelayPhase || p == Param::ComboCfg || p == Param::SendBus;
 	}
 
 	/// Canonical XML name for a param id (single source for write and read).
@@ -268,6 +283,8 @@ public:
 		case Param::Diffusion: return "diffusion";
 		case Param::HPF: return "hpf";
 		case Param::Level: return "level";
+		case Param::InGain: return "inGain";
+		case Param::SendBus: return "sendBus";
 		case Param::PreDelay: return "preDelay";
 		case Param::ERLevel: return "erLevel";
 		case Param::BassDecay: return "bassDecay";
@@ -307,7 +324,7 @@ public:
 		reclaimRetired();
 
 		reverb::Base* replacement = nullptr;
-		if (m != Model::EMPTY && m != Model::FILTER) {
+		if (m != Model::EMPTY && m != Model::FILTER && m != Model::GLOBAL_SEND) {
 			replacement = constructEngine(m);
 			if (replacement == nullptr) {
 				return false; // pool exhausted; keep the current bloc as-is
@@ -330,13 +347,18 @@ public:
 			// every send-style engine — blocs were silently passthrough until this.
 			replacement->setPanLevels(reverb::kdfx::unityWetPan(), reverb::kdfx::unityWetPan());
 			for (const auto& def : paramDefs(m)) {
-				if (def.param == Param::None || def.param == Param::Level) {
+				if (def.param == Param::None || def.param == Param::Level || def.param == Param::InGain) {
 					continue;
 				}
 				cache_[util::to_underlying(def.param)] = readEngineParam(replacement, def.param);
 			}
 		}
 		cache_[util::to_underlying(Param::Level)] = 1.0f;
+		cache_[util::to_underlying(Param::InGain)] = tFromReal(INGAIN_DEF(), 0.0f);
+		if (m == Model::GLOBAL_SEND) {
+			cache_[util::to_underlying(Param::SendBus)] = 0.0f;
+			cache_[util::to_underlying(Param::Width)] = 0.5f; // Center pan
+		}
 		dirty_ = 0;
 		return true;
 	}
@@ -410,9 +432,42 @@ public:
 	/// engines (tremolo, auto-pan) transform the buffer directly; send engines consume
 	/// a mono input and wet-add into the stereo buffer.
 	bool process(StereoSample* buffer, size_t numSamples) {
+		if (model_ == Model::GLOBAL_SEND) {
+			float inGainDb = displayValue(INGAIN_DEF(), cache_[util::to_underlying(Param::InGain)]);
+			float inGainLin = (inGainDb <= -95.0f) ? 0.0f : std::pow(10.0f, inGainDb / 20.0f);
+			float level = std::clamp(cache_[util::to_underlying(Param::Level)], 0.0f, 1.0f);
+			float totalGain = inGainLin * level;
+			if (totalGain > 0.0001f) {
+				int32_t busIdx = std::clamp<int32_t>(static_cast<int32_t>(cache_[util::to_underlying(Param::SendBus)]), 0, 2);
+				float pan = std::clamp<float>(displayValue(bipolarPct(Param::Width, "PAN", 100.f),
+				                                           cache_[util::to_underlying(Param::Width)]),
+				                              -100.f, 100.f);
+				accumulateMasterSend(busIdx, buffer, numSamples, totalGain, pan);
+			}
+			return true;
+		}
 		if (engine_ == nullptr) {
 			return false;
 		}
+
+		// Input volume attenuation (down to silence) or boost up to +3dB (default 0dB)
+		float inGainDb = displayValue(INGAIN_DEF(), cache_[util::to_underlying(Param::InGain)]);
+		float inGainLin = (inGainDb <= -95.0f) ? 0.0f : std::pow(10.0f, inGainDb / 20.0f);
+		if (inGainLin == 0.0f) {
+			for (size_t i = 0; i < numSamples; i++) {
+				buffer[i].l = 0;
+				buffer[i].r = 0;
+			}
+		}
+		else if (std::fabs(inGainLin - 1.0f) > 0.001f) {
+			for (size_t i = 0; i < numSamples; i++) {
+				buffer[i].l = static_cast<int32_t>(std::clamp<int64_t>(
+				    static_cast<int64_t>(buffer[i].l * inGainLin), -2147483648LL, 2147483647LL));
+				buffer[i].r = static_cast<int32_t>(std::clamp<int64_t>(
+				    static_cast<int64_t>(buffer[i].r * inGainLin), -2147483648LL, 2147483647LL));
+			}
+		}
+
 		if (engine_->isInsert()) {
 			float level = std::clamp(cache_[util::to_underlying(Param::Level)], 0.0f, 1.0f);
 			if (level >= 0.999f) {
@@ -657,36 +712,40 @@ private:
 
 // ---- Per-model param tables, file scope (see the in-class declaration for why) ----
 
-constexpr FxBloc::ParamDef kDefsFreeverb[4] = {
-    {FxBloc::Param::RoomSize, "SIZE"},
-    {FxBloc::Param::Damping, "DAMP"},
-    {FxBloc::Param::Width, "WIDTH"},
+constexpr FxBloc::ParamDef kDefsFreeverb[5] = {
+    FxBloc::pct(FxBloc::Param::RoomSize, "SIZE"),
+    FxBloc::pct(FxBloc::Param::Damping, "DAMP"),
+    FxBloc::pct(FxBloc::Param::Width, "WIDTH"),
     FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
 };
-constexpr FxBloc::ParamDef kDefsMutable[5] = {
-    {FxBloc::Param::RoomSize, "SIZE"},
-    {FxBloc::Param::Damping, "DAMP"},
-    {FxBloc::Param::Width, "WIDTH"},
+constexpr FxBloc::ParamDef kDefsMutable[6] = {
+    FxBloc::pct(FxBloc::Param::RoomSize, "SIZE"),
+    FxBloc::pct(FxBloc::Param::Damping, "DAMP"),
+    FxBloc::pct(FxBloc::Param::Width, "WIDTH"),
     FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
     FxBloc::hz(FxBloc::Param::HPF, "HPF", 20.f, 1000.f, 0),
 };
-constexpr FxBloc::ParamDef kDefsKdfxReverb[9] = {
+constexpr FxBloc::ParamDef kDefsKdfxReverb[10] = {
     {FxBloc::Param::RoomSize, "SIZE", false, 0, 1, nullptr, "M", 3.f, 48.f, 0, false}, // tank scale 1x-3.7x
-    FxBloc::rt60(FxBloc::Param::Decay, "DCAY", 0.6f, 19.5f),
+    FxBloc::rt60(FxBloc::Param::Decay, "DCAY", 0.6f, 999.f),
     FxBloc::hz(FxBloc::Param::Damping, "DAMP", 351.f, 7019.f, 0), // one-pole cutoff, coeff 0.05-1.0
     FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
     FxBloc::pct(FxBloc::Param::Width, "WIDTH"),
     FxBloc::ms(FxBloc::Param::PreDelay, "PREDL", 0.f, 300.f, 0),
     FxBloc::pct(FxBloc::Param::ERLevel, "ER"),
     {FxBloc::Param::BassDecay, "BASS", false, 0, 1, nullptr, "X", 0.2f, 2.5f, 2, false},
     FxBloc::pct(FxBloc::Param::AirShelf, "AIR"),
 };
-constexpr FxBloc::ParamDef kDefsKdfxDelay[10] = {
+constexpr FxBloc::ParamDef kDefsKdfxDelay[11] = {
     // Both delay lines and the feedback lead — they are the primary controls.
     FxBloc::ms(FxBloc::Param::RoomSize, "TIM L", 1.f, 1480.f, 0),
     FxBloc::ms(FxBloc::Param::DelayTimeR, "TIM R", 1.f, 1480.f, 0),
     {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 99.f, 0, false},
     FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
     FxBloc::hz(FxBloc::Param::Damping, "TONE", 351.f, 7019.f, 0),
     FxBloc::pct(FxBloc::Param::Diffusion, "XFEED"),
     FxBloc::db(FxBloc::Param::DelayDrive, "DRV", 0.f, 18.f),
@@ -694,22 +753,24 @@ constexpr FxBloc::ParamDef kDefsKdfxDelay[10] = {
     FxBloc::pct(FxBloc::Param::Width, "WIDTH"),
     {FxBloc::Param::DelayPhase, "PHASE", true, 0, 1, FxBloc::kPhaseOptions()},
 };
-constexpr FxBloc::ParamDef kDefsKdfxChorus[9] = {
+constexpr FxBloc::ParamDef kDefsKdfxChorus[10] = {
     FxBloc::hz(FxBloc::Param::RoomSize, "RATE", 0.05f, 15.f),
     FxBloc::ms(FxBloc::Param::Decay, "DEPTH", 0.f, 10.f),
     FxBloc::bipolarPct(FxBloc::Param::Damping, "FDBK", 95.f),
     FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
     FxBloc::ms(FxBloc::Param::BaseDelay, "BASE", 0.1f, 40.f),
     {FxBloc::Param::ChorusVoices, "VOICE", true, 2, 6},
     {FxBloc::Param::ChorusWaveform, "WAVE", true, 0, 2, FxBloc::kWaveformOptions()},
     {FxBloc::Param::Diffusion, "SPRD", false, 0, 1, nullptr, "DEG", 0.f, 180.f, 0, false},
     FxBloc::hz(FxBloc::Param::HPF, "HPF", 20.f, 1000.f, 0),
 };
-constexpr FxBloc::ParamDef kDefsKdfxTone[10] = {
+constexpr FxBloc::ParamDef kDefsKdfxTone[11] = {
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     FxBloc::db(FxBloc::Param::BassGain, "BASS", -15.f, 15.f, true),
     FxBloc::db(FxBloc::Param::MidGain, "MID", -15.f, 15.f, true),
     FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::ShaperMode, "SHPR", true, 0, 3, FxBloc::kShaperOptions()},
     FxBloc::hz(FxBloc::Param::BassFreq, "BFREQ", 30.f, 400.f, 0),
     FxBloc::db(FxBloc::Param::TrebleGain, "TRBL", -15.f, 15.f, true),
@@ -717,38 +778,43 @@ constexpr FxBloc::ParamDef kDefsKdfxTone[10] = {
     FxBloc::hz(FxBloc::Param::MidFreq, "MFREQ", 200.f, 8000.f, 0),
     FxBloc::hz(FxBloc::Param::TrebleFreq, "TFREQ", 1000.f, 16000.f, 0),
 };
-constexpr FxBloc::ParamDef kDefsKdfxFlanger[7] = {
+constexpr FxBloc::ParamDef kDefsKdfxFlanger[8] = {
     FxBloc::hz(FxBloc::Param::RoomSize, "RATE", 0.05f, 8.f),
     FxBloc::ms(FxBloc::Param::Decay, "DEPTH", 0.f, 3.f, 2),
     FxBloc::bipolarPct(FxBloc::Param::Damping, "FDBK", 95.f),
     FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
     FxBloc::ms(FxBloc::Param::BaseDelay, "BASE", 0.1f, 7.f),
     {FxBloc::Param::Diffusion, "SPRD", false, 0, 1, nullptr, "DEG", 0.f, 180.f, 0, false},
     FxBloc::hz(FxBloc::Param::HPF, "HPF", 20.f, 1000.f, 0),
 };
-constexpr FxBloc::ParamDef kDefsKdfxPhaser[6] = {
+constexpr FxBloc::ParamDef kDefsKdfxPhaser[7] = {
     FxBloc::hz(FxBloc::Param::RoomSize, "RATE", 0.05f, 8.f),
     FxBloc::pct(FxBloc::Param::Decay, "DEPTH"),
     {FxBloc::Param::Damping, "FDBK", false, 0, 1, nullptr, "%", 0.f, 70.f, 0, false},
     FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::Diffusion, "SPRD", false, 0, 1, nullptr, "DEG", 0.f, 180.f, 0, false},
     FxBloc::hz(FxBloc::Param::HPF, "HPF", 20.f, 1000.f, 0),
 };
-constexpr FxBloc::ParamDef kDefsKdfxTremolo[3] = {
+constexpr FxBloc::ParamDef kDefsKdfxTremolo[4] = {
     FxBloc::hz(FxBloc::Param::RoomSize, "RATE", 0.10f, 16.f),
     FxBloc::pct(FxBloc::Param::Decay, "DEPTH"),
+    FxBloc::INGAIN_DEF(),
     FxBloc::LEVEL_DEF(),
 };
-constexpr FxBloc::ParamDef kDefsKdfxAutoPan[3] = {
+constexpr FxBloc::ParamDef kDefsKdfxAutoPan[4] = {
     FxBloc::hz(FxBloc::Param::RoomSize, "RATE", 0.05f, 10.f),
     FxBloc::pct(FxBloc::Param::Decay, "WIDTH"),
+    FxBloc::INGAIN_DEF(),
     FxBloc::LEVEL_DEF(),
 };
-constexpr FxBloc::ParamDef kDefsKdfxTubeAmp[11] = {
+constexpr FxBloc::ParamDef kDefsKdfxTubeAmp[12] = {
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
     FxBloc::hz(FxBloc::Param::LoCut, "LOCUT", 20.f, 300.f, 0),
     FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
     FxBloc::pct(FxBloc::Param::CabSim, "CAB"),
     FxBloc::hz(FxBloc::Param::HiCut, "HCUT", 1000.f, 16000.f, 0),
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 5.f),
@@ -756,25 +822,33 @@ constexpr FxBloc::ParamDef kDefsKdfxTubeAmp[11] = {
     FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 10.f),
     {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
 };
-constexpr FxBloc::ParamDef kDefsKdfxDist[6] = {
+constexpr FxBloc::ParamDef kDefsKdfxDist[7] = {
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
     FxBloc::hz(FxBloc::Param::LoCut, "LOCUT", 20.f, 300.f, 0),
     FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
     FxBloc::pct(FxBloc::Param::CabSim, "CAB"),
     FxBloc::hz(FxBloc::Param::HiCut, "HCUT", 1000.f, 16000.f, 0),
 };
 /// Stock compressor wrapped as a bloc (manual comp/gate family 950-957 stand-in).
 /// Param aliases: roomSize=threshold, decay=ratio, damping=attack, diffusion=release,
 /// hpf=sidechain HPF, width=wet/dry blend — curves match the engine's setters.
-constexpr FxBloc::ParamDef kDefsCompressor[7] = {
+constexpr FxBloc::ParamDef kDefsCompressor[8] = {
     {FxBloc::Param::RoomSize, "THRSH", false, 0, 1, nullptr, "DB", 0.f, -48.f, 1, false},
     {FxBloc::Param::Decay, "RATIO", false, 0, 1, nullptr, "", 0.1f, 128.f, 1, false, 3, 1.5f},
     {FxBloc::Param::Damping, "ATK", false, 0, 1, nullptr, "MS", 0.5f, 100.f, 1, false, 2, 1.5f},
     FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::Diffusion, "REL", false, 0, 1, nullptr, "MS", 10.f, 1000.f, 0, false, 2, 1.5f},
     {FxBloc::Param::HPF, "SIDE", false, 0, 1, nullptr, "HZ", 0.f, 100.f, 0, false, 4, 1.5f},
     {FxBloc::Param::Width, "BLEND", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+};
+constexpr FxBloc::ParamDef kDefsGlobalSend[4] = {
+    {FxBloc::Param::SendBus, "BUS", true, 0, 2, FxBloc::kBusOptions()},
+    FxBloc::bipolarPct(FxBloc::Param::Width, "PAN", 100.f),
+    FxBloc::INGAIN_DEF(),
+    FxBloc::LEVEL_DEF(),
 };
 
 constexpr FxBloc::ParamDef kDefsEmpty[1] = {{}};
@@ -794,6 +868,7 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_AUTOPAN: return kDefsKdfxAutoPan;
 	case Model::KDFX_DIST: return kDefsKdfxDist;
 	case Model::KDFX_TUBEAMP: return kDefsKdfxTubeAmp;
+	case Model::GLOBAL_SEND: return kDefsGlobalSend;
 	case Model::EMPTY:
 	case Model::FILTER:
 	default: return kDefsEmpty;

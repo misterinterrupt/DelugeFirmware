@@ -18,6 +18,7 @@
 #pragma once
 
 #include "definitions_cxx.hpp"
+#include "dsp/fx_bloc/master_fx_chain.hpp"
 #include "model/mod_controllable/mod_controllable_audio.h"
 #include "model/sample/sample_recorder.h"
 #include "modulation/arpeggiator.h"
@@ -155,6 +156,9 @@ public:
 
 	virtual ArpeggiatorSettings* getArpSettings(InstrumentClip* clip = NULL) = 0;
 	virtual void setSkippingRendering(bool newSkipping);
+
+	deluge::dsp::FxChain fxChain;
+	deluge::dsp::FxChain* getFxChain() override { return &fxChain; }
 
 	ModFXType getModFXType();
 	bool setModFXType(ModFXType newType) final;

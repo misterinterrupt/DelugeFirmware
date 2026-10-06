@@ -143,9 +143,11 @@ public:
 
 	void setDecay(float value) override {
 		decay_val_ = value;
-		// 0.40..0.97, reaching the cap exactly at full travel (the low-band path
-		// also multiplies by the bass-boost factor; see updateBassClamp).
-		decayFloat_ = std::min(0.40f + value * 0.57f, 0.97f);
+		// 0.40..1.0 per the manual (Rvrb Time "adjustable up to Inf"): full travel
+		// is unity loop gain — sustaining, never building (the loop's damping
+		// filters still bleed energy, and updateBassClamp keeps the bass path
+		// below unity so the only way to hold a tail is to leave DECAY up).
+		decayFloat_ = std::min(0.40f + value * 0.60f, 1.0f);
 		decay_ = static_cast<q31_t>(decayFloat_ * ONE_Q31f);
 		updateBassClamp();
 	}

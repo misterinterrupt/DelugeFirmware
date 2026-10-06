@@ -52,11 +52,16 @@ class StorageManager;
 class Serializer;
 class Deserializer;
 
+namespace deluge::dsp {
+class FxChain;
+}
+
 class ModControllableAudio : public ModControllable {
 public:
 	ModControllableAudio();
 	virtual ~ModControllableAudio();
 	virtual void cloneFrom(ModControllableAudio* other);
+	virtual deluge::dsp::FxChain* getFxChain() { return nullptr; }
 
 	void processStutter(StereoSample* buffer, int32_t numSamples, ParamManager* paramManager);
 	void processReverbSendAndVolume(StereoSample* buffer, int32_t numSamples, int32_t* reverbBuffer,

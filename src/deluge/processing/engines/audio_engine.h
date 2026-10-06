@@ -49,7 +49,8 @@ class AbsValueFollower;
 
 namespace deluge::dsp {
 class Reverb;
-class MasterFxChain;
+class FxChain;
+using MasterFxChain = FxChain;
 }
 
 /*

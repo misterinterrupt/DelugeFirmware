@@ -98,6 +98,9 @@ using enum deluge::l10n::String;
 #include "gui/menu_item/patch_cable_strength/fixed.h"
 #include "gui/menu_item/master_transpose.h"
 #include "gui/menu_item/fx_bloc/master_fx_items.h"
+#include "gui/ui/sound_editor.h"
+#include "model/global_effectable/global_effectable_for_clip.h"
+#include "processing/sound/sound.h"
 
 // -------------------------------------------------------------------------------------------------
 // External MenuItem declarations
@@ -310,10 +313,6 @@ static const VisualPage synthLfoPages[] = {
 };
 
 static const VisualPage synthFxPages[] = {
-    {"Reverb", STRING_FOR_REVERB,
-     {{{&reverbRoomSizeMenu, "SIZE"}, {&reverbDampingMenu, "DAMP"}, {&reverbAmountMenu, "SEND"}, {&reverbWidthMenu, "WIDTH"}}}},
-    {"Reverb Details", STRING_FOR_REVERB,
-     {{{&reverbPanMenu, "PAN"}, {nullptr, ""}, {nullptr, ""}, {nullptr, ""}}}},
     {"Delay", STRING_FOR_DELAY,
      {{{&delayRateMenu, "RATE"}, {&delayFeedbackMenu, "FDBK"}, {&delaySyncMenu, "SYNC"}, {&delayPingPongMenu, "P-PONG"}}}},
     {"Delay Mode", STRING_FOR_DELAY,
@@ -373,8 +372,6 @@ static const VisualPage audioClipFilterPages[] = {
 };
 
 static const VisualPage audioClipFxPages[] = {
-    {"Reverb", STRING_FOR_REVERB,
-     {{{&reverbRoomSizeMenu, "SIZE"}, {&reverbDampingMenu, "DAMP"}, {&globalReverbSendAmountMenu, "SEND"}, {&reverbWidthMenu, "WIDTH"}}}},
     {"Delay", STRING_FOR_DELAY,
      {{{&globalDelayRateMenu, "RATE"}, {&globalDelayFeedbackMenu, "FDBK"}, {&delaySyncMenu, "SYNC"}, {&delayPingPongMenu, "P-PONG"}}}},
     {"Mod FX", STRING_FOR_MOD_FX,
@@ -409,9 +406,26 @@ static const VisualCategory midiCvCategories[] = {
 
 // -------------------------------------------------------------------------------------------------
 // Modular master FX blocs (song mode). Slot models/routing write through the PAU
-// lifecycle (lazy allocation, boundary swap, deferred params); params reset on reboot
-// until XML persistence lands.
-// -------------------------------------------------------------------------------------------------
+} // namespace deluge::gui::ui::visual_menu
+
+namespace deluge::gui::menu_item::fx_bloc {
+dsp::FxChain* getCurrentFxChain() {
+	if (rootUIIsClipMinderScreen()) {
+		if (soundEditor.currentSound != nullptr) {
+			return &soundEditor.currentSound->fxChain;
+		}
+		if (soundEditor.currentModControllable != nullptr) {
+			auto* chain = soundEditor.currentModControllable->getFxChain();
+			if (chain != nullptr) {
+				return chain;
+			}
+		}
+	}
+	return &AudioEngine::masterFxChain;
+}
+} // namespace deluge::gui::menu_item::fx_bloc
+
+namespace deluge::gui::ui::visual_menu {
 using namespace deluge::gui::menu_item::fx_bloc;
 
 MasterSlotBloc masterSlotBlocMenus[3] = {{0}, {1}, {2}};
@@ -434,31 +448,39 @@ MasterSlotParam masterParamMenus[3][dsp::FxBloc::kMaxSlotParams] = {
 static VisualPage fxBlocRuntimePages[1 + 3 * (1 + dsp::FxBloc::kMaxSlotParams / 4)];
 static size_t fxBlocRuntimePageCount = 0;
 static char fxBlocRuntimeTitles[sizeof(fxBlocRuntimePages) / sizeof(VisualPage)][12];
-static VisualCategory songCategories[4]; // defined below; entry 3 is mutated by rebuild
+
+static VisualCategory songCategories[4];
 static constexpr size_t kFxBlocSongCategoryIndex = 3;
-static void ensureSongCategoriesInit(); // lazy fill, defined below
+
+static VisualCategory synthCategoriesRuntime[10];
+static constexpr size_t kFxBlocSynthCategoryIndex = 9;
+
+static VisualCategory audioClipCategoriesRuntime[4];
+static constexpr size_t kFxBlocAudioCategoryIndex = 3;
+
+static void ensureCategoriesInit();
 
 void rebuildFxBlocPages() {
-	ensureSongCategoriesInit();
+	ensureCategoriesInit();
 	size_t p = 0;
 	auto nextTitle = [&p]() { return fxBlocRuntimeTitles[p]; };
 
-	fxBlocRuntimePages[p++] = {"Chain", EMPTY_STRING,
-	                           {{{&masterRoutingMenu, "ROUTE", -1, 4},
-	                             {nullptr, "", -1, 0},
-	                             {nullptr, "", -1, 0},
-	                             {nullptr, "", -1, 0}}}};
+	fxBlocRuntimePages[p++] = VisualPage{
+	    .title = "Chain",
+	    .titleString = EMPTY_STRING,
+	    .slots = {VisualSlot{&masterRoutingMenu, "ROUTE", -1, 4}, VisualSlot{nullptr, "", -1, 0},
+	              VisualSlot{nullptr, "", -1, 0}, VisualSlot{nullptr, "", -1, 0}}};
 
+	auto* chain = getCurrentFxChain();
 	for (int32_t s = 0; s < 3; s++) {
 		snprintf(nextTitle(), 12, "BLOC %d", s + 1);
-		fxBlocRuntimePages[p++] = {fxBlocRuntimeTitles[p - 1],
-		                           EMPTY_STRING,
-		                           {{{&masterSlotBlocMenus[s], "BLOC", -1, 4},
-	                             {nullptr, "", -1, 0},
-	                             {nullptr, "", -1, 0},
-	                             {nullptr, "", -1, 0}}}};
+		fxBlocRuntimePages[p++] = VisualPage{
+		    .title = fxBlocRuntimeTitles[p - 1],
+		    .titleString = EMPTY_STRING,
+		    .slots = {VisualSlot{&masterSlotBlocMenus[s], "BLOC", -1, 4}, VisualSlot{nullptr, "", -1, 0},
+		              VisualSlot{nullptr, "", -1, 0}, VisualSlot{nullptr, "", -1, 0}}};
 
-		auto model = AudioEngine::masterFxChain.slot(s).getModel();
+		auto model = chain != nullptr ? chain->slot(s).getModel() : dsp::FxBloc::Model::EMPTY;
 		size_t n = dsp::FxBloc::paramDefs(model).size();
 		size_t numParamPages = std::max<size_t>(1, (n + 3) / 4);
 		for (size_t pg = 0; pg < numParamPages; pg++) {
@@ -471,17 +493,20 @@ void rebuildFxBlocPages() {
 			for (size_t c = 0; c < 4; c++) {
 				size_t idx = pg * 4 + c;
 				if (idx < n) {
-					page.slots[c] = {&masterParamMenus[s][idx], nullptr, -1, 1};
+					page.slots[c] = VisualSlot{&masterParamMenus[s][idx], nullptr, -1, 1};
 				}
 				else {
-					page.slots[c] = {nullptr, "", -1, 0};
+					page.slots[c] = VisualSlot{nullptr, "", -1, 0};
 				}
 			}
 			fxBlocRuntimePages[p++] = page;
 		}
 	}
 	fxBlocRuntimePageCount = p;
-	songCategories[kFxBlocSongCategoryIndex].pages = std::span{fxBlocRuntimePages, fxBlocRuntimePageCount};
+	auto pagesSpan = std::span{fxBlocRuntimePages, fxBlocRuntimePageCount};
+	songCategories[kFxBlocSongCategoryIndex].pages = pagesSpan;
+	synthCategoriesRuntime[kFxBlocSynthCategoryIndex].pages = pagesSpan;
+	audioClipCategoriesRuntime[kFxBlocAudioCategoryIndex].pages = pagesSpan;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -494,15 +519,22 @@ static const VisualPage songMasterPages[] = {
      {{{&globalLevelMenu, "LEVEL"}, {&globalPanMenu, "PAN"}, {nullptr, ""}, {nullptr, ""}}}},
 };
 
-// Defined (tentatively, zero-init) above so rebuildFxBlocPages() can mutate
-// entry kFxBlocSongCategoryIndex; filled lazily on first song-mode fetch —
-// static-init-order-safe (everything it touches is runtime state).
-static bool songCategoriesInitialized = false;
-static void ensureSongCategoriesInit() {
-	if (songCategoriesInitialized) {
+static bool categoriesInitialized = false;
+static void ensureCategoriesInit() {
+	if (categoriesInitialized) {
 		return;
 	}
-	songCategoriesInitialized = true;
+	categoriesInitialized = true;
+	for (size_t i = 0; i < 9; i++) {
+		synthCategoriesRuntime[i] = synthCategories[i];
+	}
+	synthCategoriesRuntime[kFxBlocSynthCategoryIndex] = {EMPTY_STRING, "FX BLOCS", {}};
+
+	for (size_t i = 0; i < 3; i++) {
+		audioClipCategoriesRuntime[i] = audioClipCategories[i];
+	}
+	audioClipCategoriesRuntime[kFxBlocAudioCategoryIndex] = {EMPTY_STRING, "FX BLOCS", {}};
+
 	songCategories[0] = {STRING_FOR_MASTER, nullptr, songMasterPages};
 	songCategories[1] = {STRING_FOR_FILTERS, nullptr, audioClipFilterPages};
 	songCategories[2] = {STRING_FOR_FX, nullptr, audioClipFxPages};
@@ -513,15 +545,21 @@ static void ensureSongCategoriesInit() {
 // Getters
 // -------------------------------------------------------------------------------------------------
 std::span<const VisualCategory> getSynthCategories() {
-	return synthCategories;
+	ensureCategoriesInit();
+	rebuildFxBlocPages();
+	return synthCategoriesRuntime;
 }
 
 std::span<const VisualCategory> getKitCategories() {
-	return synthCategories; // Kit sound drum rows use synth sound parameter tables
+	ensureCategoriesInit();
+	rebuildFxBlocPages();
+	return synthCategoriesRuntime; // Kit sound drum rows use synth sound parameter tables
 }
 
 std::span<const VisualCategory> getAudioClipCategories() {
-	return audioClipCategories;
+	ensureCategoriesInit();
+	rebuildFxBlocPages();
+	return audioClipCategoriesRuntime;
 }
 
 std::span<const VisualCategory> getMidiCvCategories() {
@@ -529,7 +567,7 @@ std::span<const VisualCategory> getMidiCvCategories() {
 }
 
 std::span<const VisualCategory> getGlobalFxCategories() {
-	ensureSongCategoriesInit();
+	ensureCategoriesInit();
 	rebuildFxBlocPages(); // page structure follows the currently selected blocs
 	return songCategories;
 }

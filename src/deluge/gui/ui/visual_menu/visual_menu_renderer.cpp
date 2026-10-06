@@ -135,8 +135,39 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 			canvas.drawString(valBuf, valX, top + 27, kTextSpacingX, kTextSizeYUpdated, 0, colRight);
 
 			// Decimal cursor if active
-			if (s == decimalCursorSlot && decimalEditPos >= 0) {
-				canvas.drawString("^", colCenter - 3, top + 34, kTextSpacingX, kTextSizeYUpdated);
+			if (s == decimalCursorSlot && decimalEditPos >= 0 && slot.item->numDecimalPositions() > 1) {
+				const char* dot = strchr(valBuf, '.');
+				int32_t targetCharIdx = -1;
+				if (dot != nullptr) {
+					int32_t dotIdx = static_cast<int32_t>(dot - valBuf);
+					if (decimalEditPos == 0) {
+						targetCharIdx = dotIdx - 1;
+					}
+					else if (decimalEditPos == 1) {
+						targetCharIdx = dotIdx + 1;
+					}
+					else if (decimalEditPos == 2) {
+						targetCharIdx = dotIdx + 2;
+					}
+				}
+				else {
+					int32_t lastDigit = -1;
+					for (int32_t i = 0; i < valLen; i++) {
+						if (valBuf[i] >= '0' && valBuf[i] <= '9') {
+							lastDigit = i;
+						}
+					}
+					if (lastDigit >= 0) {
+						targetCharIdx = lastDigit - decimalEditPos;
+						if (targetCharIdx < 0) {
+							targetCharIdx = 0;
+						}
+					}
+				}
+				int32_t caretX = (targetCharIdx >= 0 && targetCharIdx < valLen)
+				                     ? (valX + targetCharIdx * kTextSpacingX)
+				                     : (colCenter - 3);
+				canvas.drawString("^", caretX, top + 34, kTextSpacingX, kTextSizeYUpdated);
 			}
 
 			// Active highlight: invertArea()'s byte walk (image_[rowY][xMin] + width bytes)

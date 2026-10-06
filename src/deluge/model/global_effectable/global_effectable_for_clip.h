@@ -18,6 +18,7 @@
 #pragma once
 
 #include "definitions_cxx.hpp"
+#include "dsp/fx_bloc/master_fx_chain.hpp"
 #include "model/global_effectable/global_effectable.h"
 #include "model/sample/sample_recorder.h"
 
@@ -32,6 +33,9 @@ class ModelStackWithTimelineCounter;
 class GlobalEffectableForClip : public GlobalEffectable {
 public:
 	GlobalEffectableForClip();
+
+	deluge::dsp::FxChain fxChain;
+	deluge::dsp::FxChain* getFxChain() override { return &fxChain; }
 
 	int32_t getSidechainVolumeAmountAsPatchCableDepth(ParamManager* paramManager);
 	void modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTimeline* paramManager) override;

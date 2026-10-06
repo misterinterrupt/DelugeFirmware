@@ -18,6 +18,7 @@
 #include "model/mod_controllable/mod_controllable_audio.h"
 #include "definitions_cxx.hpp"
 #include "deluge/model/settings/runtime_feature_settings.h"
+#include "dsp/fx_bloc/master_fx_chain.hpp"
 #include "dsp/stereo_sample.h"
 #include "gui/l10n/l10n.h"
 #include "gui/views/automation_view.h"
@@ -119,6 +120,9 @@ void ModControllableAudio::cloneFrom(ModControllableAudio* other) {
 	sidechain.cloneFrom(&other->sidechain);
 	midiKnobArray.cloneFrom(&other->midiKnobArray); // Could fail if no RAM... not too big a concern
 	delay = other->delay;
+	if (other->getFxChain() != nullptr && getFxChain() != nullptr) {
+		getFxChain()->cloneFrom(*other->getFxChain());
+	}
 }
 
 void ModControllableAudio::initParams(ParamManager* paramManager) {
@@ -824,6 +828,51 @@ void ModControllableAudio::writeTagsToFile(Serializer& writer) {
 	writer.writeAttribute("compHPF", compressor.getSidechain());
 	writer.writeAttribute("compBlend", compressor.getBlend());
 	writer.closeTag();
+
+	// Modular track FX chain (Milestone 2b)
+	auto* chain = getFxChain();
+	if (chain != nullptr) {
+		bool anySlot = false;
+		for (size_t s = 0; s < dsp::FxChain::kNumSlots; s++) {
+			if (!chain->slot(s).isEmpty()) {
+				anySlot = true;
+				break;
+			}
+		}
+		if (anySlot || chain->getRouting() != dsp::FxChain::Routing::SERIES) {
+			writer.writeOpeningTagBeginning("fxChain");
+			writer.writeAttribute("routing", util::to_underlying(chain->getRouting()));
+			writer.writeOpeningTagEnd();
+			for (size_t s = 0; s < dsp::FxChain::kNumSlots; s++) {
+				auto& bloc = chain->slot(s);
+				if (bloc.isEmpty()) {
+					continue;
+				}
+				writer.writeOpeningTagBeginning("slot");
+				writer.writeAttribute("index", (int32_t)s);
+				writer.writeAttribute("model", util::to_underlying(bloc.getModel()));
+				for (const auto& def : dsp::FxBloc::paramDefs(bloc.getModel())) {
+					if (def.param == dsp::FxBloc::Param::None) {
+						continue;
+					}
+					const char* name = dsp::FxBloc::paramName(def.param);
+					if (name == nullptr) {
+						continue;
+					}
+					if (def.isInt) {
+						writer.writeAttribute(name, (int32_t)std::lround(bloc.getParam(def.param)));
+					}
+					else {
+						uint32_t v = bloc.getParam(def.param) * (uint32_t)2147483648u;
+						v = std::min(v, (uint32_t)2147483647);
+						writer.writeAttribute(name, v);
+					}
+				}
+				writer.closeTag();
+			}
+			writer.writeClosingTag("fxChain");
+		}
+	}
 }
 
 void ModControllableAudio::writeParamAttributesToFile(Serializer& writer, ParamManager* paramManager,
@@ -1215,6 +1264,75 @@ doReadPatchedParam:
 			reader.exitTag();
 		}
 		reader.exitTag("midiKnobs");
+	}
+
+	else if (!strcmp(tagName, "fxChain")) {
+		auto* chain = getFxChain();
+		while (*(tagName = reader.readNextTagOrAttributeName())) {
+			if (!strcmp(tagName, "routing")) {
+				int32_t r = reader.readTagOrAttributeValueInt();
+				if (chain != nullptr) {
+					chain->setRouting(static_cast<dsp::FxChain::Routing>(
+					    std::clamp<int32_t>(r, 0, util::to_underlying(dsp::FxChain::Routing::PARALLEL_SERIES))));
+				}
+				reader.exitTag("routing");
+			}
+			else if (!strcmp(tagName, "slot")) {
+				int32_t slotIndex = -1;
+				int32_t modelVal = 0;
+				float params[dsp::FxBloc::kMaxSlotParams + 1] = {};
+				uint32_t seen = 0;
+				while (*(tagName = reader.readNextTagOrAttributeName())) {
+					if (!strcmp(tagName, "index")) {
+						slotIndex = reader.readTagOrAttributeValueInt();
+						reader.exitTag("index");
+					}
+					else if (!strcmp(tagName, "model")) {
+						modelVal = reader.readTagOrAttributeValueInt();
+						reader.exitTag("model");
+					}
+					else {
+						bool matched = false;
+						for (uint32_t pid = 1; pid <= dsp::FxBloc::kMaxSlotParams && !matched; pid++) {
+							const char* nm = dsp::FxBloc::paramName(static_cast<dsp::FxBloc::Param>(pid));
+							if (nm != nullptr && !strcmp(tagName, nm)) {
+								int32_t raw = reader.readTagOrAttributeValueInt();
+								auto p = static_cast<dsp::FxBloc::Param>(pid);
+								params[pid] = dsp::FxBloc::paramIsInt(p) ? (float)raw : (float)raw / 2147483648u;
+								seen |= (1u << pid);
+								matched = true;
+							}
+						}
+						reader.exitTag(tagName);
+					}
+				}
+				if (chain != nullptr && slotIndex >= 0 && slotIndex < (int32_t)dsp::FxChain::kNumSlots) {
+					auto model = static_cast<dsp::FxBloc::Model>(
+					    std::clamp<int32_t>(modelVal, 0, util::to_underlying(dsp::FxBloc::Model::COMPRESSOR)));
+					bool ok = chain->slot(slotIndex).setModel(model);
+					if (!ok) {
+						// Budget/RAM limit: gracefully degrade to EMPTY
+						chain->slot(slotIndex).setModel(dsp::FxBloc::Model::EMPTY);
+					}
+					else {
+						for (const auto& def : dsp::FxBloc::paramDefs(model)) {
+							if (def.param == dsp::FxBloc::Param::None) {
+								continue;
+							}
+							uint32_t pid = static_cast<uint32_t>(def.param);
+							if (seen & (1u << pid)) {
+								chain->slot(slotIndex).setParam(def.param, params[pid]);
+							}
+						}
+					}
+				}
+				reader.exitTag("slot");
+			}
+			else {
+				reader.exitTag(tagName);
+			}
+		}
+		reader.exitTag("fxChain");
 	}
 
 	else {

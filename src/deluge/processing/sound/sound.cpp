@@ -2201,6 +2201,8 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
                    int32_t* reverbBuffer, int32_t sideChainHitPending, int32_t reverbAmountAdjust,
                    bool shouldLimitDelayFeedback, int32_t pitchAdjust, SampleRecorder* recorder) {
 
+	fxChain.applyPending();
+
 	if (skippingRendering) {
 		compressor.gainReduction = 0;
 		return;
@@ -2437,7 +2439,7 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 	processStutter((StereoSample*)soundBuffer, numSamples, paramManager);
 
 	processReverbSendAndVolume((StereoSample*)soundBuffer, numSamples, reverbBuffer, postFXVolume, postReverbVolume,
-	                           reverbSendAmount, 0, true);
+	                           0, 0, true);
 
 	q31_t compThreshold = paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
 	q31_t compBlend = paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_BLEND);
@@ -2453,6 +2455,10 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 	}
 	else {
 		compressor.reset();
+	}
+
+	if (fxChain.isActive()) {
+		fxChain.process((StereoSample*)soundBuffer, numSamples);
 	}
 
 	if (recorder && recorder->status < RecorderStatus::FINISHED_CAPTURING_BUT_STILL_WRITING) {

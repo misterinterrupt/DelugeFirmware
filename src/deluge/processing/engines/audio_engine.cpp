@@ -619,6 +619,7 @@ void renderAudio(size_t numSamples) {
 	// Render boundary for the modular master chain: swap any pending engine selections,
 	// retire displaced engines, advance the reclamation generation.
 	masterFxChain.applyPending();
+	masterFxChain.clearSendBusses(numSamples);
 
 	memset(&renderingBuffer, 0, numSamples * sizeof(StereoSample));
 	memset(&reverbBuffer, 0, numSamples * sizeof(StereoSample));
@@ -641,7 +642,7 @@ void renderAudio(size_t numSamples) {
 	renderSamplePreview(numSamples);
 
 	if (gainerJob().isWaitingForGain()) {
-		if (getCurrentUI() == &soundEditor && soundEditor.getCurrentMenuItem() == deluge::gui::menu_item::getGainActionMenuItem()) {
+		if (getCurrentUI() == &soundEditor && soundEditor.getCurrentMenuItem() == ::deluge::gui::menu_item::getGainActionMenuItem()) {
 			DistortionConfig const& cfg = gainerJob().getDistortionConfig();
 			float gainDb = gainerJob().getGainDb();
 			float gainMultiplier = powf(10.0f, gainDb / 20.0f);
@@ -705,6 +706,7 @@ void renderAudioForStemExport(size_t numSamples) {
 	memset(&reverbBuffer, 0, numSamples * sizeof(StereoSample));
 
 	masterFxChain.applyPending();
+	masterFxChain.clearSendBusses(numSamples);
 
 	if (sideChainHitPending) {
 		timeLastSideChainHit = audioSampleTimer;
@@ -1818,5 +1820,11 @@ bool isAnyInternalRecordingHappening() {
 }
 
 } // namespace AudioEngine
+
+namespace deluge::dsp {
+FxChain* getGlobalMasterFxChain() {
+	return &AudioEngine::masterFxChain;
+}
+} // namespace deluge::dsp
 
 //     for (Voice* thisVoice = voices; thisVoice != &voices[numVoices]; thisVoice++) {

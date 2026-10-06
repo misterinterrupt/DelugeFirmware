@@ -200,10 +200,15 @@ public:
 	/// @brief Synchronize value for visual menu without triggering display side-effects.
 	virtual void syncValueForVisualMenu() {}
 
-	/// @brief Whether this item participates in the FX-bloc fine-edit controls: shift
-	/// switches the select encoder to fine stepping and select-click steps the decimal
-	/// position. False for everything stock, so only items that opt in change behaviour.
+	/// @brief Whether this item participates in the FX-bloc fine-edit controls:
+	/// select-click steps the decimal position, encoder steps at the chosen position.
 	virtual bool supportsFineEdit() const { return false; }
+
+	/// @brief Number of decimal/digit positions available for select-click cycling in visual menu.
+	virtual int8_t numDecimalPositions() const { return 1; }
+
+	/// @brief Step size in internal units for a given decimalEditPos in visual menu.
+	virtual int32_t stepForDecimalPos(int8_t pos) const { return 100; }
 
 	/// @brief Coarse (unshifted) encoder step for fine-edit items, in units of
 	/// 1/100 of the item's display step. Default = one whole display step.

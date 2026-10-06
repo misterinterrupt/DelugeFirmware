@@ -28,6 +28,7 @@ public:
 	void selectEncoderAction(int32_t offset) final;
 	void horizontalEncoderAction(int32_t offset) override;
 	void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) override;
+	[[nodiscard]] int8_t numDecimalPositions() const override { return static_cast<int8_t>(getNumDecimalPlaces() + 1); }
 
 protected:
 	void drawValue() override;
