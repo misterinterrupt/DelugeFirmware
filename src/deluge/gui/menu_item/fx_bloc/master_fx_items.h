@@ -43,7 +43,10 @@ public:
 	    dsp::FxBloc::Model::KDFX_FLANGER, dsp::FxBloc::Model::KDFX_PHASER,
 	    dsp::FxBloc::Model::KDFX_TREMOLO, dsp::FxBloc::Model::KDFX_AUTOPAN,
 	    dsp::FxBloc::Model::KDFX_DIST, dsp::FxBloc::Model::KDFX_TUBEAMP,
-	    dsp::FxBloc::Model::KDFX_LASER,
+	    dsp::FxBloc::Model::KDFX_LASER, dsp::FxBloc::Model::KDFX_CHO_DLY,
+	    dsp::FxBloc::Model::KDFX_CHO_REV, dsp::FxBloc::Model::KDFX_FLG_DLY,
+	    dsp::FxBloc::Model::KDFX_FLG_REV, dsp::FxBloc::Model::KDFX_FLG_LASER,
+	    dsp::FxBloc::Model::KDFX_SHPR_REV,
 	    dsp::FxBloc::Model::COMPRESSOR, dsp::FxBloc::Model::GLOBAL_SEND,
 	};
 

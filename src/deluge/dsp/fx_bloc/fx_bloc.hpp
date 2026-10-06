@@ -29,6 +29,7 @@
 #include "dsp/reverb/kdfx/distortion.hpp"
 #include "dsp/reverb/kdfx/flanger.hpp"
 #include "dsp/reverb/kdfx/laser.hpp"
+#include "dsp/reverb/kdfx/pair.hpp"
 #include "dsp/reverb/kdfx/phaser.hpp"
 #include "dsp/reverb/kdfx/reverb.hpp"
 #include "dsp/reverb/kdfx/tone.hpp"
@@ -68,6 +69,12 @@ public:
 		KDFX_DIST,
 		KDFX_TUBEAMP,
 		KDFX_LASER,
+		KDFX_CHO_DLY,
+		KDFX_CHO_REV,
+		KDFX_FLG_DLY,
+		KDFX_FLG_REV,
+		KDFX_FLG_LASER,
+		KDFX_SHPR_REV,
 		GLOBAL_SEND,
 	};
 
@@ -632,6 +639,24 @@ private:
 		case Model::KDFX_LASER:
 			size = sizeof(reverb::KdfxLaserVerb);
 			break;
+		case Model::KDFX_CHO_DLY:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::CHORUS, reverb::PairEngine::Kind::DELAY, true>);
+			break;
+		case Model::KDFX_CHO_REV:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::CHORUS, reverb::PairEngine::Kind::REVERB, true>);
+			break;
+		case Model::KDFX_FLG_DLY:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::DELAY, false>);
+			break;
+		case Model::KDFX_FLG_REV:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::REVERB, true>);
+			break;
+		case Model::KDFX_FLG_LASER:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::LASER, true>);
+			break;
+		case Model::KDFX_SHPR_REV:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::TONE, reverb::PairEngine::Kind::REVERB, true>);
+			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
 			break;
@@ -669,6 +694,18 @@ private:
 			return new (memory) reverb::KdfxTubeAmp();
 		case Model::KDFX_LASER:
 			return new (memory) reverb::KdfxLaserVerb();
+		case Model::KDFX_CHO_DLY:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::CHORUS, reverb::PairEngine::Kind::DELAY, true>();
+		case Model::KDFX_CHO_REV:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::CHORUS, reverb::PairEngine::Kind::REVERB, true>();
+		case Model::KDFX_FLG_DLY:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::DELAY, false>();
+		case Model::KDFX_FLG_REV:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::REVERB, true>();
+		case Model::KDFX_FLG_LASER:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::LASER, true>();
+		case Model::KDFX_SHPR_REV:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::TONE, reverb::PairEngine::Kind::REVERB, true>();
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:
@@ -838,6 +875,71 @@ constexpr FxBloc::ParamDef kDefsKdfxLaser[8] = {
     FxBloc::pct(FxBloc::Param::Diffusion, "CONT"),
     {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
 };
+// Pair combinations (manual 706-724): primary half's natural ids + the Mod*
+// trio for the modulated half; CFG only where the manual's "<>" allows order
+// swaps ("+" variants are fixed-order).
+constexpr FxBloc::ParamDef kDefsKdfxChoDly[9] = {
+    FxBloc::pct(FxBloc::Param::Diffusion, "XFEED"),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
+    FxBloc::ms(FxBloc::Param::RoomSize, "TIME", 1.f, 1480.f, 0),
+    {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 15.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 10.f),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+    {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
+};
+constexpr FxBloc::ParamDef kDefsKdfxChoRev[8] = {
+    FxBloc::ms(FxBloc::Param::RoomSize, "SIZE", 3.f, 48.f, 0),
+    FxBloc::rt60(FxBloc::Param::Decay, "DCAY", 0.6f, 999.f),
+    FxBloc::hz(FxBloc::Param::Damping, "DAMP", 351.f, 7019.f, 0),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 15.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 10.f),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+    {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
+};
+constexpr FxBloc::ParamDef kDefsKdfxFlgDly[9] = {
+    FxBloc::pct(FxBloc::Param::Diffusion, "XFEED"),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::INGAIN_DEF(),
+    FxBloc::ms(FxBloc::Param::RoomSize, "TIME", 1.f, 1480.f, 0),
+    {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+};
+constexpr FxBloc::ParamDef kDefsKdfxFlgRev[8] = {
+    FxBloc::ms(FxBloc::Param::RoomSize, "SIZE", 3.f, 48.f, 0),
+    FxBloc::rt60(FxBloc::Param::Decay, "DCAY", 0.6f, 999.f),
+    FxBloc::hz(FxBloc::Param::Damping, "DAMP", 351.f, 7019.f, 0),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+    {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
+};
+constexpr FxBloc::ParamDef kDefsKdfxFlgLaser[8] = {
+    FxBloc::ms(FxBloc::Param::RoomSize, "TIME", 0.f, 2000.f, 0),
+    {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+    {FxBloc::Param::Width, "SPAC", false, 0, 1, nullptr, "SMP", 0.f, 40.f, 1, false},
+    FxBloc::LEVEL_DEF(),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+    {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
+};
+constexpr FxBloc::ParamDef kDefsKdfxShprRev[9] = {
+    FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
+    {FxBloc::Param::ShaperMode, "SHPR", true, 0, 3, FxBloc::kShaperOptions()},
+    FxBloc::db(FxBloc::Param::BassGain, "BASS", -15.f, 15.f, true),
+    FxBloc::db(FxBloc::Param::MidGain, "MID", -15.f, 15.f, true),
+    FxBloc::db(FxBloc::Param::TrebleGain, "TRBL", -15.f, 15.f, true),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::ms(FxBloc::Param::ModRate, "SIZE", 3.f, 48.f, 0),
+    FxBloc::rt60(FxBloc::Param::ModDepth, "DCAY", 0.6f, 999.f),
+    {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
+};
 constexpr FxBloc::ParamDef kDefsKdfxDist[7] = {
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
@@ -885,6 +987,12 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_DIST: return kDefsKdfxDist;
 	case Model::KDFX_TUBEAMP: return kDefsKdfxTubeAmp;
 	case Model::KDFX_LASER: return kDefsKdfxLaser;
+	case Model::KDFX_CHO_DLY: return kDefsKdfxChoDly;
+	case Model::KDFX_CHO_REV: return kDefsKdfxChoRev;
+	case Model::KDFX_FLG_DLY: return kDefsKdfxFlgDly;
+	case Model::KDFX_FLG_REV: return kDefsKdfxFlgRev;
+	case Model::KDFX_FLG_LASER: return kDefsKdfxFlgLaser;
+	case Model::KDFX_SHPR_REV: return kDefsKdfxShprRev;
 	case Model::GLOBAL_SEND: return kDefsGlobalSend;
 	case Model::EMPTY:
 	case Model::FILTER:
