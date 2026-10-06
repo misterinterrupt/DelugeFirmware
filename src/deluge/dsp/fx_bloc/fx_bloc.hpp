@@ -28,6 +28,7 @@
 #include "dsp/reverb/kdfx/delay.hpp"
 #include "dsp/reverb/kdfx/distortion.hpp"
 #include "dsp/reverb/kdfx/flanger.hpp"
+#include "dsp/reverb/kdfx/laser.hpp"
 #include "dsp/reverb/kdfx/phaser.hpp"
 #include "dsp/reverb/kdfx/reverb.hpp"
 #include "dsp/reverb/kdfx/tone.hpp"
@@ -66,6 +67,7 @@ public:
 		KDFX_AUTOPAN,
 		KDFX_DIST,
 		KDFX_TUBEAMP,
+		KDFX_LASER,
 		GLOBAL_SEND,
 	};
 
@@ -627,6 +629,9 @@ private:
 		case Model::KDFX_TUBEAMP:
 			size = sizeof(reverb::KdfxTubeAmp);
 			break;
+		case Model::KDFX_LASER:
+			size = sizeof(reverb::KdfxLaserVerb);
+			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
 			break;
@@ -662,6 +667,8 @@ private:
 			return new (memory) reverb::KdfxDistortion();
 		case Model::KDFX_TUBEAMP:
 			return new (memory) reverb::KdfxTubeAmp();
+		case Model::KDFX_LASER:
+			return new (memory) reverb::KdfxLaserVerb();
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:
@@ -822,6 +829,15 @@ constexpr FxBloc::ParamDef kDefsKdfxTubeAmp[12] = {
     FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 10.f),
     {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
 };
+constexpr FxBloc::ParamDef kDefsKdfxLaser[8] = {
+    // TIME leads (overall delay length = duration); SPAC sets the buzz start pitch
+    // / descent, CONT the shape (0=delay, 34%=reverse), FDBK extends (100% sustains).
+    FxBloc::ms(FxBloc::Param::RoomSize, "TIME", 0.f, 2000.f, 0),
+    FxBloc::LEVEL_DEF(),
+    {FxBloc::Param::Width, "SPAC", false, 0, 1, nullptr, "SMP", 0.f, 40.f, 1, false},
+    FxBloc::pct(FxBloc::Param::Diffusion, "CONT"),
+    {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+};
 constexpr FxBloc::ParamDef kDefsKdfxDist[7] = {
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
@@ -868,6 +884,7 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_AUTOPAN: return kDefsKdfxAutoPan;
 	case Model::KDFX_DIST: return kDefsKdfxDist;
 	case Model::KDFX_TUBEAMP: return kDefsKdfxTubeAmp;
+	case Model::KDFX_LASER: return kDefsKdfxLaser;
 	case Model::GLOBAL_SEND: return kDefsGlobalSend;
 	case Model::EMPTY:
 	case Model::FILTER:

@@ -43,6 +43,7 @@ public:
 	    dsp::FxBloc::Model::KDFX_FLANGER, dsp::FxBloc::Model::KDFX_PHASER,
 	    dsp::FxBloc::Model::KDFX_TREMOLO, dsp::FxBloc::Model::KDFX_AUTOPAN,
 	    dsp::FxBloc::Model::KDFX_DIST, dsp::FxBloc::Model::KDFX_TUBEAMP,
+	    dsp::FxBloc::Model::KDFX_LASER,
 	    dsp::FxBloc::Model::COMPRESSOR, dsp::FxBloc::Model::GLOBAL_SEND,
 	};
 
