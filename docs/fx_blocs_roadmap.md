@@ -28,12 +28,13 @@ Stock wrapping is a convenience; the manual's algorithms are the product.
 | 380bd4268 | **reverb trio in real units** (SIZE metres, DECAY RT60 seconds, DAMP Hz) + **dynamic param pages**: tables variable-length (no 8 cap), pages = ceil(params/4) per bloc, rebuilt on selection; reverb gains AIR, delay gains WIDTH + PHASE, tone gains MFREQ/TFREQ, chorus gains HPF |
 | 98a55adfe | **fine controls (FX items only, stock untouched)**: pads forwarded in song view (panel stays live), select-click cycles decimal position, value space at 1/100 display step; FxBloc::tFromReal inverse curves |
 | afbac6d06 / e4dc480b7 | **KDFX DIST** (724-728) and **KDFX TUBEAMP** (729-732, first combination, CFG order swap; Mod* ids + uint64 dirty mask) |
+| ebf8fd6ad | track-send FxChain groundwork banked (in flight, unverified) + manual-faithfulness: reverb DECAY = exponential RT60 0.2-20.0 S with INF only at the top detent (engine g = e^(-0.594/RT60)); delay FDBK reaches a true 100% (manual: sustains); KDFX manual PDF tracked |
 | 6d6f433f1 | bloc selector auto-deselect after one change fixed (rebuild no longer wipes held slots); RT60 DECAY capped at ~1 S and compressor RATIO at 1.0 fixed — ParamDef ranges are display units, engine conversions live in the curves |
 | d404bfa66 | **regression fixes + coarse/fine swap**: percent params had collapsed to 0-1 (LEVEL read 0%/1%) — explicit 0-100 ranges; unshifted = coarse nice-number steps (span in ~100 detents), shift = fine; compact readouts (7.0K, 1480) never truncated; manual ch.5 parameter audit table in docs/kdfx_coverage.md |
 | (this push) | **Track reverb shortcuts removed**; **Per-bloc IN-GN (input gain)** (-96dB/-INF to +3dB, default 0dB) on all blocs; **MST SEND bloc** (`GLOBAL_SEND`) to send track audio into master FX busses (BUS 1/2/3) across all routing topologies |
 
 **Not yet hardware-verified:** everything from ecd715ad9 onward. Flash
-`build/Release/deluge.bin` (14:54 or later).
+`build/Release/deluge.bin` (22:00 or later).
 
 ## Push order (KDFX first)
 
