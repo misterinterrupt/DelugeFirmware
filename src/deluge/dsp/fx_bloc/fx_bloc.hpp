@@ -27,6 +27,7 @@
 #include "dsp/reverb/kdfx/chorus.hpp"
 #include "dsp/reverb/kdfx/delay.hpp"
 #include "dsp/reverb/kdfx/distortion.hpp"
+#include "dsp/reverb/kdfx/filterbank.hpp"
 #include "dsp/reverb/kdfx/flanger.hpp"
 #include "dsp/reverb/kdfx/laser.hpp"
 #include "dsp/reverb/kdfx/pair.hpp"
@@ -75,6 +76,9 @@ public:
 		KDFX_FLG_REV,
 		KDFX_FLG_LASER,
 		KDFX_SHPR_REV,
+		KDFX_RESFILT,
+		KDFX_ENVFILT,
+		KDFX_LFOFILT,
 		GLOBAL_SEND,
 	};
 
@@ -130,6 +134,13 @@ public:
 		ModRate,    // combination blocs: modulation LFO rate
 		ModDepth,   // combination blocs: modulation depth
 		ModFdbk,    // combination blocs: modulation feedback
+		FiltType,   // kdfx filter bank, int (0 LP / 1 HP / 2 BP / 3 notch)
+		FiltFreq,   // centre / primary frequency (log 16-8372 HZ)
+		FiltRes,    // resonance 0-50 DB
+		FiltMinFreq, // env-follow at-rest frequency
+		FiltSweep,  // env-follow sweep, bipolar ±100%
+		FiltAtk,    // env attack rate 0-300 DB/S
+		FiltRel,    // env release rate 0-300 DB/S
 		kNumParams
 	};
 	static_assert(util::to_underlying(Param::kNumParams) <= 64, "dirty bitmask is uint64");
@@ -208,6 +219,9 @@ public:
 			t = std::log(1.0f + frac * (std::exp(d.expK) - 1.0f)) / d.expK;
 			break;
 		}
+		case 6:
+			t = std::log(std::max(r, 1.0f) / d.realMin) / std::log(d.realMax / d.realMin);
+			break;
 		case 5: {
 			if (r >= 900.0f) {
 				return 1.0f;
@@ -232,6 +246,7 @@ public:
 	static constexpr const char* kShaperOptionStrings[] = {"SOFT", "TAPE", "HARD", "FOLD"};
 	static constexpr const char* kPhaseOptionStrings[] = {"OFF", "ON"};
 	static constexpr const char* kCfgOptionStrings[] = {"AMP>MOD", "MOD>AMP"};
+	static constexpr const char* kFiltTypeStrings[] = {"LP", "HP", "BP", "NOTCH"};
 	static constexpr const char* kBusOptionStrings[] = {"BUS 1", "BUS 2", "BUS 3"};
 
 	static constexpr ParamDef LEVEL_DEF() { return {Param::Level, "LEVEL", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false}; }
@@ -240,6 +255,7 @@ public:
 	static constexpr const char* const* kShaperOptions() { return kShaperOptionStrings; }
 	static constexpr const char* const* kPhaseOptions() { return kPhaseOptionStrings; }
 	static constexpr const char* const* kCfgOptions() { return kCfgOptionStrings; }
+	static constexpr const char* const* kFiltTypeOptions() { return kFiltTypeStrings; }
 	static constexpr const char* const* kBusOptions() { return kBusOptionStrings; }
 
 	// Real-unit helpers for the tables below (defaults leave out the trailing fields).
@@ -254,6 +270,9 @@ public:
 	}
 	/// Plain percent, 0-100 in display units (a null-unit def would read as a 0-1
 	/// range in the fine value space — always go through this or an explicit range).
+	static constexpr ParamDef logHz(Param p, const char* label, float minHz, float maxHz, uint8_t dec = 0) {
+		return {p, label, false, 0, 1, nullptr, "HZ", minHz, maxHz, dec, false, 6, 1.5f};
+	}
 	static constexpr ParamDef pct(Param p, const char* label) {
 		return {p, label, false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false};
 	}
@@ -318,6 +337,13 @@ public:
 		case Param::ModRate: return "modRate";
 		case Param::ModDepth: return "modDepth";
 		case Param::ModFdbk: return "modFdbk";
+		case Param::FiltType: return "filtType";
+		case Param::FiltFreq: return "filtFreq";
+		case Param::FiltRes: return "filtRes";
+		case Param::FiltMinFreq: return "filtMinFreq";
+		case Param::FiltSweep: return "filtSweep";
+		case Param::FiltAtk: return "filtAtk";
+		case Param::FiltRel: return "filtRel";
 		default: return nullptr;
 		}
 	}
@@ -559,6 +585,13 @@ private:
 		case Param::ModRate: e->setModRate(v); break;
 		case Param::ModDepth: e->setModDepth(v); break;
 		case Param::ModFdbk: e->setModFdbk(v); break;
+		case Param::FiltType: e->setFiltType(static_cast<int32_t>(v)); break;
+		case Param::FiltFreq: e->setWidth(v); break;
+		case Param::FiltRes: e->setFiltRes(v); break;
+		case Param::FiltMinFreq: e->setHPF(v); break;
+		case Param::FiltSweep: e->setDiffusion(v); break;
+		case Param::FiltAtk: e->setDamping(v); break;
+		case Param::FiltRel: e->setDecay(v); break;
 		default: break;
 		}
 	}
@@ -596,6 +629,13 @@ private:
 		case Param::ModRate: return e->getModRate();
 		case Param::ModDepth: return e->getModDepth();
 		case Param::ModFdbk: return e->getModFdbk();
+		case Param::FiltType: return static_cast<float>(e->getFiltType());
+		case Param::FiltFreq: return e->getWidth();
+		case Param::FiltRes: return e->getFiltRes();
+		case Param::FiltMinFreq: return e->getHPF();
+		case Param::FiltSweep: return e->getDiffusion();
+		case Param::FiltAtk: return e->getDamping();
+		case Param::FiltRel: return e->getDecay();
 		default: return 0.f;
 		}
 	}
@@ -657,6 +697,15 @@ private:
 		case Model::KDFX_SHPR_REV:
 			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::TONE, reverb::PairEngine::Kind::REVERB, true>);
 			break;
+		case Model::KDFX_RESFILT:
+			size = sizeof(reverb::KdfxFilter);
+			break;
+		case Model::KDFX_ENVFILT:
+			size = sizeof(reverb::KdfxFilter);
+			break;
+		case Model::KDFX_LFOFILT:
+			size = sizeof(reverb::KdfxFilter);
+			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
 			break;
@@ -706,6 +755,12 @@ private:
 			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::LASER, true>();
 		case Model::KDFX_SHPR_REV:
 			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::TONE, reverb::PairEngine::Kind::REVERB, true>();
+		case Model::KDFX_RESFILT:
+			return new (memory) reverb::KdfxFilter(reverb::KdfxFilter::Sweep::FIXED);
+		case Model::KDFX_ENVFILT:
+			return new (memory) reverb::KdfxFilter(reverb::KdfxFilter::Sweep::ENV_FOLLOW);
+		case Model::KDFX_LFOFILT:
+			return new (memory) reverb::KdfxFilter(reverb::KdfxFilter::Sweep::LFO);
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:
@@ -940,6 +995,32 @@ constexpr FxBloc::ParamDef kDefsKdfxShprRev[9] = {
     FxBloc::rt60(FxBloc::Param::ModDepth, "DCAY", 0.6f, 999.f),
     {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
 };
+// Resonant filter bank (manual 900/902/903): common TYPE/FREQ/RES; the env
+// variant adds at-rest MIN Freq + bipolar SWEEP + dB/sec rates, the LFO variant
+// rides the Mod* trio (rate 0.01-10 HZ, depth in octaves).
+constexpr FxBloc::ParamDef kDefsKdfxResFilt[5] = {
+    {FxBloc::Param::FiltType, "TYPE", true, 0, 3, FxBloc::kFiltTypeOptions()},
+    FxBloc::logHz(FxBloc::Param::FiltFreq, "FREQ", 16.f, 8372.f, 0),
+    FxBloc::db(FxBloc::Param::FiltRes, "RES", 0.f, 50.f),
+    FxBloc::LEVEL_DEF(),
+};
+constexpr FxBloc::ParamDef kDefsKdfxEnvFilt[8] = {
+    {FxBloc::Param::FiltType, "TYPE", true, 0, 3, FxBloc::kFiltTypeOptions()},
+    FxBloc::logHz(FxBloc::Param::FiltMinFreq, "MINF", 16.f, 8372.f, 0),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::db(FxBloc::Param::FiltRes, "RES", 0.f, 50.f),
+    {FxBloc::Param::FiltSweep, "SWP", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, true},
+    {FxBloc::Param::FiltAtk, "ATK", false, 0, 1, nullptr, "DB/S", 0.f, 300.f, 0, false},
+    {FxBloc::Param::FiltRel, "REL", false, 0, 1, nullptr, "DB/S", 0.f, 300.f, 0, false},
+};
+constexpr FxBloc::ParamDef kDefsKdfxLfoFilt[7] = {
+    {FxBloc::Param::FiltType, "TYPE", true, 0, 3, FxBloc::kFiltTypeOptions()},
+    FxBloc::logHz(FxBloc::Param::FiltFreq, "FREQ", 16.f, 8372.f, 0),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::db(FxBloc::Param::FiltRes, "RES", 0.f, 50.f),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.01f, 10.f),
+    {FxBloc::Param::ModDepth, "MDEP", false, 0, 1, nullptr, "OCT", 0.f, 6.f, 1, false},
+};
 constexpr FxBloc::ParamDef kDefsKdfxDist[7] = {
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
@@ -993,6 +1074,9 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_FLG_REV: return kDefsKdfxFlgRev;
 	case Model::KDFX_FLG_LASER: return kDefsKdfxFlgLaser;
 	case Model::KDFX_SHPR_REV: return kDefsKdfxShprRev;
+	case Model::KDFX_RESFILT: return kDefsKdfxResFilt;
+	case Model::KDFX_ENVFILT: return kDefsKdfxEnvFilt;
+	case Model::KDFX_LFOFILT: return kDefsKdfxLfoFilt;
 	case Model::GLOBAL_SEND: return kDefsGlobalSend;
 	case Model::EMPTY:
 	case Model::FILTER:

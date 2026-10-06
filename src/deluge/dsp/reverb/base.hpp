@@ -112,6 +112,12 @@ struct Base {
 	[[nodiscard]] virtual float getModDepth() const { return 0.5f; }
 	virtual void setModFdbk(float value) {}
 	[[nodiscard]] virtual float getModFdbk() const { return 0.5f; }
+
+	// KDFX resonant filter bank (900/902/903)
+	virtual void setFiltType(int32_t value) {}
+	[[nodiscard]] virtual int32_t getFiltType() const { return 0; }
+	virtual void setFiltRes(float value) {}
+	[[nodiscard]] virtual float getFiltRes() const { return 0.0f; }
 	virtual void setShaperMode(int32_t value) {}
 	[[nodiscard]] virtual int32_t getShaperMode() const { return 0; }
 
