@@ -44,6 +44,10 @@ defines it but our engine does not implement it yet (never list those — rule 3
 | KDFX PAN | 963 AutoPanner, 964 Dual AutoPanner | Insert-style; linear crossfade v1 |
 | KDFX DIST | Distortion 724–728 (Mono/Stereo Distort, +Cab, +EQ) | Insert-style: LOCUT/DRIVE/4 shaper modes/CAB/HCUT; "+EQ" = chain KDFX TONE after it |
 | KDFX TUBEAMP | TubeAmp/PolyAmp<>MD>Chor/Flan 729–732 | Insert-style combination: amp (distortion engine) + modulated delay; CFG swaps order (AMP>MOD / MOD>AMP) |
+| KDFX LASER | LaserVerb 911–913 (Mono/Lite/full) | Widening-spaces impulse train: TIME 0–2 S, SPAC 0–40 SMP, CONT (0=delay, 34%=reverse), FDBK to 100% |
+| CHO+DLY / CHO+REV | 700 / 703–704 class combinations | Generic pair engine; Mod* trio for the chorus half; CFG where the manual's <> allows |
+| FLG+DLY / FLG+REV / FLG+LASER | 706 / 710 / 711 | Pair engine, fixed order (manual "+") |
+| SHPR+REV | 718 Shaper<>Reverb | Pair engine; tone drive/EQ + full reverb suite; CFG |
 | COMPRESSOR | Comp/gate family 950–957 stand-in | Stock engine wrapped insert-style; THRSH/RATIO/ATK/REL/SIDE/BLEND |
 
 Send-style blocs wet-add (reverb-class); tremolo/panner are insert engines via
@@ -52,7 +56,7 @@ Send-style blocs wet-add (reverb-class); tremolo/panner are insert engines via
 ## Not yet implemented (manual backlog, by category)
 
 - **Reverb variants** 1–15 as distinct voicings (MiniVerb, gated, plate/room/hall presets)
-- **Combination chains** 700–723 (Chorus+Delay, Flange<>Reverb, Pitcher+Chor+Dly, LaserVerb …)
+- **Combination chains** 700–723 remainder: Pitcher-dependent combos (720–723) blocked on a pitch engine; quantize/flange (714) pending the quantizer
 - **Tone wheel organ** 733–737 (VibChor+Rotor, KB3)
 - **Filters** 900–906 (Env Follow, Trig Envelope, LFO Sweep, Resonant, EQ Morpher)
 - **Special FX** 907–913 (Ring Modulator, Pitcher, LaserVerb family)
