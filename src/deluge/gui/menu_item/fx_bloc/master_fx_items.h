@@ -285,7 +285,7 @@ public:
 			snprintf(outBuffer, bufferSize, "-INF");
 			return;
 		}
-		if (real >= 900.0f) {
+		if (d.curve == 5 && real >= 900.0f) {
 			snprintf(outBuffer, bufferSize, "INF"); // RT60 infinite sustain (manual ceiling)
 			return;
 		}

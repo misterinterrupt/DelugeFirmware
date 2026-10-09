@@ -122,7 +122,9 @@ public:
 
 	void setDecay(float value) override {
 		feedback_val_ = value;
-		feedback_ = static_cast<q31_t>(std::clamp(value * 0.99f, 0.0f, 0.99f) * ONE_Q31f);
+		// 100% = unity loop gain: repeats sustain per the manual (the loop's HF
+		// damping still colors them); kill is turning FDBK down.
+		feedback_ = static_cast<q31_t>(std::clamp(value, 0.0f, 1.0f) * ONE_Q31f);
 	}
 	[[nodiscard]] float getDecay() const override { return feedback_val_; }
 
