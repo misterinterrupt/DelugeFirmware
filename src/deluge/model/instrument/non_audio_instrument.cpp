@@ -27,8 +27,7 @@
 #include <cstring>
 
 void NonAudioInstrument::renderOutput(ModelStack* modelStack, StereoSample* startPos, StereoSample* endPos,
-                                      int32_t numSamples, int32_t sideChainHitPending,
-                                      bool shouldLimitDelayFeedback, bool isClipActive) {
+                                      int32_t numSamples, int32_t sideChainHitPending, bool isClipActive) {
 
 	// MIDI / CV arpeggiator
 	if (activeClip) {

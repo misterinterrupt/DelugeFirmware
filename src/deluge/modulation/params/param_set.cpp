@@ -391,8 +391,6 @@ bool UnpatchedParamSet::shouldParamIndicateMiddleValue(ModelStackWithParamId con
 	// Global
 	if (modelStack->paramCollection->getParamKind() == deluge::modulation::params::Kind::UNPATCHED_GLOBAL) {
 		switch (modelStack->paramId) {
-		case params::UNPATCHED_DELAY_RATE:
-		case params::UNPATCHED_DELAY_AMOUNT:
 		case params::UNPATCHED_PAN:
 		case params::UNPATCHED_PITCH_ADJUST:
 			return true;
@@ -537,8 +535,6 @@ bool PatchedParamSet::shouldParamIndicateMiddleValue(ModelStackWithParamId const
 	case params::LOCAL_OSC_B_PITCH_ADJUST:
 	case params::LOCAL_MODULATOR_0_PITCH_ADJUST:
 	case params::LOCAL_MODULATOR_1_PITCH_ADJUST:
-	case params::GLOBAL_DELAY_FEEDBACK:
-	case params::GLOBAL_DELAY_RATE:
 	case params::GLOBAL_ARP_RATE:
 		return true;
 	default:

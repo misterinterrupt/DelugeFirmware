@@ -131,9 +131,6 @@ Sound::Sound() : patcher(&patchableInfoForSound) {
 	modKnobs[2][1].paramDescriptor.setToHaveParamOnly(params::LOCAL_ENV_0_ATTACK);
 	modKnobs[2][0].paramDescriptor.setToHaveParamOnly(params::LOCAL_ENV_0_RELEASE);
 
-	modKnobs[3][1].paramDescriptor.setToHaveParamOnly(params::GLOBAL_DELAY_RATE);
-	modKnobs[3][0].paramDescriptor.setToHaveParamOnly(params::GLOBAL_DELAY_FEEDBACK);
-
 	modKnobs[5][1].paramDescriptor.setToHaveParamOnly(params::GLOBAL_LFO_FREQ);
 
 	modKnobs[4][1].paramDescriptor.setToHaveParamAndSource(params::GLOBAL_VOLUME_POST_REVERB_SEND,
@@ -184,9 +181,7 @@ void Sound::initParams(ParamManager* paramManager) {
 	patchedParams->params[params::LOCAL_HPF_MORPH].setCurrentValueBasicForSetup(-2147483648);
 	patchedParams->params[params::LOCAL_LPF_MORPH].setCurrentValueBasicForSetup(-2147483648);
 	patchedParams->params[params::LOCAL_PITCH_ADJUST].setCurrentValueBasicForSetup(0);
-	patchedParams->params[params::GLOBAL_DELAY_RATE].setCurrentValueBasicForSetup(0);
 	patchedParams->params[params::GLOBAL_ARP_RATE].setCurrentValueBasicForSetup(0);
-	patchedParams->params[params::GLOBAL_DELAY_FEEDBACK].setCurrentValueBasicForSetup(-2147483648);
 	patchedParams->params[params::LOCAL_CARRIER_0_FEEDBACK].setCurrentValueBasicForSetup(-2147483648);
 	patchedParams->params[params::LOCAL_CARRIER_1_FEEDBACK].setCurrentValueBasicForSetup(-2147483648);
 	patchedParams->params[params::LOCAL_MODULATOR_0_FEEDBACK].setCurrentValueBasicForSetup(-2147483648);
@@ -2014,7 +2009,7 @@ void Sound::reassessRenderSkippingStatus(ModelStackWithSoundFlags* modelStack, b
 	ArpeggiatorSettings* arpSettings = getArpSettings();
 
 	bool skippingStatusNow =
-	    ((numVoicesAssigned == 0) && (delay.repeatsUntilAbandon == 0u) && !stutterer.isStuttering(this)
+	    ((numVoicesAssigned == 0) && !stutterer.isStuttering(this)
 	     && ((arpSettings == nullptr) || !getArp()->hasAnyInputNotesActive() || arpSettings->mode == ArpMode::OFF));
 
 	if (skippingStatusNow != skippingRendering) {
@@ -2170,8 +2165,7 @@ void Sound::stopParamLPF(ModelStackWithSoundFlags* modelStack) {
 }
 
 void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outputBuffer, int32_t numSamples,
-                   int32_t sideChainHitPending, bool shouldLimitDelayFeedback, int32_t pitchAdjust,
-                   SampleRecorder* recorder) {
+                   int32_t sideChainHitPending, int32_t pitchAdjust, SampleRecorder* recorder) {
 
 	fxChain.applyPending();
 
@@ -2258,18 +2252,6 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 			    instruction.arpNoteOn->inputCharacteristics[util::to_underlying(MIDICharacteristic::CHANNEL)]);
 		}
 	}
-
-	// Setup delay
-	Delay::State delayWorkingState{};
-	delayWorkingState.delayFeedbackAmount = paramFinalValues[params::GLOBAL_DELAY_FEEDBACK - params::FIRST_GLOBAL];
-	if (shouldLimitDelayFeedback) {
-		delayWorkingState.delayFeedbackAmount =
-		    std::min(delayWorkingState.delayFeedbackAmount, (int32_t)(1 << 30) - (1 << 26));
-	}
-	delayWorkingState.userDelayRate = paramFinalValues[params::GLOBAL_DELAY_RATE - params::FIRST_GLOBAL];
-	uint32_t timePerTickInverse = playbackHandler.getTimePerInternalTickInverse(true);
-	delay.setupWorkingState(delayWorkingState, timePerTickInverse, numVoicesAssigned != 0);
-	delayWorkingState.analog_saturation = 8;
 
 	// Render each voice into a local buffer here
 	bool renderingInStereo = renderingVoicesInStereo(modelStackWithSoundFlags);
@@ -2380,10 +2362,6 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 		}
 	}
 	else {
-		if (!delayWorkingState.doDelay) {
-			reassessRenderSkippingStatus(modelStackWithSoundFlags);
-		}
-
 		if (!renderingInStereo) {
 			memset(&soundBuffer[numSamples], 0, numSamples * sizeof(int32_t));
 		}
@@ -2400,8 +2378,7 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 	int32_t modFXRate = paramFinalValues[params::GLOBAL_MOD_FX_RATE - params::FIRST_GLOBAL];
 
 	processSRRAndBitcrushing((StereoSample*)soundBuffer, numSamples, &postFXVolume, paramManager);
-	processFX((StereoSample*)soundBuffer, numSamples, modFXType, modFXRate, modFXDepth, delayWorkingState,
-	          &postFXVolume, paramManager);
+	processFX((StereoSample*)soundBuffer, numSamples, modFXType, modFXRate, modFXDepth, &postFXVolume, paramManager);
 	processStutter((StereoSample*)soundBuffer, numSamples, paramManager);
 
 	processOutputVolume((StereoSample*)soundBuffer, numSamples, postFXVolume, postReverbVolume, 0, true);
@@ -2440,11 +2417,7 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 		sources[i].dxPatchChanged = false;
 	}
 
-	// Unlike all the other possible reasons we might want to start skipping rendering, delay.repeatsUntilAbandon may
-	// have changed state just now.
-	if (!delay.repeatsUntilAbandon || startSkippingRenderingAtTime) {
-		reassessRenderSkippingStatus(modelStackWithSoundFlags);
-	}
+	reassessRenderSkippingStatus(modelStackWithSoundFlags);
 
 	doParamLPF(numSamples, modelStackWithSoundFlags);
 }
@@ -3873,14 +3846,6 @@ bool Sound::readParamTagFromFile(Deserializer& reader, char const* tagName, Para
 		patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_MOD_FX_DEPTH, readAutomationUpToPos);
 		reader.exitTag("modFXDepth");
 	}
-	else if (!strcmp(tagName, "delayRate")) {
-		patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_DELAY_RATE, readAutomationUpToPos);
-		reader.exitTag("delayRate");
-	}
-	else if (!strcmp(tagName, "delayFeedback")) {
-		patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_DELAY_FEEDBACK, readAutomationUpToPos);
-		reader.exitTag("delayFeedback");
-	}
 	else if (!strcmp(tagName, "arpeggiatorRate")) {
 		patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_ARP_RATE, readAutomationUpToPos);
 		reader.exitTag("arpeggiatorRate");
@@ -3952,9 +3917,6 @@ void Sound::writeParamsToFile(Serializer& writer, ParamManager* paramManager, bo
 
 	patchedParams->writeParamAsAttribute(writer, "modFXRate", params::GLOBAL_MOD_FX_RATE, writeAutomation);
 	patchedParams->writeParamAsAttribute(writer, "modFXDepth", params::GLOBAL_MOD_FX_DEPTH, writeAutomation);
-
-	patchedParams->writeParamAsAttribute(writer, "delayRate", params::GLOBAL_DELAY_RATE, writeAutomation);
-	patchedParams->writeParamAsAttribute(writer, "delayFeedback", params::GLOBAL_DELAY_FEEDBACK, writeAutomation);
 
 	patchedParams->writeParamAsAttribute(writer, "arpeggiatorRate", params::GLOBAL_ARP_RATE, writeAutomation);
 
@@ -4209,9 +4171,6 @@ void Sound::modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTime
 	// if top knob == Treble && bottom knob == Bass
 	// --> displayFilterSettings(on, currentFilterType);
 
-	// if top knob == Delay Rate && bottom knob == Delay Amount
-	// --> displayDelaySettings(on);
-
 	// else --> display param name
 
 	if (ourModKnobTop->paramDescriptor.isSetToParamWithNoSource(params::LOCAL_LPF_FREQ)
@@ -4226,10 +4185,6 @@ void Sound::modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTime
 	         && ourModKnobBottom->paramDescriptor.isSetToParamWithNoSource(params::UNPATCHED_START
 	                                                                       + params::UNPATCHED_BASS)) {
 		displayFilterSettings(on, FilterType::EQ);
-	}
-	else if (ourModKnobTop->paramDescriptor.isSetToParamWithNoSource(params::GLOBAL_DELAY_RATE)
-	         && ourModKnobBottom->paramDescriptor.isSetToParamWithNoSource(params::GLOBAL_DELAY_FEEDBACK)) {
-		displayDelaySettings(on);
 	}
 	else if (whichModButton == 6) {
 		if (on) {
@@ -4365,80 +4320,8 @@ bool Sound::modEncoderButtonAction(uint8_t whichModEncoder, bool on, ModelStackW
 
 	ModKnob* ourModKnob = &modKnobs[modKnobMode][1 - whichModEncoder];
 
-	// Switch delay pingpong
-	if (ourModKnob->paramDescriptor.isSetToParamWithNoSource(params::GLOBAL_DELAY_RATE)) {
-		if (on) {
-			if (runtimeFeatureSettings.get(RuntimeFeatureSettingType::AltGoldenKnobDelayParams)
-			    == RuntimeFeatureStateToggle::On) {
-				switchDelaySyncType();
-
-				// if mod button is pressed, update mod button pop up
-				if (Buttons::isButtonPressed(
-				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displayDelaySettings(on);
-				}
-				else {
-					display->displayPopup(getDelaySyncTypeDisplayName());
-				}
-			}
-			else {
-				switchDelayPingPong();
-
-				// if mod button is pressed, update mod button pop up
-				if (Buttons::isButtonPressed(
-				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displayDelaySettings(on);
-				}
-				else {
-					display->displayPopup(getDelayPingPongStatusDisplayName());
-				}
-			}
-			return true;
-		}
-		else {
-			return false;
-		}
-	}
-
-	// Switch delay analog sim
-	else if (ourModKnob->paramDescriptor.isSetToParamWithNoSource(params::GLOBAL_DELAY_FEEDBACK)) {
-		if (on) {
-			if (runtimeFeatureSettings.get(RuntimeFeatureSettingType::AltGoldenKnobDelayParams)
-			    == RuntimeFeatureStateToggle::On) {
-				switchDelaySyncLevel();
-
-				// if mod button is pressed, update mod button pop up
-				if (Buttons::isButtonPressed(
-				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displayDelaySettings(on);
-				}
-				else {
-					char displayName[30];
-					getDelaySyncLevelDisplayName(displayName);
-					display->displayPopup(displayName);
-				}
-			}
-			else {
-				switchDelayAnalog();
-
-				// if mod button is pressed, update mod button pop up
-				if (Buttons::isButtonPressed(
-				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displayDelaySettings(on);
-				}
-				else {
-					display->displayPopup(getDelayTypeDisplayName());
-				}
-			}
-			return true;
-		}
-		else {
-			return false;
-		}
-	}
-
 	// Switch LPF mode
-	else if (ourModKnob->paramDescriptor.isSetToParamWithNoSource(params::LOCAL_LPF_RESONANCE)) {
+	if (ourModKnob->paramDescriptor.isSetToParamWithNoSource(params::LOCAL_LPF_RESONANCE)) {
 		if (on) {
 			switchLPFMode();
 			FilterType currentFilterType = FilterType::LPF;

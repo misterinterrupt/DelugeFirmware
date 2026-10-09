@@ -125,7 +125,6 @@ enum Global : ParamType {
 
 	// Global non-volume params begin
 	FIRST_GLOBAL_NON_VOLUME,
-	GLOBAL_DELAY_FEEDBACK = FIRST_GLOBAL_NON_VOLUME,
 
 	// Global hybrid params begin
 
@@ -135,8 +134,7 @@ enum Global : ParamType {
 
 	// Global exp params begin
 	FIRST_GLOBAL_EXP = FIRST_GLOBAL_HYBRID,
-	GLOBAL_DELAY_RATE = FIRST_GLOBAL_EXP,
-	GLOBAL_MOD_FX_RATE,
+	GLOBAL_MOD_FX_RATE = FIRST_GLOBAL_EXP,
 	GLOBAL_LFO_FREQ,
 	GLOBAL_ARP_RATE,
 
@@ -197,8 +195,6 @@ enum UnpatchedSound : ParamType {
 enum UnpatchedGlobal : ParamType {
 	UNPATCHED_MOD_FX_RATE = UNPATCHED_NUM_SHARED,
 	UNPATCHED_MOD_FX_DEPTH,
-	UNPATCHED_DELAY_RATE,
-	UNPATCHED_DELAY_AMOUNT,
 	UNPATCHED_PAN,
 	UNPATCHED_LPF_FREQ,
 	UNPATCHED_LPF_RES,
@@ -286,7 +282,7 @@ const uint32_t patchedParamShortcuts[kDisplayWidth][kDisplayHeight] = {
     {GLOBAL_ARP_RATE         , kNoParamID                    , kNoParamID                    , kNoParamID             , kNoParamID     , kNoParamID                , kNoParamID            , kNoParamID},
     {GLOBAL_LFO_FREQ         , kNoParamID                    , kNoParamID                    , kNoParamID             , kNoParamID     , kNoParamID                , GLOBAL_MOD_FX_DEPTH   , GLOBAL_MOD_FX_RATE},
     {LOCAL_LFO_LOCAL_FREQ    , kNoParamID                    , kNoParamID                    , kNoParamID             , kNoParamID     , kNoParamID                , kNoParamID            , kNoParamID},
-    {GLOBAL_DELAY_RATE       , kNoParamID                    , kNoParamID                    , GLOBAL_DELAY_FEEDBACK  , kNoParamID     , kNoParamID                , kNoParamID            , kNoParamID},
+    {kNoParamID              , kNoParamID                    , kNoParamID                    , kNoParamID             , kNoParamID     , kNoParamID                , kNoParamID            , kNoParamID},
     {kNoParamID              , kNoParamID                    , kNoParamID                    , kNoParamID             , kNoParamID     , kNoParamID                , kNoParamID            , kNoParamID}
 };
 // clang-format on
@@ -332,7 +328,7 @@ const uint32_t unpatchedGlobalParamShortcuts[kDisplayWidth][kDisplayHeight] = {
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID				   , kNoParamID			   		 	, UNPATCHED_TREBLE      , UNPATCHED_TREBLE_FREQ},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , UNPATCHED_MOD_FX_OFFSET   , UNPATCHED_MOD_FX_FEEDBACK		, UNPATCHED_MOD_FX_DEPTH, UNPATCHED_MOD_FX_RATE},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                 , kNoParamID				   , kNoParamID			   		 	, kNoParamID            , kNoParamID},
-    {UNPATCHED_DELAY_RATE, kNoParamID            , kNoParamID                , UNPATCHED_DELAY_AMOUNT      , kNoParamID				   , kNoParamID			  		 	, kNoParamID            , kNoParamID},
+    {kNoParamID,          kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID				   , kNoParamID			  		 	, kNoParamID            , kNoParamID},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID				   , kNoParamID			   		 	, kNoParamID            , kNoParamID}};
 // clang-format on
 

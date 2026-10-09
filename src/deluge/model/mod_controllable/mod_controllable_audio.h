@@ -19,7 +19,6 @@
 
 #include "definitions_cxx.hpp"
 #include "dsp/compressor/rms_feedback.h"
-#include "dsp/delay/delay.h"
 #include "hid/button.h"
 #include "model/fx/stutterer.h"
 #include "model/mod_controllable/filters/filter_config.h"
@@ -114,8 +113,6 @@ public:
 	int32_t withoutTrebleR;
 	int32_t bassOnlyR;
 
-	// Delay
-	Delay delay;
 
 	bool sampleRateReductionOnLastTime;
 	uint8_t clippingAmount; // Song probably doesn't currently use this?
@@ -162,11 +159,7 @@ public:
 
 protected:
 	void processFX(StereoSample* buffer, int32_t numSamples, ModFXType modFXType, int32_t modFXRate, int32_t modFXDepth,
-	               const Delay::State& delayWorkingState, int32_t* postFXVolume, ParamManager* paramManager);
-	void switchDelayPingPong();
-	void switchDelayAnalog();
-	void switchDelaySyncType();
-	void switchDelaySyncLevel();
+	               int32_t* postFXVolume, ParamManager* paramManager);
 	void switchLPFMode();
 	void switchHPFMode();
 	void clearModFXMemory();
@@ -181,19 +174,13 @@ protected:
 	char const* getFilterModeDisplayName(FilterType currentFilterType);
 	char const* getLPFModeDisplayName();
 	char const* getHPFModeDisplayName();
-	char const* getDelayTypeDisplayName();
-	char const* getDelayPingPongStatusDisplayName();
-	char const* getDelaySyncTypeDisplayName();
-	void getDelaySyncLevelDisplayName(char* displayName);
 	char const* getSidechainDisplayName();
 
 	void displayFilterSettings(bool on, FilterType currentFilterType);
-	void displayDelaySettings(bool on);
 	void displaySidechainSettings(bool on);
 	void displayOtherModKnobSettings(uint8_t whichModButton, bool on);
 
 private:
-	void initializeSecondaryDelayBuffer(int32_t newNativeRate, bool makeNativeRatePreciseRelativeToOtherBuffer);
 	void doEQ(bool doBass, bool doTreble, int32_t* inputL, int32_t* inputR, int32_t bassAmount, int32_t trebleAmount);
 	ModelStackWithThreeMainThings* addNoteRowIndexAndStuff(ModelStackWithTimelineCounter* modelStack,
 	                                                       int32_t noteRowIndex);

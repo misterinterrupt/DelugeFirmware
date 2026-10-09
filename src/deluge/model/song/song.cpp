@@ -2359,7 +2359,7 @@ void Song::renderAudio(StereoSample* outputBuffer, int32_t numSamples, int32_t s
 		DISABLE_ALL_INTERRUPTS();
 		if (output->shouldRenderInSong()) {
 			output->renderOutput(modelStack, outputBuffer, outputBuffer + numSamples, numSamples, sideChainHitPending,
-			                     !isClipActiveNow, isClipActiveNow);
+			                     isClipActiveNow);
 		}
 		ENABLE_INTERRUPTS();
 #if DO_AUDIO_LOG
@@ -2382,10 +2382,7 @@ void Song::renderAudio(StereoSample* outputBuffer, int32_t numSamples, int32_t s
 		}
 	}
 
-	Delay::State delayWorkingState = globalEffectable.createDelayWorkingState(paramManager);
-
-	globalEffectable.processFXForGlobalEffectable(outputBuffer, numSamples, &volumePostFX, &paramManager,
-	                                              delayWorkingState);
+	globalEffectable.processFXForGlobalEffectable(outputBuffer, numSamples, &volumePostFX, &paramManager);
 
 	int32_t postReverbVolume = paramNeutralValues[params::GLOBAL_VOLUME_POST_REVERB_SEND];
 

@@ -32,7 +32,7 @@ public:
 	}
 
 	void renderOutput(ModelStack* modelStack, StereoSample* startPos, StereoSample* endPos, int32_t numSamples,
-	                  int32_t sideChainHitPending, bool shouldLimitDelayFeedback, bool isClipActive);
+	                  int32_t sideChainHitPending, bool isClipActive);
 	void sendNote(ModelStackWithThreeMainThings* modelStack, bool isOn, int32_t noteCode, int16_t const* mpeValues,
 	              int32_t fromMIDIChannel = 16, uint8_t velocity = 64, uint32_t sampleSyncLength = 0,
 	              int32_t ticksLate = 0, uint32_t samplesLate = 0);

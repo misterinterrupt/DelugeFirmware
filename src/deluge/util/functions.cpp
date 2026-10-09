@@ -55,9 +55,6 @@ int32_t getParamRange(int32_t p) {
 	case params::LOCAL_ENV_1_ATTACK:
 		return 536870912 * 1.5;
 
-	case params::GLOBAL_DELAY_RATE:
-		return 536870912;
-
 	case params::LOCAL_PITCH_ADJUST:
 	case params::LOCAL_OSC_A_PITCH_ADJUST:
 	case params::LOCAL_OSC_B_PITCH_ADJUST:
@@ -126,7 +123,6 @@ int32_t getParamNeutralValue(int32_t p) {
 
 	case params::LOCAL_ENV_0_SUSTAIN:
 	case params::LOCAL_ENV_1_SUSTAIN:
-	case params::GLOBAL_DELAY_FEEDBACK:
 		return 1073741824; // 536870912;
 
 	case params::LOCAL_MODULATOR_0_FEEDBACK:
@@ -135,7 +131,6 @@ int32_t getParamNeutralValue(int32_t p) {
 	case params::LOCAL_CARRIER_1_FEEDBACK:
 		return 536870912;
 
-	case params::GLOBAL_DELAY_RATE:
 	case params::GLOBAL_ARP_RATE:
 	case params::LOCAL_PITCH_ADJUST:
 	case params::LOCAL_OSC_A_PITCH_ADJUST:

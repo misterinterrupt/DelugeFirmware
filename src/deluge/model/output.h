@@ -111,7 +111,7 @@ public:
 
 	// Only gets called if there's an activeClip
 	virtual void renderOutput(ModelStack* modelStack, StereoSample* startPos, StereoSample* endPos, int32_t numSamples,
-	                          int32_t sideChainHitPending, bool shouldLimitDelayFeedback, bool isClipActive) = 0;
+	                          int32_t sideChainHitPending, bool isClipActive) = 0;
 
 	virtual void setupWithoutActiveClip(ModelStack* modelStack);
 	virtual bool setActiveClip(

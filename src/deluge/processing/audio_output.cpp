@@ -58,16 +58,14 @@ void AudioOutput::cloneFrom(ModControllableAudio* other) {
 }
 
 void AudioOutput::renderOutput(ModelStack* modelStack, StereoSample* outputBuffer, StereoSample* outputBufferEnd,
-                               int32_t numSamples, int32_t sideChainHitPending, bool shouldLimitDelayFeedback,
-                               bool isClipActive) {
+                               int32_t numSamples, int32_t sideChainHitPending, bool isClipActive) {
 
 	ParamManager* paramManager = getParamManager(modelStack->song);
 
 	ModelStackWithTimelineCounter* modelStackWithTimelineCounter = modelStack->addTimelineCounter(activeClip);
 
 	GlobalEffectableForClip::renderOutput(modelStackWithTimelineCounter, paramManager, outputBuffer, numSamples,
-	                                      sideChainHitPending, shouldLimitDelayFeedback, isClipActive,
-	                                      OutputType::AUDIO, recorder);
+	                                      sideChainHitPending, isClipActive, OutputType::AUDIO, recorder);
 }
 
 void AudioOutput::resetEnvelope() {
@@ -84,9 +82,8 @@ void AudioOutput::resetEnvelope() {
 // Beware - unlike usual, modelStack, a ModelStackWithThreeMainThings*,  might have a NULL timelineCounter
 bool AudioOutput::renderGlobalEffectableForClip(ModelStackWithTimelineCounter* modelStack, StereoSample* renderBuffer,
                                                 int32_t* bufferToTransferTo, int32_t numSamples,
-                                                int32_t sideChainHitPending, bool shouldLimitDelayFeedback,
-                                                bool isClipActive, int32_t pitchAdjust, int32_t amplitudeAtStart,
-                                                int32_t amplitudeAtEnd) {
+                                                int32_t sideChainHitPending, bool isClipActive, int32_t pitchAdjust,
+                                                int32_t amplitudeAtStart, int32_t amplitudeAtEnd) {
 	bool rendered = false;
 	// audio outputs can have an activeClip while being muted
 	if (isClipActive) {
@@ -286,7 +283,7 @@ renderEnvelope:
 		char modelStackMemory[MODEL_STACK_MAX_SIZE];
 		ModelStack* songModelStack = setupModelStackWithSong(modelStackMemory, currentSong);
 		outputRecordingFrom->renderOutput(songModelStack, outputBuffer, outputBuffer + numSamples, numSamples,
-		                                  sideChainHitPending, shouldLimitDelayFeedback, isClipActive);
+		                                  sideChainHitPending, isClipActive);
 	}
 	return rendered;
 }

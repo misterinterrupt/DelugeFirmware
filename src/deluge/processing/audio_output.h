@@ -31,12 +31,12 @@ public:
 	void cloneFrom(ModControllableAudio* other);
 
 	void renderOutput(ModelStack* modelStack, StereoSample* startPos, StereoSample* endPos, int32_t numSamples,
-	                  int32_t sideChainHitPending, bool shouldLimitDelayFeedback, bool isClipActive);
+	                  int32_t sideChainHitPending, bool isClipActive);
 
 	bool renderGlobalEffectableForClip(ModelStackWithTimelineCounter* modelStack, StereoSample* globalEffectableBuffer,
 	                                   int32_t* bufferToTransferTo, int32_t numSamples, int32_t sideChainHitPending,
-	                                   bool shouldLimitDelayFeedback, bool isClipActive, int32_t pitchAdjust,
-	                                   int32_t amplitudeAtStart, int32_t amplitudeAtEnd);
+	                                   bool isClipActive, int32_t pitchAdjust, int32_t amplitudeAtStart,
+	                                   int32_t amplitudeAtEnd);
 
 	void resetEnvelope();
 

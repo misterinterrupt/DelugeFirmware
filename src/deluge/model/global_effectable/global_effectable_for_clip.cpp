@@ -50,8 +50,8 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 [[gnu::hot]] void GlobalEffectableForClip::renderOutput(ModelStackWithTimelineCounter* modelStack,
                                                         ParamManager* paramManagerForClip, StereoSample* outputBuffer,
                                                         int32_t numSamples, int32_t sideChainHitPending,
-                                                        bool shouldLimitDelayFeedback, bool isClipActive,
-                                                        OutputType outputType, SampleRecorder* recorder) {
+                                                        bool isClipActive, OutputType outputType,
+                                                        SampleRecorder* recorder) {
 	fxChain.applyPending();
 	UnpatchedParamSet* unpatchedParams = paramManagerForClip->getUnpatchedParamSet();
 
@@ -75,12 +75,6 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 
 	int32_t pitchAdjust =
 	    getFinalParameterValueExp(kMaxSampleValue, unpatchedParams->getValue(params::UNPATCHED_PITCH_ADJUST) >> 3);
-
-	Delay::State delayWorkingState =
-	    createDelayWorkingState(*paramManagerForClip, shouldLimitDelayFeedback, renderedLastTime);
-	if (outputType == OutputType::AUDIO) {
-		delayWorkingState.analog_saturation = 5;
-	}
 
 	setupFilterSetConfig(&volumePostFX, paramManagerForClip);
 
@@ -119,8 +113,8 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 
 	// Render actual Drums / AudioClip
 	renderedLastTime = renderGlobalEffectableForClip(modelStack, globalEffectableBuffer, NULL, numSamples,
-	                                                 sideChainHitPending, shouldLimitDelayFeedback, isClipActive,
-	                                                 pitchAdjust, 134217728, 134217728);
+	                                                 sideChainHitPending, isClipActive, pitchAdjust, 134217728,
+	                                                 134217728);
 
 	// Render saturation
 	if (clippingAmount) {
@@ -139,7 +133,7 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 	// Render FX
 	processSRRAndBitcrushing(globalEffectableBuffer, numSamples, &volumePostFX, paramManagerForClip);
 	processFXForGlobalEffectable(globalEffectableBuffer, numSamples, &volumePostFX, paramManagerForClip,
-	                             delayWorkingState, renderedLastTime);
+	                             renderedLastTime);
 	processStutter(globalEffectableBuffer, numSamples, paramManagerForClip);
 	// record before pan/compression/volume to keep volumes consistent
 	if (recorder && recorder->status < RecorderStatus::FINISHED_CAPTURING_BUT_STILL_WRITING) {

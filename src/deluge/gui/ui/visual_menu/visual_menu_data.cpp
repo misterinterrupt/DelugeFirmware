@@ -69,9 +69,6 @@ using enum deluge::l10n::String;
 #include "gui/menu_item/modulator/destination.h"
 #include "gui/menu_item/voice/polyphony.h"
 #include "gui/menu_item/voice/priority.h"
-#include "gui/menu_item/delay/analog.h"
-#include "gui/menu_item/delay/ping_pong.h"
-#include "gui/menu_item/delay/sync.h"
 #include "gui/menu_item/fx/clipping.h"
 #include "gui/menu_item/midi/bank.h"
 #include "gui/menu_item/midi/pgm.h"
@@ -162,13 +159,6 @@ extern deluge::gui::menu_item::lfo::Rate lfo2RateMenu;
 extern deluge::gui::menu_item::lfo::Sync lfo2SyncMenu;
 extern deluge::gui::menu_item::lfo::Type lfo2TypeMenu;
 
-// FX: Delay, ModFX, Distortion, Compressor (reverb is FX BLOCS only)
-extern deluge::gui::menu_item::patched_param::Integer delayRateMenu;
-extern deluge::gui::menu_item::patched_param::Integer delayFeedbackMenu;
-extern deluge::gui::menu_item::delay::Sync delaySyncMenu;
-extern deluge::gui::menu_item::delay::PingPong delayPingPongMenu;
-extern deluge::gui::menu_item::delay::Analog delayAnalogMenu;
-
 extern deluge::gui::menu_item::mod_fx::Type modFXTypeMenu;
 extern deluge::gui::menu_item::patched_param::Integer modFXRateMenu;
 extern deluge::gui::menu_item::mod_fx::Depth_Patched modFXDepthMenu;
@@ -221,8 +211,6 @@ extern deluge::gui::menu_item::UnpatchedParam globalLPFMorphMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalHPFFreqMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalHPFResMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalHPFMorphMenu;
-extern deluge::gui::menu_item::UnpatchedParam globalDelayRateMenu;
-extern deluge::gui::menu_item::UnpatchedParam globalDelayFeedbackMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalModFXRateMenu;
 extern deluge::gui::menu_item::mod_fx::Depth_Unpatched globalModFXDepthMenu;
 extern deluge::gui::menu_item::unpatched_param::UpdatingReverbParams globalSidechainVolumeMenu;
@@ -302,10 +290,6 @@ static const VisualPage synthLfoPages[] = {
 };
 
 static const VisualPage synthFxPages[] = {
-    {"Delay", STRING_FOR_DELAY,
-     {{{&delayRateMenu, "RATE"}, {&delayFeedbackMenu, "FDBK"}, {&delaySyncMenu, "SYNC"}, {&delayPingPongMenu, "P-PONG"}}}},
-    {"Delay Mode", STRING_FOR_DELAY,
-     {{{&delayAnalogMenu, "ANALOG"}, {nullptr, ""}, {nullptr, ""}, {nullptr, ""}}}},
     {"Mod FX", STRING_FOR_MOD_FX,
      {{{&modFXTypeMenu, "TYPE"}, {&modFXRateMenu, "RATE"}, {&modFXDepthMenu, "DEPTH"}, {&modFXFeedbackMenu, "FDBK"}}}},
     {"Mod FX Offset", STRING_FOR_MOD_FX,
@@ -361,8 +345,6 @@ static const VisualPage audioClipFilterPages[] = {
 };
 
 static const VisualPage audioClipFxPages[] = {
-    {"Delay", STRING_FOR_DELAY,
-     {{{&globalDelayRateMenu, "RATE"}, {&globalDelayFeedbackMenu, "FDBK"}, {&delaySyncMenu, "SYNC"}, {&delayPingPongMenu, "P-PONG"}}}},
     {"Mod FX", STRING_FOR_MOD_FX,
      {{{&modFXTypeMenu, "TYPE"}, {&globalModFXRateMenu, "RATE"}, {&globalModFXDepthMenu, "DEPTH"}, {&modFXFeedbackMenu, "FDBK"}}}},
     {"Distortion", STRING_FOR_DISTORTION,

@@ -31,7 +31,7 @@
 using std::max;
 using std::min;
 
-const int32_t __attribute__((aligned(16))) zeros[DX_MAX_N] = {0};
+namespace { const int32_t __attribute__((aligned(16))) zeros[DX_MAX_N] = {0}; } // NOLINT(bugprone-exception-escape)
 
 static const uint16_t NEGATIVE_BIT = 0x8000;
 static const uint16_t ENV_BITDEPTH = 14;

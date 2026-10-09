@@ -49,7 +49,7 @@ int32_t Stutterer::getStutterRate(ParamManager* paramManager, int32_t magnitude,
 	paramValue = unpatchedParams->knobPosToParamValue(knobPos, nullptr);
 
 	int32_t rate =
-	    getFinalParameterValueExp(paramNeutralValues[params::GLOBAL_DELAY_RATE], cableToExpParamShortcut(paramValue));
+	    getFinalParameterValueExp(kMaxSampleValue, cableToExpParamShortcut(paramValue));
 
 	if (sync != 0) {
 		rate = multiply_32x32_rshift32(rate, timePerTickInverse);

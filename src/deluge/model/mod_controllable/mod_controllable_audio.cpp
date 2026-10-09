@@ -94,12 +94,9 @@ ModControllableAudio::ModControllableAudio() {
 	else {
 		syncLevel = (SyncLevel)(8 - FlashStorage::defaultMagnitude);
 	}
-	delay.syncLevel = syncLevel;
 }
 
 ModControllableAudio::~ModControllableAudio() {
-	// delay.discardBuffers(); // No! The DelayBuffers will themselves destruct and do this
-
 	// Free the mod fx memory
 	if (modFXBuffer) {
 		delugeDealloc(modFXBuffer);
@@ -119,7 +116,6 @@ void ModControllableAudio::cloneFrom(ModControllableAudio* other) {
 	filterRoute = other->filterRoute;
 	sidechain.cloneFrom(&other->sidechain);
 	midiKnobArray.cloneFrom(&other->midiKnobArray); // Could fail if no RAM... not too big a concern
-	delay = other->delay;
 	if (other->getFxChain() != nullptr && getFxChain() != nullptr) {
 		getFxChain()->cloneFrom(*other->getFxChain());
 	}
@@ -180,8 +176,7 @@ void ModControllableAudio::setWrapsToShutdown() {
 }
 
 void ModControllableAudio::processFX(StereoSample* buffer, int32_t numSamples, ModFXType modFXType, int32_t modFXRate,
-                                     int32_t modFXDepth, const Delay::State& delayWorkingState, int32_t* postFXVolume,
-                                     ParamManager* paramManager) {
+                                     int32_t modFXDepth, int32_t* postFXVolume, ParamManager* paramManager) {
 
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
 
@@ -543,8 +538,6 @@ void ModControllableAudio::processFX(StereoSample* buffer, int32_t numSamples, M
 		} while (++currentSample != bufferEnd);
 	}
 
-	// Delay ----------------------------------------------------------------------------------
-	delay.process({buffer, static_cast<size_t>(numSamples)}, delayWorkingState);
 }
 
 void ModControllableAudio::processOutputVolume(StereoSample* buffer, int32_t numSamples, int32_t postFXVolume,
@@ -751,15 +744,6 @@ void ModControllableAudio::writeAttributesToFile(Serializer& writer) {
 }
 
 void ModControllableAudio::writeTagsToFile(Serializer& writer) {
-	// Delay
-	writer.writeOpeningTagBeginning("delay");
-	writer.writeAttribute("pingPong", delay.pingPong);
-	writer.writeAttribute("analog", delay.analog);
-	writer.writeAbsoluteSyncLevelToFile(currentSong, "syncLevel", delay.syncLevel, true);
-	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
-	writer.writeSyncTypeToFile(currentSong, "syncType", delay.syncType, true);
-	writer.closeTag();
-
 	// MIDI knobs
 	if (midiKnobArray.getNumElements()) {
 		writer.writeOpeningTag("midiKnobs");
@@ -1034,62 +1018,6 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 	else if (!strcmp(tagName, "clippingAmount")) {
 		clippingAmount = reader.readTagOrAttributeValueInt();
 		reader.exitTag("clippingAmount");
-	}
-
-	else if (!strcmp(tagName, "delay")) {
-		// Set default values in case they are not configured
-		delay.syncType = SYNC_TYPE_EVEN;
-		delay.syncLevel = SYNC_LEVEL_NONE;
-
-		while (*(tagName = reader.readNextTagOrAttributeName())) {
-
-			// These first two ensure compatibility with old files (pre late 2016 I think?)
-			if (!strcmp(tagName, "feedback")) {
-				p = params::GLOBAL_DELAY_FEEDBACK;
-doReadPatchedParam:
-				if (paramManager) {
-					if (!paramManager->containsAnyMainParamCollections()) {
-						Error error = Sound::createParamManagerForLoading(paramManager);
-						if (error != Error::NONE) {
-							return error;
-						}
-					}
-					ParamCollectionSummary* patchedParamsSummary = paramManager->getPatchedParamSetSummary();
-					PatchedParamSet* patchedParams = (PatchedParamSet*)patchedParamsSummary->paramCollection;
-					patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_DELAY_FEEDBACK,
-					                         readAutomationUpToPos);
-				}
-				reader.exitTag();
-			}
-			else if (!strcmp(tagName, "rate")) {
-				p = params::GLOBAL_DELAY_RATE;
-				goto doReadPatchedParam;
-			}
-
-			else if (!strcmp(tagName, "pingPong")) {
-				int32_t contents = reader.readTagOrAttributeValueInt();
-				delay.pingPong = static_cast<bool>(std::clamp(contents, 0_i32, 1_i32));
-				reader.exitTag("pingPong");
-			}
-			else if (!strcmp(tagName, "analog")) {
-				int32_t contents = reader.readTagOrAttributeValueInt();
-				delay.analog = static_cast<bool>(std::clamp(contents, 0_i32, 1_i32));
-				reader.exitTag("analog");
-			}
-			else if (!strcmp(tagName, "syncType")) {
-				delay.syncType = (SyncType)reader.readTagOrAttributeValueInt();
-				reader.exitTag("syncType");
-			}
-			else if (!strcmp(tagName, "syncLevel")) {
-				delay.syncLevel =
-				    (SyncLevel)song->convertSyncLevelFromFileValueToInternalValue(reader.readTagOrAttributeValueInt());
-				reader.exitTag("syncLevel");
-			}
-			else {
-				reader.exitTag(tagName);
-			}
-		}
-		reader.exitTag("delay");
 	}
 
 	else if (!strcmp(tagName, "audioCompressor")) {
@@ -1656,63 +1584,6 @@ void ModControllableAudio::endStutter(ParamManagerForTimeline* paramManager) {
 	exitUIMode(UI_MODE_STUTTERING);
 }
 
-void ModControllableAudio::switchDelayPingPong() {
-	delay.pingPong = !delay.pingPong;
-}
-
-void ModControllableAudio::switchDelayAnalog() {
-	delay.analog = !delay.analog;
-}
-
-char const* ModControllableAudio::getDelayTypeDisplayName() {
-	switch (delay.analog) {
-		using enum deluge::l10n::String;
-	case 0:
-		return l10n::get(STRING_FOR_DIGITAL_DELAY);
-	default:
-		return l10n::get(STRING_FOR_ANALOG_DELAY);
-	}
-}
-
-void ModControllableAudio::switchDelaySyncType() {
-	switch (delay.syncType) {
-	case SYNC_TYPE_TRIPLET:
-		delay.syncType = SYNC_TYPE_DOTTED;
-		break;
-	case SYNC_TYPE_DOTTED:
-		delay.syncType = SYNC_TYPE_EVEN;
-		break;
-
-	default: // SYNC_TYPE_EVEN
-		delay.syncType = SYNC_TYPE_TRIPLET;
-		break;
-	}
-}
-
-char const* ModControllableAudio::getDelaySyncTypeDisplayName() {
-	switch (delay.syncType) {
-	case SYNC_TYPE_TRIPLET:
-		return "Triplet";
-	case SYNC_TYPE_DOTTED:
-		return "Dotted";
-	default: // SYNC_TYPE_EVEN
-		return "Even";
-	}
-}
-
-void ModControllableAudio::switchDelaySyncLevel() {
-	// Note: SYNC_LEVEL_NONE (value 0) can't be selected
-	delay.syncLevel = (SyncLevel)((delay.syncLevel) % SyncLevel::SYNC_LEVEL_256TH + 1); // cycle from 1 to 9 (omit 0)
-}
-
-void ModControllableAudio::getDelaySyncLevelDisplayName(char* displayName) {
-	// Note: SYNC_LEVEL_NONE (value 0) can't be selected
-	delay.syncLevel = (SyncLevel)(delay.syncLevel % SyncLevel::SYNC_LEVEL_256TH); // cycle from 1 to 9 (omit 0)
-	StringBuf buffer{shortStringBuffer, kShortStringBufferSize};
-	currentSong->getNoteLengthName(buffer, (uint32_t)3 << (SYNC_LEVEL_256TH - delay.syncLevel));
-	strncpy(displayName, buffer.data(), 29);
-}
-
 char const* ModControllableAudio::getFilterTypeDisplayName(FilterType currentFilterType) {
 	using enum deluge::l10n::String;
 	switch (currentFilterType) {
@@ -1814,7 +1685,6 @@ char const* ModControllableAudio::getHPFModeDisplayName() {
 
 // This can get called either for hibernation, or because drum now has no active noteRow
 void ModControllableAudio::wontBeRenderedForAWhile() {
-	delay.discardBuffers();
 	endStutter(nullptr);
 }
 
@@ -1950,66 +1820,6 @@ void ModControllableAudio::displayFilterSettings(bool on, FilterType currentFilt
 		else {
 			display->displayPopup(getFilterModeDisplayName(currentFilterType));
 		}
-	}
-}
-
-void ModControllableAudio::displayDelaySettings(bool on) {
-	if (display->haveOLED()) {
-		if (on) {
-			DEF_STACK_STRING_BUF(popupMsg, 100);
-			if (runtimeFeatureSettings.get(RuntimeFeatureSettingType::AltGoldenKnobDelayParams)
-			    == RuntimeFeatureStateToggle::On) {
-				popupMsg.append("Type: ");
-				popupMsg.append(getDelaySyncTypeDisplayName());
-
-				popupMsg.append("\nSync: ");
-				char displayName[30];
-				getDelaySyncLevelDisplayName(displayName);
-				popupMsg.append(displayName);
-			}
-			else {
-				popupMsg.append("Ping pong: ");
-				popupMsg.append(getDelayPingPongStatusDisplayName());
-				popupMsg.append("\n");
-				popupMsg.append(getDelayTypeDisplayName());
-			}
-
-			display->popupText(popupMsg.c_str());
-		}
-		else {
-			display->cancelPopup();
-		}
-	}
-	else {
-		if (runtimeFeatureSettings.get(RuntimeFeatureSettingType::AltGoldenKnobDelayParams)
-		    == RuntimeFeatureStateToggle::On) {
-			if (on) {
-				display->displayPopup(getDelaySyncTypeDisplayName());
-			}
-			else {
-				char displayName[30];
-				getDelaySyncLevelDisplayName(displayName);
-				display->displayPopup(displayName);
-			}
-		}
-		else {
-			if (on) {
-				display->displayPopup(getDelayPingPongStatusDisplayName());
-			}
-			else {
-				display->displayPopup(getDelayTypeDisplayName());
-			}
-		}
-	}
-}
-
-char const* ModControllableAudio::getDelayPingPongStatusDisplayName() {
-	using enum deluge::l10n::String;
-	switch (delay.pingPong) {
-	case 0:
-		return l10n::get(STRING_FOR_DISABLED);
-	default:
-		return l10n::get(STRING_FOR_ENABLED);
 	}
 }
 

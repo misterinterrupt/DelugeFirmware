@@ -166,8 +166,8 @@ public:
 	void patchedParamPresetValueChanged(uint8_t p, ModelStackWithSoundFlags* modelStack, int32_t oldValue,
 	                                    int32_t newValue);
 	void render(ModelStackWithThreeMainThings* modelStack, StereoSample* outputBuffer, int32_t numSamples,
-	            int32_t sideChainHitPending, bool shouldLimitDelayFeedback = false,
-	            int32_t pitchAdjust = kMaxSampleValue, SampleRecorder* recorder = nullptr);
+	            int32_t sideChainHitPending, int32_t pitchAdjust = kMaxSampleValue,
+	            SampleRecorder* recorder = nullptr);
 	void unassignAllVoices();
 
 	void ensureInaccessibleParamPresetValuesWithoutKnobsAreZero(Song* song) final; // Song may be NULL

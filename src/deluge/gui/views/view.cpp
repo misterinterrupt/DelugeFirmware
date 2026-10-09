@@ -795,43 +795,6 @@ void View::modEncoderAction(int32_t whichModEncoder, int32_t offset) {
 		bool noteTailsAllowedBefore;
 		ModelStackWithAutoParam* modelStackWithParam = getModelStackWithParam(whichModEncoder, noteTailsAllowedBefore);
 
-		if (Buttons::isShiftButtonPressed() && modelStackWithParam && modelStackWithParam->paramId == params::GLOBAL_DELAY_RATE) {
-			ModControllableAudio* audio = (ModControllableAudio*)activeModControllableModelStack.modControllable;
-			if (audio) {
-				static int32_t delaySyncAccumulator = 0;
-				delaySyncAccumulator += offset;
-				int32_t step = 0;
-				constexpr int32_t kThreshold = 12;
-				if (delaySyncAccumulator >= kThreshold) {
-					step = 1;
-					delaySyncAccumulator = 0;
-				}
-				else if (delaySyncAccumulator <= -kThreshold) {
-					step = -1;
-					delaySyncAccumulator = 0;
-				}
-
-				if (step != 0) {
-					int32_t currentChronoIndex = getChronologicalSyncOption(audio->delay.syncType, audio->delay.syncLevel);
-					int32_t newChronoIndex = std::clamp<int32_t>(currentChronoIndex + step, 0, 33);
-					getSyncTypeAndLevelFromChronologicalOption(newChronoIndex, audio->delay.syncType, audio->delay.syncLevel);
-
-					int32_t menuOption = syncTypeAndLevelToMenuOption(audio->delay.syncType, audio->delay.syncLevel);
-
-					DEF_STACK_STRING_BUF(buffer, 30);
-					if (menuOption == 0) {
-						buffer.append(l10n::get(l10n::String::STRING_FOR_OFF));
-					}
-					else {
-						syncValueToString(menuOption, buffer, currentSong->getInputTickMagnitude());
-					}
-					display->displayPopup(buffer.c_str());
-					setKnobIndicatorLevel(whichModEncoder);
-				}
-				return;
-			}
-		}
-
 		// If non-existent param, still let the ModControllable know
 		if (!modelStackWithParam || !modelStackWithParam->autoParam) {
 			ActionResult result = activeModControllableModelStack.modControllable->modEncoderActionForNonExistentParam(

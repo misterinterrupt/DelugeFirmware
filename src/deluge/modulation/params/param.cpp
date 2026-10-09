@@ -105,8 +105,7 @@ char const* getPatchedParamShortName(ParamType type) {
 	    [GLOBAL_VOLUME_POST_FX]          = "POSTFXLVL",
 	    [GLOBAL_VOLUME_POST_REVERB_SEND] = "Side level",
 	    [GLOBAL_MOD_FX_DEPTH]            = "ModFXdepth",
-	    [GLOBAL_DELAY_FEEDBACK]          = "Delay feed",
-	    [GLOBAL_DELAY_RATE]              = "Delay rate",
+	    [FIRST_GLOBAL_NON_VOLUME]        = "", // enum anchor: no named param lives here (tables must stay gap-free)
 	    [GLOBAL_MOD_FX_RATE]             = "ModFX rate",
 	    [GLOBAL_LFO_FREQ]                = "LFO1 rate",
 	    [GLOBAL_ARP_RATE]                = "Arp. rate",
@@ -165,8 +164,7 @@ char const* getPatchedParamDisplayName(int32_t p) {
 	    [GLOBAL_VOLUME_POST_FX] = STRING_FOR_PARAM_GLOBAL_VOLUME_POST_FX,
 	    [GLOBAL_VOLUME_POST_REVERB_SEND] = STRING_FOR_PARAM_GLOBAL_VOLUME_POST_REVERB_SEND,
 	    [GLOBAL_MOD_FX_DEPTH] = STRING_FOR_PARAM_GLOBAL_MOD_FX_DEPTH,
-	    [GLOBAL_DELAY_FEEDBACK] = STRING_FOR_PARAM_GLOBAL_DELAY_FEEDBACK,
-	    [GLOBAL_DELAY_RATE] = STRING_FOR_PARAM_GLOBAL_DELAY_RATE,
+	    [FIRST_GLOBAL_NON_VOLUME] = STRING_FOR_NONE, // enum anchor, tables must stay gap-free
 	    [GLOBAL_MOD_FX_RATE] = STRING_FOR_PARAM_GLOBAL_MOD_FX_RATE,
 	    [GLOBAL_LFO_FREQ] = STRING_FOR_PARAM_GLOBAL_LFO_FREQ,
 	    [GLOBAL_ARP_RATE] = STRING_FOR_PARAM_GLOBAL_ARP_RATE,
@@ -234,8 +232,6 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		static l10n::String const NAMES[UNPATCHED_GLOBAL_MAX_NUM - unc]{
 		    [UNPATCHED_MOD_FX_RATE - unc] = STRING_FOR_MOD_FX_RATE,
 		    [UNPATCHED_MOD_FX_DEPTH - unc] = STRING_FOR_MOD_FX_DEPTH,
-		    [UNPATCHED_DELAY_RATE - unc] = STRING_FOR_DELAY_RATE,
-		    [UNPATCHED_DELAY_AMOUNT - unc] = STRING_FOR_DELAY_AMOUNT,
 		    [UNPATCHED_PAN - unc] = STRING_FOR_PAN,
 		    [UNPATCHED_LPF_FREQ - unc] = STRING_FOR_LPF_FREQUENCY,
 		    [UNPATCHED_LPF_RES - unc] = STRING_FOR_LPF_RESONANCE,
@@ -278,7 +274,6 @@ bool paramNeedsLPF(ParamType p, bool fromAutomation) {
 	case params::LOCAL_CARRIER_0_FEEDBACK:
 	case params::LOCAL_CARRIER_1_FEEDBACK:
 	case params::GLOBAL_MOD_FX_DEPTH:
-	case params::GLOBAL_DELAY_FEEDBACK:
 		return true;
 
 	default:
@@ -322,12 +317,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 
 		case UNPATCHED_MOD_FX_DEPTH:
 			return "modFXDepth";
-
-		case UNPATCHED_DELAY_RATE:
-			return "delayRate";
-
-		case UNPATCHED_DELAY_AMOUNT:
-			return "delayFeedback";
 
 		case UNPATCHED_PAN:
 			return "pan";
@@ -430,12 +419,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 
 		case GLOBAL_VOLUME_POST_REVERB_SEND:
 			return "volumePostReverbSend";
-
-		case GLOBAL_DELAY_RATE:
-			return "delayRate";
-
-		case GLOBAL_DELAY_FEEDBACK:
-			return "delayFeedback";
 
 		case GLOBAL_MOD_FX_RATE:
 			return "modFXRate";

@@ -36,7 +36,7 @@ public:
 	bool noteIsOn(int32_t noteCode, bool resetTimeEntered);
 
 	void renderOutput(ModelStack* modelStack, StereoSample* startPos, StereoSample* endPos, int32_t numSamples,
-	                  int32_t sideChainHitPending, bool shouldLimitDelayFeedback, bool isClipActive);
+	                  int32_t sideChainHitPending, bool isClipActive);
 
 	// A timelineCounter is required
 	void offerReceivedCCToLearnedParams(MIDIDevice* fromDevice, uint8_t channel, uint8_t ccNumber, uint8_t value,

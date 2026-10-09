@@ -66,10 +66,7 @@ void GlobalEffectable::initParams(ParamManager* paramManager) {
 	unpatchedParams->params[params::UNPATCHED_MOD_FX_RATE].setCurrentValueBasicForSetup(-536870912);
 	unpatchedParams->params[params::UNPATCHED_MOD_FX_FEEDBACK].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
 	unpatchedParams->params[params::UNPATCHED_MOD_FX_DEPTH].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_DELAY_RATE].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_PAN].setCurrentValueBasicForSetup(0);
-
-	unpatchedParams->params[params::UNPATCHED_DELAY_AMOUNT].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
 
 	unpatchedParams->params[params::UNPATCHED_VOLUME].setCurrentValueBasicForSetup(889516852); // 3/4 of the way up
 	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_VOLUME].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
@@ -101,10 +98,6 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 	// LPF/HPF/EQ
 	if (whichModButton == 1) {
 		displayFilterSettings(on, currentFilterType);
-	}
-	// Delay
-	else if (whichModButton == 3) {
-		displayDelaySettings(on);
 	}
 	// Compressor
 	else if (whichModButton == 4) {
@@ -406,78 +399,6 @@ bool GlobalEffectable::modEncoderButtonAction(uint8_t whichModEncoder, bool on,
 		}
 	}
 
-	// Delay section
-	else if (modKnobMode == 3) {
-		if (whichModEncoder == 1) {
-			if (on) {
-				if (runtimeFeatureSettings.get(RuntimeFeatureSettingType::AltGoldenKnobDelayParams)
-				    == RuntimeFeatureStateToggle::On) {
-					switchDelaySyncType();
-
-					// if mod button is pressed, update mod button pop up
-					if (Buttons::isButtonPressed(
-					        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-						displayDelaySettings(on);
-					}
-					else {
-						display->displayPopup(getDelaySyncTypeDisplayName());
-					}
-				}
-				else {
-					switchDelayPingPong();
-
-					// if mod button is pressed, update mod button pop up
-					if (Buttons::isButtonPressed(
-					        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-						displayDelaySettings(on);
-					}
-					else {
-						display->displayPopup(getDelayPingPongStatusDisplayName());
-					}
-				}
-				return true;
-			}
-			else {
-				return false;
-			}
-		}
-		else {
-			if (on) {
-				if (runtimeFeatureSettings.get(RuntimeFeatureSettingType::AltGoldenKnobDelayParams)
-				    == RuntimeFeatureStateToggle::On) {
-					switchDelaySyncLevel();
-
-					// if mod button is pressed, update mod button pop up
-					if (Buttons::isButtonPressed(
-					        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-						displayDelaySettings(on);
-					}
-					else {
-						char displayName[30];
-						getDelaySyncLevelDisplayName(displayName);
-						display->displayPopup(displayName);
-					}
-				}
-				else {
-					switchDelayAnalog();
-
-					// if mod button is pressed, update mod button pop up
-					if (Buttons::isButtonPressed(
-					        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-						displayDelaySettings(on);
-					}
-					else {
-						display->displayPopup(getDelayTypeDisplayName());
-					}
-				}
-				return true;
-			}
-			else {
-				return false;
-			}
-		}
-	}
-
 	// Compressor section
 	else if (modKnobMode == 4) {
 		if (whichModEncoder == 0) { // Comp param select
@@ -728,15 +649,6 @@ int32_t GlobalEffectable::getParameterFromKnob(int32_t whichModEncoder) {
 			}
 		}
 	}
-	else if (modKnobMode == 3) {
-		if (whichModEncoder != 0) {
-			return params::UNPATCHED_DELAY_RATE;
-		}
-		else {
-			return params::UNPATCHED_DELAY_AMOUNT;
-		}
-	}
-
 	else if (modKnobMode == 4) {
 		// Encoder 0 here selects comp params via clicks; no continuous param while
 		// not editing the compressor.
@@ -947,13 +859,6 @@ void GlobalEffectable::writeParamTagsToFile(Serializer& writer, ParamManager* pa
 
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
 
-	writer.writeOpeningTagBeginning("delay");
-	unpatchedParams->writeParamAsAttribute(writer, "rate", params::UNPATCHED_DELAY_RATE, writeAutomation, false,
-	                                       valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "feedback", params::UNPATCHED_DELAY_AMOUNT, writeAutomation, false,
-	                                       valuesForOverride);
-	writer.closeTag();
-
 	writer.writeOpeningTagBeginning("lpf");
 	unpatchedParams->writeParamAsAttribute(writer, "frequency", params::UNPATCHED_LPF_FREQ, writeAutomation, false,
 	                                       valuesForOverride);
@@ -989,23 +894,7 @@ bool GlobalEffectable::readParamTagFromFile(Deserializer& reader, char const* ta
 	ParamCollectionSummary* unpatchedParamsSummary = paramManager->getUnpatchedParamSetSummary();
 	UnpatchedParamSet* unpatchedParams = (UnpatchedParamSet*)unpatchedParamsSummary->paramCollection;
 
-	if (!strcmp(tagName, "delay")) {
-		while (*(tagName = reader.readNextTagOrAttributeName())) {
-			if (!strcmp(tagName, "rate")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_DELAY_RATE,
-				                           readAutomationUpToPos);
-				reader.exitTag("rate");
-			}
-			else if (!strcmp(tagName, "feedback")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_DELAY_AMOUNT,
-				                           readAutomationUpToPos);
-				reader.exitTag("feedback");
-			}
-		}
-		reader.exitTag("delay");
-	}
-
-	else if (!strcmp(tagName, "lpf")) {
+	if (!strcmp(tagName, "lpf")) {
 		while (*(tagName = reader.readNextTagOrAttributeName())) {
 			if (!strcmp(tagName, "frequency")) {
 				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_LPF_FREQ,
@@ -1196,31 +1085,9 @@ ModFXType GlobalEffectable::getActiveModFXType(ParamManager* paramManager) {
 	return modFXTypeNow;
 }
 
-Delay::State GlobalEffectable::createDelayWorkingState(ParamManager& paramManager, bool shouldLimitDelayFeedback,
-                                                       bool soundComingIn) {
-
-	Delay::State delayWorkingState;
-	UnpatchedParamSet* unpatchedParams = paramManager.getUnpatchedParamSet();
-
-	delayWorkingState.delayFeedbackAmount = getFinalParameterValueLinear(
-	    paramNeutralValues[params::GLOBAL_DELAY_FEEDBACK],
-	    cableToLinearParamShortcut(unpatchedParams->getValue(params::UNPATCHED_DELAY_AMOUNT)));
-	if (shouldLimitDelayFeedback) {
-		delayWorkingState.delayFeedbackAmount =
-		    std::min(delayWorkingState.delayFeedbackAmount, (int32_t)(1 << 30) - (1 << 26));
-	}
-	delayWorkingState.userDelayRate =
-	    getFinalParameterValueExp(paramNeutralValues[params::GLOBAL_DELAY_RATE],
-	                              cableToExpParamShortcut(unpatchedParams->getValue(params::UNPATCHED_DELAY_RATE)));
-	uint32_t timePerTickInverse = playbackHandler.getTimePerInternalTickInverse(true);
-	delay.setupWorkingState(delayWorkingState, timePerTickInverse, soundComingIn);
-
-	return delayWorkingState;
-}
-
 void GlobalEffectable::processFXForGlobalEffectable(StereoSample* inputBuffer, int32_t numSamples,
                                                     int32_t* postFXVolume, ParamManager* paramManager,
-                                                    const Delay::State& delayWorkingState, bool grainHadInput) {
+                                                    bool grainHadInput) {
 
 	StereoSample* inputBufferEnd = inputBuffer + numSamples;
 
@@ -1293,6 +1160,5 @@ void GlobalEffectable::processFXForGlobalEffectable(StereoSample* inputBuffer, i
 		}
 	}
 
-	processFX(inputBuffer, numSamples, modFXTypeNow, modFXRate, modFXDepth, delayWorkingState, postFXVolume,
-	          paramManager);
+	processFX(inputBuffer, numSamples, modFXTypeNow, modFXRate, modFXDepth, postFXVolume, paramManager);
 }

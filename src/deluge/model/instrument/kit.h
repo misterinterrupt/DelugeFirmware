@@ -46,7 +46,7 @@ public:
 	Error loadAllAudioFiles(bool mayActuallyReadFiles) override;
 	void cutAllSound() override;
 	void renderOutput(ModelStack* modelStack, StereoSample* startPos, StereoSample* endPos, int32_t numSamples,
-	                  int32_t sideChainHitPending, bool shouldLimitDelayFeedback, bool isClipActive) override;
+	                  int32_t sideChainHitPending, bool isClipActive) override;
 
 	void offerReceivedCC(ModelStackWithTimelineCounter* modelStackWithTimelineCounter, MIDIDevice* fromDevice,
 	                     uint8_t channel, uint8_t ccNumber, uint8_t value, bool* doingMidiThru) override;
@@ -127,8 +127,8 @@ public:
 
 	bool renderGlobalEffectableForClip(ModelStackWithTimelineCounter* modelStack, StereoSample* globalEffectableBuffer,
 	                                   int32_t* bufferToTransferTo, int32_t numSamples, int32_t sideChainHitPending,
-	                                   bool shouldLimitDelayFeedback, bool isClipActive, int32_t pitchAdjust,
-	                                   int32_t amplitudeAtStart, int32_t amplitudeAtEnd);
+	                                   bool isClipActive, int32_t pitchAdjust, int32_t amplitudeAtStart,
+	                                   int32_t amplitudeAtEnd);
 
 	void modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTimeline* paramManager) final;
 	ActionResult modEncoderActionForNonExistentParam(int32_t offset, int32_t whichModEncoder,

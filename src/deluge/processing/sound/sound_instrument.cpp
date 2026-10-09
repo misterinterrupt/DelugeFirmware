@@ -88,8 +88,7 @@ void SoundInstrument::cutAllSound() {
 }
 
 void SoundInstrument::renderOutput(ModelStack* modelStack, StereoSample* startPos, StereoSample* endPos,
-                                   int32_t numSamples, int32_t sideChainHitPending, bool shouldLimitDelayFeedback,
-                                   bool isClipActive) {
+                                   int32_t numSamples, int32_t sideChainHitPending, bool isClipActive) {
 	// this should only happen in the rare case that this is called while replacing an instrument but after the clips
 	// have been cleared
 	if (!activeClip) [[unlikely]] {
@@ -104,8 +103,8 @@ void SoundInstrument::renderOutput(ModelStack* modelStack, StereoSample* startPo
 		compressor.gainReduction = 0;
 	}
 	else {
-		Sound::render(modelStackWithThreeMainThings, startPos, numSamples, sideChainHitPending,
-		              shouldLimitDelayFeedback, kMaxSampleValue, recorder);
+		Sound::render(modelStackWithThreeMainThings, startPos, numSamples, sideChainHitPending, kMaxSampleValue,
+		              recorder);
 	}
 
 	if (playbackHandler.isEitherClockActive() && !playbackHandler.ticksLeftInCountIn && isClipActive) {

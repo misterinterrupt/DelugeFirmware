@@ -31,7 +31,7 @@
 extern "C" void neon_fm_kernel(const int32_t* in, const int32_t* busin, int32_t* out, int count, int32_t phase0,
                                int32_t freq, int32_t gain1, int32_t dgain);
 
-const int32_t __attribute__((aligned(16))) zeros[DX_MAX_N] = {0};
+namespace { const int32_t __attribute__((aligned(16))) fmKernelZeros[DX_MAX_N] = {0}; } // NOLINT(bugprone-exception-escape)
 
 #endif
 
@@ -41,7 +41,7 @@ void FmOpKernel::compute(int32_t* output, int n, const int32_t* input, int32_t p
 	int32_t phase = phase0;
 	if (neon) {
 #ifdef HAVE_NEON
-		neon_fm_kernel(input, add ? output : zeros, output, n, phase0, freq, gain, dgain);
+		neon_fm_kernel(input, add ? output : fmKernelZeros, output, n, phase0, freq, gain, dgain);
 #endif
 	}
 	else {
@@ -72,7 +72,7 @@ void FmOpKernel::compute_pure(int32_t* output, int n, int32_t phase0, int32_t fr
 	int32_t phase = phase0;
 	if (neon) {
 #ifdef HAVE_NEON
-		neon_fm_kernel(zeros, add ? output : zeros, output, n, phase0, freq, gain, dgain);
+		neon_fm_kernel(fmKernelZeros, add ? output : fmKernelZeros, output, n, phase0, freq, gain, dgain);
 #endif
 	}
 	else {

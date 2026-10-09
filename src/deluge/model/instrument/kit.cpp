@@ -515,8 +515,8 @@ void Kit::cutAllSound() {
 // Beware - unlike usual, modelStack, a ModelStackWithThreeMainThings*,  might have a NULL timelineCounter
 bool Kit::renderGlobalEffectableForClip(ModelStackWithTimelineCounter* modelStack, StereoSample* globalEffectableBuffer,
                                         int32_t* bufferToTransferTo, int32_t numSamples, int32_t sideChainHitPending,
-                                        bool shouldLimitDelayFeedback, bool isClipActive, int32_t pitchAdjust,
-                                        int32_t amplitudeAtStart, int32_t amplitudeAtEnd) {
+                                        bool isClipActive, int32_t pitchAdjust, int32_t amplitudeAtStart,
+                                        int32_t amplitudeAtEnd) {
 	bool rendered = false;
 	// Render Drums. Traverse backwards, in case one stops rendering (removing itself from the list) as we render it
 	for (int32_t d = drumsWithRenderingActive.getNumElements() - 1; d >= 0; d--) {
@@ -557,7 +557,7 @@ bool Kit::renderGlobalEffectableForClip(ModelStackWithTimelineCounter* modelStac
 		    modelStack->addNoteRow(noteRowIndex, thisNoteRow)->addOtherTwoThings(soundDrum, drumParamManager);
 
 		soundDrum->render(modelStackWithThreeMainThings, globalEffectableBuffer, numSamples, sideChainHitPending,
-		                  shouldLimitDelayFeedback, pitchAdjust, nullptr);
+		                  pitchAdjust, nullptr);
 		rendered = true;
 	}
 
@@ -646,8 +646,7 @@ yesTickParamManager:
 }
 
 void Kit::renderOutput(ModelStack* modelStack, StereoSample* outputBuffer, StereoSample* outputBufferEnd,
-                       int32_t numSamples, int32_t sideChainHitPending, bool shouldLimitDelayFeedback,
-                       bool isClipActive) {
+                       int32_t numSamples, int32_t sideChainHitPending, bool isClipActive) {
 
 	ParamManager* paramManager = getParamManager(modelStack->song);
 
@@ -655,8 +654,7 @@ void Kit::renderOutput(ModelStack* modelStack, StereoSample* outputBuffer, Stere
 	// Beware - modelStackWithThreeMainThings might have a NULL timelineCounter
 
 	GlobalEffectableForClip::renderOutput(modelStackWithTimelineCounter, paramManager, outputBuffer, numSamples,
-	                                      sideChainHitPending, shouldLimitDelayFeedback, isClipActive, OutputType::KIT,
-	                                      recorder);
+	                                      sideChainHitPending, isClipActive, OutputType::KIT, recorder);
 }
 
 // offer the CC to kit gold knobs without also offering to all drums
