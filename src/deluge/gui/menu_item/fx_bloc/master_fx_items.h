@@ -61,6 +61,12 @@ public:
 	    "RESFILT", "ENVFILT", "LFOFILT", "RINGMOD", "QUANT", "QNT+FLG", "COMPRESSOR", "MST SEND",
 	};
 
+	// The names and models are a hand-maintained parallel pair — when they last
+	// drifted, every entry past the old name list's end silently selected the
+	// wrong engine ("COMPRESSOR" selected the LaserVerb). Keep them locked.
+	static_assert(sizeof(kNames) / sizeof(kNames[0]) == sizeof(kOptions) / sizeof(kOptions[0]),
+	              "MasterSlotBloc names and options must list the same number of blocs");
+
 	MasterSlotBloc(int32_t slotIndex) : Selection(l10n::String::EMPTY_STRING), slot_(slotIndex) {}
 
 	/// MST SEND belongs on track slots; on the master chain it would be a dead tap
