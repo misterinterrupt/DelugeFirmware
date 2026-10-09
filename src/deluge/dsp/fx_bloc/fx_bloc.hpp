@@ -58,7 +58,6 @@ public:
 	enum class Model : uint8_t {
 		EMPTY = 0,
 		COMPRESSOR,
-		FILTER,
 		FREEVERB,
 		MUTABLE,
 		KDFX_REVERB,
@@ -411,7 +410,7 @@ public:
 		reclaimRetired();
 
 		reverb::Base* replacement = nullptr;
-		if (m != Model::EMPTY && m != Model::FILTER && m != Model::GLOBAL_SEND) {
+		if (m != Model::EMPTY && m != Model::GLOBAL_SEND) {
 			replacement = constructEngine(m);
 			if (replacement == nullptr) {
 				return false; // pool exhausted; keep the current bloc as-is
@@ -1233,7 +1232,6 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_QNT_FLG: return kDefsKdfxQntFlg;
 	case Model::GLOBAL_SEND: return kDefsGlobalSend;
 	case Model::EMPTY:
-	case Model::FILTER:
 	default: return kDefsEmpty;
 	}
 }

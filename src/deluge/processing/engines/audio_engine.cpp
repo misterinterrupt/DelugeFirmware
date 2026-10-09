@@ -1313,9 +1313,8 @@ void getMasterFxParamsFromSong(Song* song) {
 	    song->masterFxRouting, 0, util::to_underlying(dsp::MasterFxChain::Routing::PARALLEL_SERIES))));
 	for (size_t s = 0; s < dsp::MasterFxChain::kNumSlots; s++) {
 		auto& bloc = masterFxChain.slot(s);
-		auto wanted = static_cast<dsp::FxBloc::Model>(
-		    std::clamp<int32_t>(song->masterFxModels[s], 0,
-		                        util::to_underlying(dsp::FxBloc::Model::KDFX_AUTOPAN)));
+		auto wanted = static_cast<dsp::FxBloc::Model>(std::clamp<int32_t>(
+		    song->masterFxModels[s], 0, util::to_underlying(dsp::FxBloc::Model::GLOBAL_SEND)));
 		if (bloc.setModel(wanted)) {
 			if (wanted != dsp::FxBloc::Model::EMPTY) {
 				// Bit position == param id (song.cpp sets 1u << pid); test explicitly.

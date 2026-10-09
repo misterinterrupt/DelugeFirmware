@@ -88,7 +88,7 @@ public:
 			}
 			out++;
 		}
-		this->setValue(0); // FILTER and unlisted legacy states display as EMPTY
+		this->setValue(0); // anything corrupt falls back to EMPTY
 	}
 
 	void writeCurrentValue() override {
