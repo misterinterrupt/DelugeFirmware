@@ -32,8 +32,10 @@ namespace deluge::gui::menu_item::fx_bloc {
 /// GlobalEffectable when inside a clip, or AudioEngine::masterFxChain when at the song level.
 dsp::FxChain* getCurrentFxChain();
 
-/// Selects which bloc a master/track slot holds. COMPRESSOR/FILTER are excluded until their
-/// adapters land (selecting them today would be a silent passthrough).
+/// Selects which bloc a master/track slot holds — every engine the chain supports.
+/// MST SEND is track-side only: it taps the track's signal into one of the master
+/// buses and does nothing useful in a master slot (under parallel routing it can
+/// even self-feed), so the master-chain context hides it from the chooser.
 class MasterSlotBloc final : public Selection {
 public:
 	static constexpr dsp::FxBloc::Model kOptions[] = {
@@ -42,53 +44,89 @@ public:
 	    dsp::FxBloc::Model::KDFX_CHORUS, dsp::FxBloc::Model::KDFX_TONE,
 	    dsp::FxBloc::Model::KDFX_FLANGER, dsp::FxBloc::Model::KDFX_PHASER,
 	    dsp::FxBloc::Model::KDFX_TREMOLO, dsp::FxBloc::Model::KDFX_AUTOPAN,
-	    dsp::FxBloc::Model::KDFX_DIST, dsp::FxBloc::Model::KDFX_TUBEAMP,
-	    dsp::FxBloc::Model::KDFX_LASER, dsp::FxBloc::Model::KDFX_CHO_DLY,
+	    dsp::FxBloc::Model::KDFX_DIST,   dsp::FxBloc::Model::KDFX_TUBEAMP,
+	    dsp::FxBloc::Model::KDFX_LASER,  dsp::FxBloc::Model::KDFX_CHO_DLY,
 	    dsp::FxBloc::Model::KDFX_CHO_REV, dsp::FxBloc::Model::KDFX_FLG_DLY,
 	    dsp::FxBloc::Model::KDFX_FLG_REV, dsp::FxBloc::Model::KDFX_FLG_LASER,
 	    dsp::FxBloc::Model::KDFX_SHPR_REV, dsp::FxBloc::Model::KDFX_RESFILT,
-	    dsp::FxBloc::Model::KDFX_ENVFILT, dsp::FxBloc::Model::KDFX_RINGMOD, dsp::FxBloc::Model::KDFX_LFOFILT,
-	    dsp::FxBloc::Model::COMPRESSOR, dsp::FxBloc::Model::GLOBAL_SEND,
+	    dsp::FxBloc::Model::KDFX_ENVFILT, dsp::FxBloc::Model::KDFX_LFOFILT,
+	    dsp::FxBloc::Model::KDFX_RINGMOD, dsp::FxBloc::Model::KDFX_QUANT,
+	    dsp::FxBloc::Model::KDFX_QNT_FLG, dsp::FxBloc::Model::COMPRESSOR,
+	    dsp::FxBloc::Model::GLOBAL_SEND,
+	};
+	static constexpr const char* kNames[] = {
+	    "EMPTY",  "FREEVERB", "MUTABLE",     "KDFX REV",   "KDFX DLY",  "KDFX CHO", "KDFX TONE",
+	    "KDFX FLANGER", "KDFX PHASER", "KDFX TREMOLO", "KDFX PAN", "KDFX DIST", "KDFX TUBEAMP",
+	    "KDFX LASER", "CHO+DLY", "CHO+REV", "FLG+DLY", "FLG+REV", "FLG+LASER", "TONE+REV",
+	    "RESFILT", "ENVFILT", "LFOFILT", "RINGMOD", "QUANT", "QNT+FLG", "COMPRESSOR", "MST SEND",
 	};
 
 	MasterSlotBloc(int32_t slotIndex) : Selection(l10n::String::EMPTY_STRING), slot_(slotIndex) {}
 
+	/// MST SEND belongs on track slots; on the master chain it would be a dead tap
+	/// (or worse, self-feeding under parallel routing), so it leaves the chooser.
+	[[nodiscard]] bool mstSendSelectable() const { return getCurrentFxChain() != &AudioEngine::masterFxChain; }
+
 	void readCurrentValue() override {
 		auto* chain = getCurrentFxChain();
 		auto wanted = chain != nullptr ? chain->slot(slot_).getModel() : dsp::FxBloc::Model::EMPTY;
+		bool sendSelectable = mstSendSelectable();
+		int32_t out = 0;
 		for (size_t i = 0; i < sizeof(kOptions) / sizeof(kOptions[0]); i++) {
+			if (!sendSelectable && kOptions[i] == dsp::FxBloc::Model::GLOBAL_SEND) {
+				continue;
+			}
 			if (kOptions[i] == wanted) {
-				this->setValue(static_cast<int32_t>(i));
+				this->setValue(out);
 				return;
 			}
+			out++;
 		}
-		this->setValue(0); // COMPRESSOR/FILTER legacy states display as EMPTY
+		this->setValue(0); // FILTER and unlisted legacy states display as EMPTY
 	}
 
 	void writeCurrentValue() override {
-		auto target = kOptions[this->getValue()];
-		auto* chain = getCurrentFxChain();
-		if (chain != nullptr) {
-			if (!chain->slot(slot_).setModel(target)) {
-				// Pool exhausted: surface it and revert the displayed value.
-				display->displayError(Error::INSUFFICIENT_RAM);
-				readCurrentValue();
+		bool sendSelectable = mstSendSelectable();
+		int32_t active = 0;
+		for (size_t i = 0; i < sizeof(kOptions) / sizeof(kOptions[0]); i++) {
+			if (!sendSelectable && kOptions[i] == dsp::FxBloc::Model::GLOBAL_SEND) {
+				continue;
+			}
+			if (active == this->getValue()) {
+				auto target = kOptions[i];
+				auto* chain = getCurrentFxChain();
+				if (chain != nullptr) {
+					if (!chain->slot(slot_).setModel(target)) {
+						// Pool exhausted: surface it and revert the displayed value.
+						display->displayError(Error::INSUFFICIENT_RAM);
+						readCurrentValue();
+						return;
+					}
+				}
+				// The param-page layout follows the newly selected bloc's table; rebuild and
+				// rebind the open menu (page count may have changed under the cursor).
+				deluge::gui::ui::visual_menu::rebuildFxBlocPages();
+				if (getCurrentUI() == &deluge::gui::ui::visual_menu::visualMenuUI) {
+					deluge::gui::ui::visual_menu::visualMenuUI.fxBlocPagesRebuilt();
+				}
 				return;
 			}
-		}
-		// The param-page layout follows the newly selected bloc's table; rebuild and
-		// rebind the open menu (page count may have changed under the cursor).
-		deluge::gui::ui::visual_menu::rebuildFxBlocPages();
-		if (getCurrentUI() == &deluge::gui::ui::visual_menu::visualMenuUI) {
-			deluge::gui::ui::visual_menu::visualMenuUI.fxBlocPagesRebuilt();
+			active++;
 		}
 	}
 
 	deluge::vector<std::string_view> getOptions() override {
 		// Shown on the full-width Bloc pages, so longer names fit.
-		return {"EMPTY",    "FREEVERB", "MUTABLE",    "KDFX REV",    "KDFX DLY",  "KDFX CHO",
-		        "KDFX TONE", "KDFX FLANGER", "KDFX PHASER", "KDFX TREMOLO", "KDFX PAN", "KDFX DIST",
-		        "KDFX TUBEAMP", "COMPRESSOR", "MST SEND"};
+		bool sendSelectable = mstSendSelectable();
+		deluge::vector<std::string_view> names;
+		names.reserve(sizeof(kOptions) / sizeof(kOptions[0]));
+		for (size_t i = 0; i < sizeof(kOptions) / sizeof(kOptions[0]); i++) {
+			if (!sendSelectable && kOptions[i] == dsp::FxBloc::Model::GLOBAL_SEND) {
+				continue;
+			}
+			names.push_back(kNames[i]);
+		}
+		return names;
 	}
 
 private:

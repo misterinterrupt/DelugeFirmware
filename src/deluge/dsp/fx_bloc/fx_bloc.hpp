@@ -444,6 +444,7 @@ public:
 		cache_[util::to_underlying(Param::InGain)] = tFromReal(INGAIN_DEF(), 0.0f);
 		if (m == Model::GLOBAL_SEND) {
 			cache_[util::to_underlying(Param::SendBus)] = 0.0f;
+			cache_[util::to_underlying(Param::Width)] = 0.5f; // Center pan
 		}
 		dirty_ = 0;
 		return true;
@@ -519,10 +520,18 @@ public:
 	/// a mono input and wet-add into the stereo buffer.
 	bool process(StereoSample* buffer, size_t numSamples) {
 		if (model_ == Model::GLOBAL_SEND) {
-			// Unity tap: which bus is the only control.
-			int32_t busIdx =
-			    std::clamp<int32_t>(static_cast<int32_t>(cache_[util::to_underlying(Param::SendBus)]), 0, 2);
-			accumulateMasterSend(busIdx, buffer, numSamples, 1.0f, 0.0f);
+			float inGainDb = displayValue(INGAIN_DEF(), cache_[util::to_underlying(Param::InGain)]);
+			float inGainLin = (inGainDb <= -95.0f) ? 0.0f : std::pow(10.0f, inGainDb / 20.0f);
+			float level = std::clamp(cache_[util::to_underlying(Param::Level)], 0.0f, 1.0f);
+			float totalGain = inGainLin * level;
+			if (totalGain > 0.0001f) {
+				int32_t busIdx =
+				    std::clamp<int32_t>(static_cast<int32_t>(cache_[util::to_underlying(Param::SendBus)]), 0, 2);
+				float pan = std::clamp<float>(displayValue(bipolarPct(Param::Width, "PAN", 100.f),
+				                                           cache_[util::to_underlying(Param::Width)]),
+				                              -100.f, 100.f);
+				accumulateMasterSend(busIdx, buffer, numSamples, totalGain, pan);
+			}
 			return true;
 		}
 		if (engine_ == nullptr) {
@@ -1183,11 +1192,13 @@ constexpr FxBloc::ParamDef kDefsCompressor[8] = {
     {FxBloc::Param::HPF, "SIDE", false, 0, 1, nullptr, "HZ", 0.f, 100.f, 0, false, 4, 1.5f},
     {FxBloc::Param::Width, "BLEND", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
 };
-/// MST SEND is deliberately param-less beyond the bus chooser: it taps the track's
-/// post-chain signal at unity and feeds the selected master FX bus. Which bus a
-/// master bloc reads is set on the master slots themselves.
-constexpr FxBloc::ParamDef kDefsGlobalSend[1] = {
+/// Track-side send into the master chain: BUS picks which master slot's bus the
+/// signal feeds; PAN/IN-GN/LEVEL shape it on the way out of the track.
+constexpr FxBloc::ParamDef kDefsGlobalSend[4] = {
     {FxBloc::Param::SendBus, "BUS", true, 0, 2, FxBloc::kBusOptions()},
+    FxBloc::bipolarPct(FxBloc::Param::Width, "PAN", 100.f),
+    FxBloc::INGAIN_DEF(),
+    FxBloc::LEVEL_DEF(),
 };
 
 constexpr FxBloc::ParamDef kDefsEmpty[1] = {{}};
