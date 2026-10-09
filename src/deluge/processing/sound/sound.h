@@ -148,7 +148,6 @@ public:
 	uint32_t modulatorRetriggerPhase[kNumModulators];
 
 	uint32_t numSamplesSkippedRenderingForGlobalLFO;
-	uint32_t timeStartedSkippingRenderingModFX;
 	uint32_t timeStartedSkippingRenderingLFO;
 	uint32_t timeStartedSkippingRenderingArp;
 	uint32_t startSkippingRenderingAtTime; // Valid when not 0. Allows a wait-time before render skipping starts, for if
@@ -160,8 +159,6 @@ public:
 	deluge::dsp::FxChain fxChain;
 	deluge::dsp::FxChain* getFxChain() override { return &fxChain; }
 
-	ModFXType getModFXType();
-	bool setModFXType(ModFXType newType) final;
 
 	void patchedParamPresetValueChanged(uint8_t p, ModelStackWithSoundFlags* modelStack, int32_t oldValue,
 	                                    int32_t newValue);
@@ -253,7 +250,7 @@ public:
 	// void channelAftertouchReceivedFromInputMIDIChannel(int32_t newValue);
 	ModelStackWithAutoParam* getParamFromModEncoder(int32_t whichModEncoder, ModelStackWithThreeMainThings* modelStack,
 	                                                bool allowCreation = true) final;
-	void reassessRenderSkippingStatus(ModelStackWithSoundFlags* modelStack, bool shouldJustCutModFX = false);
+	void reassessRenderSkippingStatus(ModelStackWithSoundFlags* modelStack);
 	virtual bool readTagFromFile(Deserializer& reader, char const* tagName) = 0;
 	void detachSourcesFromAudioFiles();
 	void confirmNumVoices(char const* error);

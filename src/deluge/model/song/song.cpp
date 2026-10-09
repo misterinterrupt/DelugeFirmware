@@ -2382,7 +2382,6 @@ void Song::renderAudio(StereoSample* outputBuffer, int32_t numSamples, int32_t s
 		}
 	}
 
-	globalEffectable.processFXForGlobalEffectable(outputBuffer, numSamples, &volumePostFX, &paramManager);
 
 	int32_t postReverbVolume = paramNeutralValues[params::GLOBAL_VOLUME_POST_REVERB_SEND];
 

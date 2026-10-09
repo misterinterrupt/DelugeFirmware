@@ -40,12 +40,8 @@ GlobalEffectable::GlobalEffectable() {
 	lpfMode = FilterMode::TRANSISTOR_24DB_LEGACY;
 	filterSet.reset();
 
-	modFXType = ModFXType::NONE;
-	currentModFXParam = ModFXParam::FEEDBACK;
 	currentFilterType = FilterType::LPF;
 
-	memset(allpassMemory, 0, sizeof(allpassMemory));
-	memset(&phaserMemory, 0, sizeof(phaserMemory));
 	editingComp = false;
 	currentCompParam = CompParam::RATIO;
 }
@@ -53,7 +49,6 @@ GlobalEffectable::GlobalEffectable() {
 void GlobalEffectable::cloneFrom(ModControllableAudio* other) {
 	ModControllableAudio::cloneFrom(other);
 
-	currentModFXParam = ((GlobalEffectable*)other)->currentModFXParam;
 	currentFilterType = ((GlobalEffectable*)other)->currentFilterType;
 }
 
@@ -63,9 +58,6 @@ void GlobalEffectable::initParams(ParamManager* paramManager) {
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
 	unpatchedParams->kind = deluge::modulation::params::Kind::UNPATCHED_GLOBAL;
 
-	unpatchedParams->params[params::UNPATCHED_MOD_FX_RATE].setCurrentValueBasicForSetup(-536870912);
-	unpatchedParams->params[params::UNPATCHED_MOD_FX_FEEDBACK].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
-	unpatchedParams->params[params::UNPATCHED_MOD_FX_DEPTH].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_PAN].setCurrentValueBasicForSetup(0);
 
 	unpatchedParams->params[params::UNPATCHED_VOLUME].setCurrentValueBasicForSetup(889516852); // 3/4 of the way up
@@ -102,10 +94,6 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 	// Compressor
 	else if (whichModButton == 4) {
 		displayCompressorSettings(on);
-	}
-	// Mod FX
-	else if (whichModButton == 5) {
-		displayModFXSettings(on);
 	}
 	// Stutter / Custom 1
 	else if (whichModButton == 6) {
@@ -205,75 +193,6 @@ char const* GlobalEffectable::getCompressorParamDisplayName() {
 	return params[int(currentCompParam)];
 }
 
-void GlobalEffectable::displayModFXSettings(bool on) {
-	if (display->haveOLED()) {
-		if (on) {
-			DEF_STACK_STRING_BUF(popupMsg, 100);
-			popupMsg.append("Type: ");
-			popupMsg.append(getModFXTypeDisplayName());
-
-			popupMsg.append("\nParam: ");
-			popupMsg.append(getModFXParamDisplayName());
-
-			display->popupText(popupMsg.c_str());
-		}
-		else {
-			display->cancelPopup();
-		}
-	}
-	else {
-		if (on) {
-			display->displayPopup(getModFXTypeDisplayName());
-		}
-		else {
-			display->displayPopup(getModFXParamDisplayName());
-		}
-	}
-}
-
-char const* GlobalEffectable::getModFXTypeDisplayName() {
-	auto modTypeCount =
-	    (runtimeFeatureSettings.get(RuntimeFeatureSettingType::EnableGrainFX) == RuntimeFeatureStateToggle::Off)
-	        ? (kNumModFXTypes - 1)
-	        : kNumModFXTypes;
-
-	modFXType = static_cast<ModFXType>(util::to_underlying(modFXType) % modTypeCount);
-	if (modFXType == ModFXType::NONE) {
-		modFXType = static_cast<ModFXType>(1);
-	}
-	switch (modFXType) {
-		using enum deluge::l10n::String;
-	case ModFXType::FLANGER:
-		return l10n::get(STRING_FOR_FLANGER);
-	case ModFXType::PHASER:
-		return l10n::get(STRING_FOR_PHASER);
-	case ModFXType::CHORUS:
-		return l10n::get(STRING_FOR_CHORUS);
-	case ModFXType::CHORUS_STEREO:
-		return l10n::get(STRING_FOR_STEREO_CHORUS);
-	case ModFXType::GRAIN:
-		return l10n::get(STRING_FOR_GRAIN);
-	default:
-		return l10n::get(STRING_FOR_NONE);
-	}
-}
-
-char const* GlobalEffectable::getModFXParamDisplayName() {
-	currentModFXParam = static_cast<ModFXParam>(util::to_underlying(currentModFXParam) % kNumModFXParams);
-
-	switch (currentModFXParam) {
-		using enum deluge::l10n::String;
-	case ModFXParam::DEPTH:
-		return l10n::get(STRING_FOR_DEPTH);
-	case ModFXParam::FEEDBACK:
-		return l10n::get(STRING_FOR_FEEDBACK);
-	case ModFXParam::OFFSET:
-		return l10n::get(STRING_FOR_OFFSET);
-	default:
-		return l10n::get(STRING_FOR_NONE);
-	}
-}
-
 // Returns whether Instrument changed
 bool GlobalEffectable::modEncoderButtonAction(uint8_t whichModEncoder, bool on,
                                               ModelStackWithThreeMainThings* modelStack) {
@@ -289,55 +208,6 @@ bool GlobalEffectable::modEncoderButtonAction(uint8_t whichModEncoder, bool on,
 			endStutter((ParamManagerForTimeline*)modelStack->paramManager);
 		}
 		return false;
-	}
-
-	// Mod FX section
-	else if (modKnobMode == 5) {
-		if (whichModEncoder == 1) {
-			if (on) {
-				auto modTypeCount = (runtimeFeatureSettings.get(RuntimeFeatureSettingType::EnableGrainFX)
-				                     == RuntimeFeatureStateToggle::Off)
-				                        ? (kNumModFXTypes - 1)
-				                        : kNumModFXTypes;
-				modFXType = static_cast<ModFXType>((util::to_underlying(modFXType) + 1) % modTypeCount);
-				if (modFXType == ModFXType::NONE) {
-					modFXType = static_cast<ModFXType>(1);
-				}
-				ensureModFXParamIsValid();
-
-				// if mod button is pressed, update mod button pop up
-				if (Buttons::isButtonPressed(
-				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displayModFXSettings(on);
-				}
-				else {
-					display->displayPopup(getModFXTypeDisplayName());
-				}
-				return true;
-			}
-			else {
-				return false;
-			}
-		}
-		else {
-			if (on) {
-				currentModFXParam =
-				    static_cast<ModFXParam>((util::to_underlying(currentModFXParam) + 1) % kNumModFXParams);
-				ensureModFXParamIsValid();
-
-				// if mod button is pressed, update mod button pop up
-				if (Buttons::isButtonPressed(
-				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displayModFXSettings(on);
-				}
-				else {
-					display->displayPopup(getModFXParamDisplayName());
-				}
-				return true;
-			}
-
-			return false;
-		}
 	}
 
 	// Filter section
@@ -653,22 +523,6 @@ int32_t GlobalEffectable::getParameterFromKnob(int32_t whichModEncoder) {
 		// Encoder 0 here selects comp params via clicks; no continuous param while
 		// not editing the compressor.
 	}
-	else if (modKnobMode == 5) {
-		if (whichModEncoder != 0) {
-			return params::UNPATCHED_MOD_FX_RATE;
-		}
-		else {
-			if (currentModFXParam == ModFXParam::DEPTH) {
-				return params::UNPATCHED_MOD_FX_DEPTH;
-			}
-			else if (currentModFXParam == ModFXParam::OFFSET) {
-				return params::UNPATCHED_MOD_FX_OFFSET;
-			}
-			else {
-				return params::UNPATCHED_MOD_FX_FEEDBACK;
-			}
-		}
-	}
 	else if (modKnobMode == 6) { // Stutter / Custom 1
 		if (custom1Shifted) {
 			if (whichModEncoder == 1) {
@@ -727,35 +581,6 @@ ModelStackWithAutoParam* GlobalEffectable::getParamFromModEncoder(int32_t whichM
 	}
 }
 
-ModFXType GlobalEffectable::getModFXType() {
-	return modFXType;
-}
-
-void GlobalEffectable::ensureModFXParamIsValid() {
-	while (true) {
-		if (currentModFXParam == ModFXParam::DEPTH) {
-			if (modFXType == ModFXType::FLANGER) {
-				goto ohNo;
-			}
-		}
-		else if (currentModFXParam == ModFXParam::OFFSET) {
-			if (modFXType != ModFXType::CHORUS && modFXType != ModFXType::CHORUS_STEREO
-			    && modFXType != ModFXType::GRAIN) {
-				goto ohNo;
-			}
-		}
-		else { // ModFXParam::FEEDBACK
-			if (modFXType == ModFXType::CHORUS || modFXType == ModFXType::CHORUS_STEREO) {
-				goto ohNo;
-			}
-		}
-		return; // If we got here, we're fine
-
-ohNo:
-		currentModFXParam = static_cast<ModFXParam>((util::to_underlying(currentModFXParam) + 1) % kNumModFXParams);
-	}
-}
-
 void GlobalEffectable::setupFilterSetConfig(int32_t* postFXVolume, ParamManager* paramManager) {
 
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
@@ -796,7 +621,6 @@ void GlobalEffectable::setupFilterSetConfig(int32_t* postFXVolume, ParamManager*
 }
 
 void GlobalEffectable::writeAttributesToFile(Serializer& writer, bool writeAutomation) {
-	writer.writeAttribute("modFXCurrentParam", (char*)modFXParamToString(currentModFXParam));
 	writer.writeAttribute("currentFilterType", (char*)filterTypeToString(currentFilterType));
 	ModControllableAudio::writeAttributesToFile(writer);
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
@@ -837,11 +661,6 @@ void GlobalEffectable::writeParamAttributesToFile(Serializer& writer, ParamManag
 
 	unpatchedParams->writeParamAsAttribute(writer, "sidechainCompressorShape", params::UNPATCHED_SIDECHAIN_SHAPE,
 	                                       writeAutomation, false, valuesForOverride);
-
-	unpatchedParams->writeParamAsAttribute(writer, "modFXDepth", params::UNPATCHED_MOD_FX_DEPTH, writeAutomation, false,
-	                                       valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "modFXRate", params::UNPATCHED_MOD_FX_RATE, writeAutomation, false,
-	                                       valuesForOverride);
 
 	ModControllableAudio::writeParamAttributesToFile(writer, paramManager, writeAutomation, valuesForOverride);
 
@@ -980,18 +799,6 @@ bool GlobalEffectable::readParamTagFromFile(Deserializer& reader, char const* ta
 		reader.exitTag("pitchAdjust");
 	}
 
-	else if (!strcmp(tagName, "modFXDepth")) {
-		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MOD_FX_DEPTH,
-		                           readAutomationUpToPos);
-		reader.exitTag("modFXDepth");
-	}
-
-	else if (!strcmp(tagName, "modFXRate")) {
-		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_MOD_FX_RATE,
-		                           readAutomationUpToPos);
-		reader.exitTag("modFXRate");
-	}
-
 	else if (ModControllableAudio::readParamTagFromFile(reader, tagName, paramManager, readAutomationUpToPos)) {}
 
 	else {
@@ -1023,16 +830,6 @@ Error GlobalEffectable::readTagFromFile(Deserializer& reader, char const* tagNam
 
 		GlobalEffectable::readParamsFromFile(reader, paramManager, readAutomationUpToPos);
 		reader.exitTag("defaultParams");
-	}
-
-	else if (!strcmp(tagName, "modFXType")) {
-		modFXType = stringToFXType(reader.readTagOrAttributeValue());
-		reader.exitTag("modFXType");
-	}
-
-	else if (!strcmp(tagName, "modFXCurrentParam")) {
-		currentModFXParam = stringToModFXParam(reader.readTagOrAttributeValue());
-		reader.exitTag("modFXCurrentParam");
 	}
 
 	else if (!strcmp(tagName, "currentFilterType")) {
@@ -1067,98 +864,4 @@ void GlobalEffectable::compensateVolumeForResonance(ParamManagerForTimeline* par
 	    && !unpatchedParams->params[params::UNPATCHED_LPF_RES].containsSomething(-1073741824)) {
 		unpatchedParams->params[params::UNPATCHED_HPF_RES].currentValue = -2147483648;
 	}
-}
-
-ModFXType GlobalEffectable::getActiveModFXType(ParamManager* paramManager) {
-	ModFXType modFXTypeNow = modFXType;
-
-	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
-
-	if ((currentModFXParam == ModFXParam::DEPTH
-	     && unpatchedParams->getValue(params::UNPATCHED_MOD_FX_DEPTH) == -2147483648)
-	    || (currentModFXParam == ModFXParam::FEEDBACK
-	        && unpatchedParams->getValue(params::UNPATCHED_MOD_FX_FEEDBACK) == -2147483648)
-	    || (currentModFXParam == ModFXParam::OFFSET
-	        && unpatchedParams->getValue(params::UNPATCHED_MOD_FX_OFFSET) == -2147483648)) {
-		modFXTypeNow = ModFXType::NONE;
-	}
-	return modFXTypeNow;
-}
-
-void GlobalEffectable::processFXForGlobalEffectable(StereoSample* inputBuffer, int32_t numSamples,
-                                                    int32_t* postFXVolume, ParamManager* paramManager,
-                                                    bool grainHadInput) {
-
-	StereoSample* inputBufferEnd = inputBuffer + numSamples;
-
-	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
-
-	int32_t modFXRate =
-	    getFinalParameterValueExp(paramNeutralValues[params::GLOBAL_MOD_FX_RATE],
-	                              cableToExpParamShortcut(unpatchedParams->getValue(params::UNPATCHED_MOD_FX_RATE)));
-	int32_t modFXDepth = getFinalParameterValueVolume(
-	    paramNeutralValues[params::GLOBAL_MOD_FX_DEPTH],
-	    cableToLinearParamShortcut(unpatchedParams->getValue(params::UNPATCHED_MOD_FX_DEPTH)));
-
-	ModFXType modFXTypeNow = getActiveModFXType(paramManager);
-
-	// For GlobalEffectables, mod FX buffer memory is allocated here in the rendering routine - this might seem
-	// strange, but it's because unlike for Sounds, the effect can be switched on and off by changing a parameter
-	// like "depth".
-	if (modFXTypeNow == ModFXType::FLANGER || modFXTypeNow == ModFXType::CHORUS
-	    || modFXTypeNow == ModFXType::CHORUS_STEREO) {
-		if (!modFXBuffer) {
-			modFXBuffer =
-			    (StereoSample*)GeneralMemoryAllocator::get().allocLowSpeed(kModFXBufferSize * sizeof(StereoSample));
-			if (!modFXBuffer) {
-				modFXTypeNow = ModFXType::NONE;
-			}
-			else {
-				memset(modFXBuffer, 0, kModFXBufferSize * sizeof(StereoSample));
-			}
-		}
-		if (modFXGrainBuffer) {
-			delugeDealloc(modFXGrainBuffer);
-			modFXGrainBuffer = NULL;
-		}
-	}
-	else if (modFXTypeNow == ModFXType::GRAIN) {
-		if (grainHadInput) {
-			setWrapsToShutdown();
-		}
-		if (wrapsToShutdown >= 0) {
-			if (!modFXGrainBuffer) {
-				modFXGrainBuffer = (StereoSample*)GeneralMemoryAllocator::get().allocLowSpeed(kModFXGrainBufferSize
-				                                                                              * sizeof(StereoSample));
-				if (!modFXGrainBuffer) {
-					modFXTypeNow = ModFXType::NONE;
-				}
-				for (int i = 0; i < 8; i++) {
-					grains[i].length = 0;
-				}
-				grainInitialized = false;
-				modFXGrainBufferWriteIndex = 0;
-			}
-			if (modFXBuffer) {
-				delugeDealloc(modFXBuffer);
-				modFXBuffer = NULL;
-			}
-		}
-		else if (modFXGrainBuffer) {
-			delugeDealloc(modFXGrainBuffer);
-			modFXGrainBuffer = NULL;
-		}
-	}
-	else {
-		if (modFXBuffer) {
-			delugeDealloc(modFXBuffer);
-			modFXBuffer = NULL;
-		}
-		if (modFXGrainBuffer) {
-			delugeDealloc(modFXGrainBuffer);
-			modFXGrainBuffer = NULL;
-		}
-	}
-
-	processFX(inputBuffer, numSamples, modFXTypeNow, modFXRate, modFXDepth, postFXVolume, paramManager);
 }

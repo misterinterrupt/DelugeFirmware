@@ -36,8 +36,6 @@ public:
 	void setupFilterSetConfig(int32_t* postFXVolume, ParamManager* paramManager);
 	void processFilters(StereoSample* buffer, int32_t numSamples);
 	void compensateVolumeForResonance(ParamManagerForTimeline* paramManager);
-	void processFXForGlobalEffectable(StereoSample* inputBuffer, int32_t numSamples, int32_t* postFXVolume,
-	                                  ParamManager* paramManager, bool grainHadInput = true);
 
 	void writeAttributesToFile(Serializer& writer, bool writeToFile);
 	void writeTagsToFile(Serializer& writer, ParamManager* paramManager, bool writeToFile);
@@ -56,24 +54,16 @@ public:
 	ActionResult modEncoderActionForNonExistentParam(int32_t offset, int32_t whichModEncoder,
 	                                                 ModelStackWithAutoParam* modelStack) override;
 	dsp::filter::FilterSet filterSet;
-	ModFXParam currentModFXParam;
 	FilterType currentFilterType;
 	bool editingComp;
 	CompParam currentCompParam;
 
-	ModFXType getModFXType();
-
 protected:
 	int maxCompParam = 0;
 	virtual int32_t getParameterFromKnob(int32_t whichModEncoder);
-	ModFXType getActiveModFXType(ParamManager* paramManager);
 
 private:
-	void ensureModFXParamIsValid();
 	void displayCompressorSettings(bool on);
 	char const* getCompressorModeDisplayName();
 	char const* getCompressorParamDisplayName();
-	void displayModFXSettings(bool on);
-	char const* getModFXTypeDisplayName();
-	char const* getModFXParamDisplayName();
 };

@@ -416,17 +416,6 @@ enum class SynthMode : uint8_t {
 };
 constexpr int kNumSynthModes = util::to_underlying(::SynthMode::RINGMOD) + 1;
 
-enum class ModFXType : uint8_t {
-	NONE,
-	FLANGER,
-	CHORUS,
-	PHASER,
-	CHORUS_STEREO,
-	GRAIN, // Look below if you want to add another one
-};
-
-// Warning: Currently GRAIN can be disabled and kNumModFXTypes might need to be used - 1
-constexpr int32_t kNumModFXTypes = util::to_underlying(ModFXType::GRAIN) + 1;
 
 constexpr int32_t SAMPLE_MAX_TRANSPOSE = 24;
 constexpr int32_t SAMPLE_MIN_TRANSPOSE = (-96);
@@ -549,11 +538,6 @@ enum class ArpMpeModSource {
 	MPE_Y,
 };
 
-enum class ModFXParam {
-	DEPTH,
-	FEEDBACK,
-	OFFSET,
-};
 
 enum class CompParam {
 	RATIO,
@@ -563,8 +547,6 @@ enum class CompParam {
 	BLEND,
 	LAST,
 };
-
-constexpr auto kNumModFXParams = util::to_underlying(ModFXParam::OFFSET) + 1;
 
 enum class PatchCableAcceptance {
 	DISALLOWED,

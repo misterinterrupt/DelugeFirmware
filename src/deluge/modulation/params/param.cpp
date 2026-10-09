@@ -104,9 +104,7 @@ char const* getPatchedParamShortName(ParamType type) {
 	    [LOCAL_ENV_1_RELEASE]            = "Env2 rel",
 	    [GLOBAL_VOLUME_POST_FX]          = "POSTFXLVL",
 	    [GLOBAL_VOLUME_POST_REVERB_SEND] = "Side level",
-	    [GLOBAL_MOD_FX_DEPTH]            = "ModFXdepth",
 	    [FIRST_GLOBAL_NON_VOLUME]        = "", // enum anchor: no named param lives here (tables must stay gap-free)
-	    [GLOBAL_MOD_FX_RATE]             = "ModFX rate",
 	    [GLOBAL_LFO_FREQ]                = "LFO1 rate",
 	    [GLOBAL_ARP_RATE]                = "Arp. rate",
 	};
@@ -163,9 +161,7 @@ char const* getPatchedParamDisplayName(int32_t p) {
 	    [LOCAL_ENV_1_RELEASE] = STRING_FOR_PARAM_LOCAL_ENV_1_RELEASE,
 	    [GLOBAL_VOLUME_POST_FX] = STRING_FOR_PARAM_GLOBAL_VOLUME_POST_FX,
 	    [GLOBAL_VOLUME_POST_REVERB_SEND] = STRING_FOR_PARAM_GLOBAL_VOLUME_POST_REVERB_SEND,
-	    [GLOBAL_MOD_FX_DEPTH] = STRING_FOR_PARAM_GLOBAL_MOD_FX_DEPTH,
 	    [FIRST_GLOBAL_NON_VOLUME] = STRING_FOR_NONE, // enum anchor, tables must stay gap-free
-	    [GLOBAL_MOD_FX_RATE] = STRING_FOR_PARAM_GLOBAL_MOD_FX_RATE,
 	    [GLOBAL_LFO_FREQ] = STRING_FOR_PARAM_GLOBAL_LFO_FREQ,
 	    [GLOBAL_ARP_RATE] = STRING_FOR_PARAM_GLOBAL_ARP_RATE,
 	};
@@ -194,8 +190,6 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		    [UNPATCHED_TREBLE_FREQ] = STRING_FOR_TREBLE_FREQUENCY,
 		    [UNPATCHED_SAMPLE_RATE_REDUCTION] = STRING_FOR_DECIMATION,
 		    [UNPATCHED_BITCRUSHING] = STRING_FOR_BITCRUSH,
-		    [UNPATCHED_MOD_FX_OFFSET] = STRING_FOR_MODFX_OFFSET,
-		    [UNPATCHED_MOD_FX_FEEDBACK] = STRING_FOR_MODFX_FEEDBACK,
 		    [UNPATCHED_SIDECHAIN_SHAPE] = STRING_FOR_SIDECHAIN_SHAPE,
 		    [UNPATCHED_COMPRESSOR_THRESHOLD] = STRING_FOR_THRESHOLD,
 		    [UNPATCHED_COMPRESSOR_RATIO] = STRING_FOR_RATIO,
@@ -230,8 +224,6 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		using enum UnpatchedGlobal;
 
 		static l10n::String const NAMES[UNPATCHED_GLOBAL_MAX_NUM - unc]{
-		    [UNPATCHED_MOD_FX_RATE - unc] = STRING_FOR_MOD_FX_RATE,
-		    [UNPATCHED_MOD_FX_DEPTH - unc] = STRING_FOR_MOD_FX_DEPTH,
 		    [UNPATCHED_PAN - unc] = STRING_FOR_PAN,
 		    [UNPATCHED_LPF_FREQ - unc] = STRING_FOR_LPF_FREQUENCY,
 		    [UNPATCHED_LPF_RES - unc] = STRING_FOR_LPF_RESONANCE,
@@ -273,7 +265,6 @@ bool paramNeedsLPF(ParamType p, bool fromAutomation) {
 	case params::LOCAL_MODULATOR_1_FEEDBACK:
 	case params::LOCAL_CARRIER_0_FEEDBACK:
 	case params::LOCAL_CARRIER_1_FEEDBACK:
-	case params::GLOBAL_MOD_FX_DEPTH:
 		return true;
 
 	default:
@@ -312,12 +303,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 	else if (kind == UNPATCHED_GLOBAL && param >= UNPATCHED_START + UNPATCHED_NUM_SHARED) {
 		// Params for GlobalEffectable
 		switch (static_cast<UnpatchedGlobal>(param - UNPATCHED_START)) {
-		case UNPATCHED_MOD_FX_RATE:
-			return "modFXRate";
-
-		case UNPATCHED_MOD_FX_DEPTH:
-			return "modFXDepth";
-
 		case UNPATCHED_PAN:
 			return "pan";
 
@@ -372,11 +357,7 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 		case UNPATCHED_BITCRUSHING:
 			return "bitcrushAmount";
 
-		case UNPATCHED_MOD_FX_OFFSET:
-			return "modFXOffset";
 
-		case UNPATCHED_MOD_FX_FEEDBACK:
-			return "modFXFeedback";
 
 		case UNPATCHED_SIDECHAIN_SHAPE:
 			return "compressorShape";
@@ -420,11 +401,7 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 		case GLOBAL_VOLUME_POST_REVERB_SEND:
 			return "volumePostReverbSend";
 
-		case GLOBAL_MOD_FX_RATE:
-			return "modFXRate";
 
-		case GLOBAL_MOD_FX_DEPTH:
-			return "modFXDepth";
 
 		case GLOBAL_ARP_RATE:
 			return "arpRate";

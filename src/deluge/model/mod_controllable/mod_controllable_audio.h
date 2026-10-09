@@ -81,8 +81,6 @@ public:
 	virtual void wontBeRenderedForAWhile();
 	void beginStutter(ParamManagerForTimeline* paramManager);
 	void endStutter(ParamManagerForTimeline* paramManager);
-	virtual ModFXType getModFXType() = 0;
-	virtual bool setModFXType(ModFXType newType);
 	bool offerReceivedCCToLearnedParamsForClip(MIDIDevice* fromDevice, uint8_t channel, uint8_t ccNumber, uint8_t value,
 	                                           ModelStackWithTimelineCounter* modelStack, int32_t noteRowIndex = -1);
 	bool offerReceivedCCToLearnedParamsForSong(MIDIDevice* fromDevice, uint8_t channel, uint8_t ccNumber, uint8_t value,
@@ -120,31 +118,11 @@ public:
 	FilterMode hpfMode;
 	FilterRoute filterRoute;
 
-	// Mod FX
-	ModFXType modFXType;
-	StereoSample* modFXBuffer;
-	uint16_t modFXBufferWriteIndex;
-	LFO modFXLFO;
 
 	RMSFeedbackCompressor compressor;
 	bool custom1Shifted = false;
 	bool custom3Shifted = false;
 
-	// Grain
-	int32_t wrapsToShutdown;
-	void setWrapsToShutdown();
-	StereoSample* modFXGrainBuffer;
-	uint32_t modFXGrainBufferWriteIndex;
-	int32_t grainSize;
-	int32_t grainRate;
-	int32_t grainShift;
-	Grain grains[8];
-	int32_t grainFeedbackVol;
-	int32_t grainVol;
-	int32_t grainDryVol;
-	int8_t grainPitchType;
-	bool grainLastTickCountIsZero;
-	bool grainInitialized;
 
 	uint32_t lowSampleRatePos;
 	uint32_t highSampleRatePos;
@@ -158,11 +136,8 @@ public:
 	int32_t postReverbVolumeLastTime;
 
 protected:
-	void processFX(StereoSample* buffer, int32_t numSamples, ModFXType modFXType, int32_t modFXRate, int32_t modFXDepth,
-	               int32_t* postFXVolume, ParamManager* paramManager);
 	void switchLPFMode();
 	void switchHPFMode();
-	void clearModFXMemory();
 
 	/// What kind of unpatched parameters this ModControllable uses.
 	///

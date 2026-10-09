@@ -118,8 +118,8 @@ const uint32_t mutePadActionUIModes[] = {UI_MODE_NOTES_PRESSED, UI_MODE_AUDITION
 
 const uint32_t verticalScrollUIModes[] = {UI_MODE_NOTES_PRESSED, UI_MODE_AUDITIONING, UI_MODE_RECORD_COUNT_IN, 0};
 
-constexpr int32_t kNumNonGlobalParamsForAutomation = 57;
-constexpr int32_t kNumGlobalParamsForAutomation = 23;
+constexpr int32_t kNumNonGlobalParamsForAutomation = 53;
+constexpr int32_t kNumGlobalParamsForAutomation = 21;
 constexpr int32_t kParamNodeWidth = 3;
 
 // synth and kit rows FX - sorted in the order that Parameters are scrolled through on the display
@@ -183,10 +183,6 @@ const std::array<std::pair<params::Kind, ParamType>, kNumNonGlobalParamsForAutom
     // LFO 2 Freq
     {params::Kind::PATCHED, params::LOCAL_LFO_LOCAL_FREQ},
     // Mod FX Offset, Feedback, Depth, Rate
-    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_MOD_FX_OFFSET},
-    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_MOD_FX_FEEDBACK},
-    {params::Kind::PATCHED, params::GLOBAL_MOD_FX_DEPTH},
-    {params::Kind::PATCHED, params::GLOBAL_MOD_FX_RATE},
     // Arp Rate, Gate, Ratchet Prob, Ratchet Amount, Sequence Length, Rhythm
     {params::Kind::PATCHED, params::GLOBAL_ARP_RATE},
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_ARP_GATE},
@@ -231,11 +227,6 @@ const std::array<std::pair<params::Kind, ParamType>, kNumGlobalParamsForAutomati
     // Decimation, Bitcrush
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SAMPLE_RATE_REDUCTION},
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_BITCRUSHING},
-    // Mod FX Offset, Feedback, Depth, Rate
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_MOD_FX_OFFSET},
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_MOD_FX_FEEDBACK},
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_MOD_FX_DEPTH},
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_MOD_FX_RATE},
     // Stutter Rate
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_STUTTER_RATE},
     // Compressor Threshold

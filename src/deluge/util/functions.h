@@ -154,11 +154,7 @@ SynthMode stringToSynthMode(char const* string);
 char const* polyphonyModeToString(PolyphonyMode synthMode);
 PolyphonyMode stringToPolyphonyMode(char const* string);
 
-char const* fxTypeToString(ModFXType fxType);
-ModFXType stringToFXType(char const* string);
 
-char const* modFXParamToString(ModFXParam fxType);
-ModFXParam stringToModFXParam(char const* string);
 
 char const* filterTypeToString(FilterType fxType);
 FilterType stringToFilterType(char const* string);

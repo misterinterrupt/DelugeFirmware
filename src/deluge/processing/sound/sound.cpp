@@ -106,7 +106,6 @@ Sound::Sound() : patcher(&patchableInfoForSound) {
 	modulatorCents[1] = 0;
 
 	transpose = 0;
-	modFXType = ModFXType::NONE;
 
 	oscillatorSync = false;
 
@@ -165,7 +164,6 @@ void Sound::initParams(ParamManager* paramManager) {
 	unpatchedParams->params[params::UNPATCHED_ARP_RATCHET_AMOUNT].setCurrentValueBasicForSetup(-2147483648);
 	unpatchedParams->params[params::UNPATCHED_ARP_SEQUENCE_LENGTH].setCurrentValueBasicForSetup(-2147483648);
 	unpatchedParams->params[params::UNPATCHED_ARP_RHYTHM].setCurrentValueBasicForSetup(-2147483648);
-	unpatchedParams->params[params::UNPATCHED_MOD_FX_FEEDBACK].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_PORTAMENTO].setCurrentValueBasicForSetup(-2147483648);
 
 	PatchedParamSet* patchedParams = paramManager->getPatchedParamSet();
@@ -203,8 +201,6 @@ void Sound::initParams(ParamManager* paramManager) {
 	    getParamFromUserValue(params::GLOBAL_LFO_FREQ, 30));
 	patchedParams->params[params::LOCAL_PAN].setCurrentValueBasicForSetup(0);
 	patchedParams->params[params::LOCAL_NOISE_VOLUME].setCurrentValueBasicForSetup(-2147483648);
-	patchedParams->params[params::GLOBAL_MOD_FX_DEPTH].setCurrentValueBasicForSetup(0);
-	patchedParams->params[params::GLOBAL_MOD_FX_RATE].setCurrentValueBasicForSetup(0);
 	patchedParams->params[params::LOCAL_OSC_A_PITCH_ADJUST].setCurrentValueBasicForSetup(0);       // Don't change
 	patchedParams->params[params::LOCAL_OSC_B_PITCH_ADJUST].setCurrentValueBasicForSetup(0);       // Don't change
 	patchedParams->params[params::LOCAL_MODULATOR_0_PITCH_ADJUST].setCurrentValueBasicForSetup(0); // Don't change
@@ -345,55 +341,6 @@ void Sound::setupAsBlankSynth(ParamManager* paramManager, bool is_dx) {
 	setupDefaultExpressionPatching(paramManager);
 
 	doneReadingFromFile();
-}
-
-ModFXType Sound::getModFXType() {
-	return modFXType;
-}
-
-// Returns false if not enough ram
-bool Sound::setModFXType(ModFXType newType) {
-	if (newType == ModFXType::FLANGER || newType == ModFXType::CHORUS || newType == ModFXType::CHORUS_STEREO) {
-		if (!modFXBuffer) {
-			// TODO: should give an error here if no free ram
-			modFXBuffer =
-			    (StereoSample*)GeneralMemoryAllocator::get().allocLowSpeed(kModFXBufferSize * sizeof(StereoSample));
-			if (!modFXBuffer) {
-				return false;
-			}
-		}
-		if (modFXGrainBuffer) {
-			delugeDealloc(modFXGrainBuffer);
-			modFXGrainBuffer = NULL;
-		}
-	}
-	else if (newType == ModFXType::GRAIN) {
-		if (!modFXGrainBuffer) {
-			modFXGrainBuffer = (StereoSample*)GeneralMemoryAllocator::get().allocLowSpeed(kModFXGrainBufferSize
-			                                                                              * sizeof(StereoSample));
-			if (!modFXGrainBuffer) {
-				return false;
-			}
-		}
-		if (modFXBuffer) {
-			delugeDealloc(modFXBuffer);
-			modFXBuffer = NULL;
-		}
-	}
-	else {
-		if (modFXBuffer) {
-			delugeDealloc(modFXBuffer);
-			modFXBuffer = NULL;
-		}
-		if (modFXGrainBuffer) {
-			delugeDealloc(modFXGrainBuffer);
-			modFXGrainBuffer = NULL;
-		}
-	}
-
-	modFXType = newType;
-	clearModFXMemory();
-	return true;
 }
 
 void Sound::patchedParamPresetValueChanged(uint8_t p, ModelStackWithSoundFlags* modelStack, int32_t oldValue,
@@ -1018,66 +965,6 @@ Error Sound::readTagFromFile(Deserializer& reader, char const* tagName, ParamMan
 		ENSURE_PARAM_MANAGER_EXISTS
 		patchedParams->readParam(reader, patchedParamsSummary, params::LOCAL_PITCH_ADJUST, readAutomationUpToPos);
 		reader.exitTag("pitchAdjust");
-	}
-
-	else if (!strcmp(tagName, "modFXType")) {
-		bool result =
-		    setModFXType(stringToFXType(reader.readTagOrAttributeValue())); // This might not work if not enough RAM
-		if (!result) {
-			display->displayError(Error::INSUFFICIENT_RAM);
-		}
-		reader.exitTag("modFXType");
-	}
-
-	else if (!strcmp(tagName, "fx")) {
-		while (*(tagName = reader.readNextTagOrAttributeName())) {
-
-			if (!strcmp(tagName, "type")) {
-				bool result = setModFXType(
-				    stringToFXType(reader.readTagOrAttributeValue())); // This might not work if not enough RAM
-				if (!result) {
-					display->displayError(Error::INSUFFICIENT_RAM);
-				}
-				reader.exitTag("type");
-			}
-			else if (!strcmp(tagName, "rate")) {
-				ENSURE_PARAM_MANAGER_EXISTS
-				patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_MOD_FX_RATE,
-				                         readAutomationUpToPos);
-				reader.exitTag("rate");
-			}
-			else if (!strcmp(tagName, "feedback")) {
-				// This is for compatibility with old files. Some reverse calculation needs to be done.
-				int32_t finalValue = reader.readTagOrAttributeValueInt();
-				int32_t i =
-				    (1 - pow(1 - ((float)finalValue / 2147483648), (float)1 / 3)) / 0.74 * 4294967296 - 2147483648;
-				ENSURE_PARAM_MANAGER_EXISTS
-				paramManager->getUnpatchedParamSet()
-				    ->params[params::UNPATCHED_MOD_FX_FEEDBACK]
-				    .setCurrentValueBasicForSetup(i);
-				reader.exitTag("feedback");
-			}
-			else if (!strcmp(tagName, "offset")) {
-				// This is for compatibility with old files. Some reverse calculation needs to be done.
-				int32_t contents = reader.readTagOrAttributeValueInt();
-				int32_t value = ((int64_t)contents << 8) - 2147483648;
-				ENSURE_PARAM_MANAGER_EXISTS
-				paramManager->getUnpatchedParamSet()
-				    ->params[params::UNPATCHED_MOD_FX_OFFSET]
-				    .setCurrentValueBasicForSetup(value);
-				reader.exitTag("offset");
-			}
-			else if (!strcmp(tagName, "depth")) {
-				ENSURE_PARAM_MANAGER_EXISTS
-				patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_MOD_FX_DEPTH,
-				                         readAutomationUpToPos);
-				reader.exitTag("depth");
-			}
-			else {
-				reader.exitTag(tagName);
-			}
-		}
-		reader.exitTag("fx");
 	}
 
 	else if (!strcmp(tagName, "lfo1")) {
@@ -2002,7 +1889,7 @@ void Sound::sampleZoneChanged(MarkerType markerType, int32_t s, ModelStackWithSo
 
 // Unlike most functions, this one accepts modelStack as NULL, because when unassigning all voices e.g. on song swap, we
 // won't have it.
-void Sound::reassessRenderSkippingStatus(ModelStackWithSoundFlags* modelStack, bool shouldJustCutModFX) {
+void Sound::reassessRenderSkippingStatus(ModelStackWithSoundFlags* modelStack) {
 
 	// TODO: should get the caller to provide this, cos they usually already have it. In fact, should put this on the
 	// ModelStack, cos many deeper-nested functions called by this one need it too!
@@ -2015,53 +1902,19 @@ void Sound::reassessRenderSkippingStatus(ModelStackWithSoundFlags* modelStack, b
 	if (skippingStatusNow != skippingRendering) {
 
 		if (skippingStatusNow) {
-
-			// We wanna start, skipping, but if MOD fx are on...
-			if ((modFXType != ModFXType::NONE) || compressor.getThreshold() > 0) {
-
-				// If we didn't start the wait-time yet, start it now
+			// The compressor's release tail is the only remaining reason to wait
+			// before skipping.
+			if (compressor.getThreshold() > 0) {
 				if (!startSkippingRenderingAtTime) {
-
-					// But wait, first, maybe we actually have just been instructed to cut the MODFX tail
-					if (shouldJustCutModFX) {
-doCutModFXTail:
-						clearModFXMemory();
-						goto yupStartSkipping;
-					}
-
-					int32_t waitSamplesModfx = 0;
-					switch (modFXType) {
-					case ModFXType::CHORUS:
-						[[fallthrough]];
-					case ModFXType::CHORUS_STEREO:
-						waitSamplesModfx = 20 * 44;
-						break;
-					case ModFXType::GRAIN:
-						waitSamplesModfx = 350 * 441;
-						break;
-					default:
-						waitSamplesModfx = (90 * 441);
-					}
-					int32_t waitSamples = std::max(waitSamplesModfx, compressor.getReleaseMS() * 44);
+					int32_t waitSamples = compressor.getReleaseMS() * 44;
 					startSkippingRenderingAtTime = AudioEngine::audioSampleTimer + waitSamples;
 				}
-
-				// Or if already waiting, see if the wait is over yet
-				else {
-					if ((int32_t)(AudioEngine::audioSampleTimer - startSkippingRenderingAtTime) >= 0) {
-						startSkippingRenderingAtTime = 0;
-						goto yupStartSkipping;
-					}
-
-					// Ok, we wanted to check that before manually cutting the MODFX tail, to save time, but that's
-					// still an option...
-					if (shouldJustCutModFX) {
-						goto doCutModFXTail;
-					}
+				else if ((int32_t)(AudioEngine::audioSampleTimer - startSkippingRenderingAtTime) >= 0) {
+					startSkippingRenderingAtTime = 0;
+					startSkippingRendering(modelStack);
 				}
 			}
 			else {
-yupStartSkipping:
 				startSkippingRendering(modelStack);
 			}
 		}
@@ -2374,11 +2227,7 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 		postReverbVolumeLastTime = postReverbVolume;
 	}
 
-	int32_t modFXDepth = paramFinalValues[params::GLOBAL_MOD_FX_DEPTH - params::FIRST_GLOBAL];
-	int32_t modFXRate = paramFinalValues[params::GLOBAL_MOD_FX_RATE - params::FIRST_GLOBAL];
-
 	processSRRAndBitcrushing((StereoSample*)soundBuffer, numSamples, &postFXVolume, paramManager);
-	processFX((StereoSample*)soundBuffer, numSamples, modFXType, modFXRate, modFXDepth, &postFXVolume, paramManager);
 	processStutter((StereoSample*)soundBuffer, numSamples, paramManager);
 
 	processOutputVolume((StereoSample*)soundBuffer, numSamples, postFXVolume, postReverbVolume, 0, true);
@@ -2430,7 +2279,6 @@ void Sound::setSkippingRendering(bool newSkipping) {
 // Unusually, modelStack may be supplied as NULL, because when unassigning all voices e.g. on song swap, we won't have
 // it.
 void Sound::startSkippingRendering(ModelStackWithSoundFlags* modelStack) {
-	timeStartedSkippingRenderingModFX = AudioEngine::audioSampleTimer;
 	timeStartedSkippingRenderingLFO = AudioEngine::audioSampleTimer;
 	timeStartedSkippingRenderingArp = AudioEngine::audioSampleTimer;
 	// compressor.status = EnvelopeStage::OFF; // Was this doing anything? Have removed, to make all of this completely
@@ -2444,19 +2292,13 @@ void Sound::startSkippingRendering(ModelStackWithSoundFlags* modelStack) {
 void Sound::stopSkippingRendering(ArpeggiatorSettings* arpSettings) {
 	if (skippingRendering) {
 
-		int32_t modFXTimeOff = AudioEngine::audioSampleTimer
-		                       - timeStartedSkippingRenderingModFX; // This variable is a good indicator of whether it
-		                                                            // actually was skipping at all
+		int32_t timeOff = AudioEngine::audioSampleTimer - timeStartedSkippingRenderingLFO;
 
 		// If rendering was actually stopped for any length of time...
-		if (modFXTimeOff) {
+		if (timeOff) {
 
 			// Do LFO
-			globalLFO.tick(AudioEngine::audioSampleTimer - timeStartedSkippingRenderingLFO,
-			               getGlobalLFOPhaseIncrement());
-
-			// Do Mod FX
-			modFXLFO.tick(modFXTimeOff, paramFinalValues[params::GLOBAL_MOD_FX_RATE - params::FIRST_GLOBAL]);
+			globalLFO.tick(timeOff, getGlobalLFOPhaseIncrement());
 
 			// Do arp
 			getArpBackInTimeAfterSkippingRendering(arpSettings);
@@ -2470,8 +2312,6 @@ void Sound::stopSkippingRendering(ArpeggiatorSettings* arpSettings) {
 			}
 			// Special state to make it grab the actual value the first time it's rendered
 			postReverbVolumeLastTime = -1;
-
-			// clearModFXMemory(); // No need anymore, now we wait for this to basically empty before starting skipping
 		}
 
 		setSkippingRendering(false);
@@ -3838,14 +3678,6 @@ bool Sound::readParamTagFromFile(Deserializer& reader, char const* tagName, Para
 		                         readAutomationUpToPos);
 		reader.exitTag("mod2PitchAdjust");
 	}
-	else if (!strcmp(tagName, "modFXRate")) {
-		patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_MOD_FX_RATE, readAutomationUpToPos);
-		reader.exitTag("modFXRate");
-	}
-	else if (!strcmp(tagName, "modFXDepth")) {
-		patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_MOD_FX_DEPTH, readAutomationUpToPos);
-		reader.exitTag("modFXDepth");
-	}
 	else if (!strcmp(tagName, "arpeggiatorRate")) {
 		patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_ARP_RATE, readAutomationUpToPos);
 		reader.exitTag("arpeggiatorRate");
@@ -3915,8 +3747,6 @@ void Sound::writeParamsToFile(Serializer& writer, ParamManager* paramManager, bo
 	patchedParams->writeParamAsAttribute(writer, "mod2PitchAdjust", params::LOCAL_MODULATOR_1_PITCH_ADJUST,
 	                                     writeAutomation, true);
 
-	patchedParams->writeParamAsAttribute(writer, "modFXRate", params::GLOBAL_MOD_FX_RATE, writeAutomation);
-	patchedParams->writeParamAsAttribute(writer, "modFXDepth", params::GLOBAL_MOD_FX_DEPTH, writeAutomation);
 
 	patchedParams->writeParamAsAttribute(writer, "arpeggiatorRate", params::GLOBAL_ARP_RATE, writeAutomation);
 
@@ -4504,8 +4334,7 @@ void Sound::wontBeRenderedForAWhile() {
 	getArp()->reset(); // Surely this shouldn't be quite necessary?
 	sidechain.status = EnvelopeStage::OFF;
 
-	// Tell it to just cut the MODFX tail - we needa change status urgently!
-	reassessRenderSkippingStatus(NULL, true);
+	reassessRenderSkippingStatus(NULL);
 
 	// If it still thinks it's meant to be rendering, we did something wrong
 	if (ALPHA_OR_BETA_VERSION && !skippingRendering) {

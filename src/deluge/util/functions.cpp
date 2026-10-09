@@ -94,7 +94,6 @@ int32_t getParamNeutralValue(int32_t p) {
 
 	case params::GLOBAL_LFO_FREQ:
 	case params::LOCAL_LFO_LOCAL_FREQ:
-	case params::GLOBAL_MOD_FX_RATE:
 		return 121739; // lfoRateTable[userValue];
 
 	case params::LOCAL_LPF_RESONANCE:
@@ -139,9 +138,6 @@ int32_t getParamNeutralValue(int32_t p) {
 	case params::LOCAL_MODULATOR_1_PITCH_ADJUST:
 		return kMaxSampleValue; // Means we have space to 8x (3-octave-shift) the pitch if we want... (wait, I've since
 		                        // made it 16x smaller)
-
-	case params::GLOBAL_MOD_FX_DEPTH:
-		return 526133494; // 2% lower than 536870912
 
 	default:
 		return 0;
@@ -875,72 +871,6 @@ PolyphonyMode stringToPolyphonyMode(char const* string) {
 	}
 }
 
-char const* fxTypeToString(ModFXType fxType) {
-	switch (fxType) {
-	case ModFXType::FLANGER:
-		return "flanger";
-
-	case ModFXType::CHORUS:
-		return "chorus";
-
-	case ModFXType::CHORUS_STEREO:
-		return "StereoChorus";
-	case ModFXType::GRAIN:
-		return "grainFX";
-
-	case ModFXType::PHASER:
-		return "phaser";
-
-	default:
-		return "none";
-	}
-}
-
-ModFXType stringToFXType(char const* string) {
-	if (!strcmp(string, "flanger")) {
-		return ModFXType::FLANGER;
-	}
-	else if (!strcmp(string, "chorus")) {
-		return ModFXType::CHORUS;
-	}
-	else if (!strcmp(string, "StereoChorus")) {
-		return ModFXType::CHORUS_STEREO;
-	}
-	else if (!strcmp(string, "grainFX")) {
-		return ModFXType::GRAIN;
-	}
-	else if (!strcmp(string, "phaser")) {
-		return ModFXType::PHASER;
-	}
-	else {
-		return ModFXType::NONE;
-	}
-}
-
-char const* modFXParamToString(ModFXParam fxType) {
-	switch (fxType) {
-	case ModFXParam::DEPTH:
-		return "depth";
-
-	case ModFXParam::FEEDBACK:
-		return "feedback";
-
-	default:
-		return "offset";
-	}
-}
-
-ModFXParam stringToModFXParam(char const* string) {
-	if (!strcmp(string, "depth")) {
-		return ModFXParam::DEPTH;
-	}
-	else if (!strcmp(string, "feedback")) {
-		return ModFXParam::FEEDBACK;
-	}
-	else {
-		return ModFXParam::OFFSET;
-	}
-}
 
 char const* filterTypeToString(FilterType fxType) {
 	switch (fxType) {

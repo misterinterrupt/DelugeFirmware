@@ -62,10 +62,6 @@ using enum deluge::l10n::String;
 #include "gui/menu_item/lfo/rate.h"
 #include "gui/menu_item/lfo/sync.h"
 #include "gui/menu_item/lfo/type.h"
-#include "gui/menu_item/mod_fx/depth_patched.h"
-#include "gui/menu_item/mod_fx/feedback.h"
-#include "gui/menu_item/mod_fx/offset.h"
-#include "gui/menu_item/mod_fx/type.h"
 #include "gui/menu_item/modulator/destination.h"
 #include "gui/menu_item/voice/polyphony.h"
 #include "gui/menu_item/voice/priority.h"
@@ -84,7 +80,6 @@ using enum deluge::l10n::String;
 #include "gui/menu_item/audio_clip/reverse.h"
 #include "gui/menu_item/audio_clip/transpose.h"
 #include "gui/menu_item/audio_interpolation.h"
-#include "gui/menu_item/mod_fx/depth_unpatched.h"
 #include "gui/menu_item/unpatched_param/pan.h"
 #include "gui/menu_item/patched_param/pan.h"
 #include "gui/menu_item/synth_mode.h"
@@ -159,11 +154,6 @@ extern deluge::gui::menu_item::lfo::Rate lfo2RateMenu;
 extern deluge::gui::menu_item::lfo::Sync lfo2SyncMenu;
 extern deluge::gui::menu_item::lfo::Type lfo2TypeMenu;
 
-extern deluge::gui::menu_item::mod_fx::Type modFXTypeMenu;
-extern deluge::gui::menu_item::patched_param::Integer modFXRateMenu;
-extern deluge::gui::menu_item::mod_fx::Depth_Patched modFXDepthMenu;
-extern deluge::gui::menu_item::mod_fx::Feedback modFXFeedbackMenu;
-extern deluge::gui::menu_item::mod_fx::Offset modFXOffsetMenu;
 
 extern deluge::gui::menu_item::fx::Clipping clippingMenu;
 extern deluge::gui::menu_item::UnpatchedParam bitcrushMenu;
@@ -211,8 +201,6 @@ extern deluge::gui::menu_item::UnpatchedParam globalLPFMorphMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalHPFFreqMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalHPFResMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalHPFMorphMenu;
-extern deluge::gui::menu_item::UnpatchedParam globalModFXRateMenu;
-extern deluge::gui::menu_item::mod_fx::Depth_Unpatched globalModFXDepthMenu;
 extern deluge::gui::menu_item::unpatched_param::UpdatingReverbParams globalSidechainVolumeMenu;
 
 // Audio Clip specifics
@@ -290,10 +278,6 @@ static const VisualPage synthLfoPages[] = {
 };
 
 static const VisualPage synthFxPages[] = {
-    {"Mod FX", STRING_FOR_MOD_FX,
-     {{{&modFXTypeMenu, "TYPE"}, {&modFXRateMenu, "RATE"}, {&modFXDepthMenu, "DEPTH"}, {&modFXFeedbackMenu, "FDBK"}}}},
-    {"Mod FX Offset", STRING_FOR_MOD_FX,
-     {{{&modFXOffsetMenu, "OFFSET"}, {nullptr, ""}, {nullptr, ""}, {nullptr, ""}}}},
     {"Distortion", STRING_FOR_DISTORTION,
      {{{&clippingMenu, "CLIP"}, {&bitcrushMenu, "DECIM"}, {&srrMenu, "CRUSH"}, {&foldMenu, "FOLD"}}}},
     {"Compressor 1", STRING_FOR_COMMUNITY_FEATURE_MASTER_COMPRESSOR,
@@ -345,8 +329,6 @@ static const VisualPage audioClipFilterPages[] = {
 };
 
 static const VisualPage audioClipFxPages[] = {
-    {"Mod FX", STRING_FOR_MOD_FX,
-     {{{&modFXTypeMenu, "TYPE"}, {&globalModFXRateMenu, "RATE"}, {&globalModFXDepthMenu, "DEPTH"}, {&modFXFeedbackMenu, "FDBK"}}}},
     {"Distortion", STRING_FOR_DISTORTION,
      {{{&clippingMenu, "CLIP"}, {&bitcrushMenu, "DECIM"}, {&srrMenu, "CRUSH"}, {nullptr, ""}}}},
     {"Sidechain", STRING_FOR_SIDECHAIN,
