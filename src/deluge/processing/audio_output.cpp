@@ -58,16 +58,16 @@ void AudioOutput::cloneFrom(ModControllableAudio* other) {
 }
 
 void AudioOutput::renderOutput(ModelStack* modelStack, StereoSample* outputBuffer, StereoSample* outputBufferEnd,
-                               int32_t numSamples, int32_t* reverbBuffer, int32_t reverbAmountAdjust,
-                               int32_t sideChainHitPending, bool shouldLimitDelayFeedback, bool isClipActive) {
+                               int32_t numSamples, int32_t sideChainHitPending, bool shouldLimitDelayFeedback,
+                               bool isClipActive) {
 
 	ParamManager* paramManager = getParamManager(modelStack->song);
 
 	ModelStackWithTimelineCounter* modelStackWithTimelineCounter = modelStack->addTimelineCounter(activeClip);
 
 	GlobalEffectableForClip::renderOutput(modelStackWithTimelineCounter, paramManager, outputBuffer, numSamples,
-	                                      reverbBuffer, reverbAmountAdjust, sideChainHitPending,
-	                                      shouldLimitDelayFeedback, isClipActive, OutputType::AUDIO, recorder);
+	                                      sideChainHitPending, shouldLimitDelayFeedback, isClipActive,
+	                                      OutputType::AUDIO, recorder);
 }
 
 void AudioOutput::resetEnvelope() {
@@ -83,10 +83,10 @@ void AudioOutput::resetEnvelope() {
 
 // Beware - unlike usual, modelStack, a ModelStackWithThreeMainThings*,  might have a NULL timelineCounter
 bool AudioOutput::renderGlobalEffectableForClip(ModelStackWithTimelineCounter* modelStack, StereoSample* renderBuffer,
-                                                int32_t* bufferToTransferTo, int32_t numSamples, int32_t* reverbBuffer,
-                                                int32_t reverbAmountAdjust, int32_t sideChainHitPending,
-                                                bool shouldLimitDelayFeedback, bool isClipActive, int32_t pitchAdjust,
-                                                int32_t amplitudeAtStart, int32_t amplitudeAtEnd) {
+                                                int32_t* bufferToTransferTo, int32_t numSamples,
+                                                int32_t sideChainHitPending, bool shouldLimitDelayFeedback,
+                                                bool isClipActive, int32_t pitchAdjust, int32_t amplitudeAtStart,
+                                                int32_t amplitudeAtEnd) {
 	bool rendered = false;
 	// audio outputs can have an activeClip while being muted
 	if (isClipActive) {
@@ -286,8 +286,7 @@ renderEnvelope:
 		char modelStackMemory[MODEL_STACK_MAX_SIZE];
 		ModelStack* songModelStack = setupModelStackWithSong(modelStackMemory, currentSong);
 		outputRecordingFrom->renderOutput(songModelStack, outputBuffer, outputBuffer + numSamples, numSamples,
-		                                  reverbBuffer, reverbAmountAdjust, sideChainHitPending,
-		                                  shouldLimitDelayFeedback, isClipActive);
+		                                  sideChainHitPending, shouldLimitDelayFeedback, isClipActive);
 	}
 	return rendered;
 }
@@ -303,11 +302,6 @@ void AudioOutput::cutAllSound() {
 		((AudioClip*)activeClip)->abortRecording(); // Needed for when this is being called as part of a song-swap - we
 		                                            // can't leave recording happening in such a case.
 	}
-}
-
-void AudioOutput::getThingWithMostReverb(Sound** soundWithMostReverb,
-                                         ParamManagerForTimeline** paramManagerWithMostReverb, Kit** kitWithMostReverb,
-                                         int32_t* highestReverbAmountFound) {
 }
 
 // Unlike for Instruments, AudioOutputs will only be written as part of a Song, so clipForSavingOutputOnly will always
@@ -417,24 +411,11 @@ bool AudioOutput::setActiveClip(ModelStackWithTimelineCounter* modelStack, PgmCh
 	        || (playbackHandler.playbackState && currentPlaybackMode == &arrangement))) {
 		((AudioClip*)activeClip)->unassignVoiceSample(false);
 	}
-	bool clipChanged = Output::setActiveClip(modelStack, maySendMIDIPGMs);
-
-	if (clipChanged) {
-		AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
-	}
-
-	return clipChanged;
+	return Output::setActiveClip(modelStack, maySendMIDIPGMs);
 }
 
 bool AudioOutput::isSkippingRendering() {
 	return !echoing && (!activeClip || !((AudioClip*)activeClip)->voiceSample);
-}
-
-void AudioOutput::getThingWithMostReverb(Sound** soundWithMostReverb, ParamManager** paramManagerWithMostReverb,
-                                         GlobalEffectableForClip** globalEffectableWithMostReverb,
-                                         int32_t* highestReverbAmountFound) {
-	GlobalEffectableForClip::getThingWithMostReverb(activeClip, soundWithMostReverb, paramManagerWithMostReverb,
-	                                                globalEffectableWithMostReverb, highestReverbAmountFound);
 }
 
 ModelStackWithAutoParam* AudioOutput::getModelStackWithParam(ModelStackWithTimelineCounter* modelStack, Clip* clip,

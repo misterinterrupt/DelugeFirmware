@@ -23,10 +23,7 @@ namespace deluge::gui::menu_item::sidechain {
 class VolumeShortcut final : public patch_cable_strength::Fixed {
 public:
 	using Fixed::Fixed;
-	void writeCurrentValue() override {
-		Fixed::writeCurrentValue();
-		AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
-	}
+	void writeCurrentValue() override { Fixed::writeCurrentValue(); }
 };
 
 } // namespace deluge::gui::menu_item::sidechain

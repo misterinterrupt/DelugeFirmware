@@ -134,8 +134,6 @@ Sound::Sound() : patcher(&patchableInfoForSound) {
 	modKnobs[3][1].paramDescriptor.setToHaveParamOnly(params::GLOBAL_DELAY_RATE);
 	modKnobs[3][0].paramDescriptor.setToHaveParamOnly(params::GLOBAL_DELAY_FEEDBACK);
 
-	modKnobs[4][0].paramDescriptor.setToHaveParamOnly(params::GLOBAL_REVERB_AMOUNT);
-
 	modKnobs[5][1].paramDescriptor.setToHaveParamOnly(params::GLOBAL_LFO_FREQ);
 
 	modKnobs[4][1].paramDescriptor.setToHaveParamAndSource(params::GLOBAL_VOLUME_POST_REVERB_SEND,
@@ -186,7 +184,6 @@ void Sound::initParams(ParamManager* paramManager) {
 	patchedParams->params[params::LOCAL_HPF_MORPH].setCurrentValueBasicForSetup(-2147483648);
 	patchedParams->params[params::LOCAL_LPF_MORPH].setCurrentValueBasicForSetup(-2147483648);
 	patchedParams->params[params::LOCAL_PITCH_ADJUST].setCurrentValueBasicForSetup(0);
-	patchedParams->params[params::GLOBAL_REVERB_AMOUNT].setCurrentValueBasicForSetup(-2147483648);
 	patchedParams->params[params::GLOBAL_DELAY_RATE].setCurrentValueBasicForSetup(0);
 	patchedParams->params[params::GLOBAL_ARP_RATE].setCurrentValueBasicForSetup(0);
 	patchedParams->params[params::GLOBAL_DELAY_FEEDBACK].setCurrentValueBasicForSetup(-2147483648);
@@ -1319,12 +1316,6 @@ Error Sound::readTagFromFile(Deserializer& reader, char const* tagName, ParamMan
 		reader.exitTag("voicePriority");
 	}
 
-	else if (!strcmp(tagName, "reverbAmount")) {
-		ENSURE_PARAM_MANAGER_EXISTS
-		patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_REVERB_AMOUNT, readAutomationUpToPos);
-		reader.exitTag("reverbAmount");
-	}
-
 	else if (!strcmp(tagName, "defaultParams")) {
 		ENSURE_PARAM_MANAGER_EXISTS
 		Sound::readParamsFromFile(reader, paramManager, readAutomationUpToPos);
@@ -2089,25 +2080,6 @@ yupStartSkipping:
 	}
 }
 
-void Sound::getThingWithMostReverb(Sound** soundWithMostReverb, ParamManager** paramManagerWithMostReverb,
-                                   GlobalEffectableForClip** globalEffectableWithMostReverb,
-                                   int32_t* highestReverbAmountFound, ParamManagerForTimeline* paramManager) {
-
-	PatchedParamSet* patchedParams = paramManager->getPatchedParamSet();
-	if (!patchedParams->params[params::GLOBAL_REVERB_AMOUNT].isAutomated()
-	    && patchedParams->params[params::GLOBAL_REVERB_AMOUNT].containsSomething(-2147483648)) {
-
-		// We deliberately don't use the LPF'ed param here
-		int32_t reverbHere = patchedParams->getValue(params::GLOBAL_REVERB_AMOUNT);
-		if (*highestReverbAmountFound < reverbHere) {
-			*highestReverbAmountFound = reverbHere;
-			*soundWithMostReverb = this;
-			*paramManagerWithMostReverb = paramManager;
-			*globalEffectableWithMostReverb = NULL;
-		}
-	}
-}
-
 // fromAutomation means whether the changes was caused by automation playing back - as opposed to the user turning the
 // knob right now
 void Sound::notifyValueChangeViaLPF(int32_t p, bool shouldDoParamLPF, ModelStackWithThreeMainThings const* modelStack,
@@ -2198,8 +2170,8 @@ void Sound::stopParamLPF(ModelStackWithSoundFlags* modelStack) {
 }
 
 void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outputBuffer, int32_t numSamples,
-                   int32_t* reverbBuffer, int32_t sideChainHitPending, int32_t reverbAmountAdjust,
-                   bool shouldLimitDelayFeedback, int32_t pitchAdjust, SampleRecorder* recorder) {
+                   int32_t sideChainHitPending, bool shouldLimitDelayFeedback, int32_t pitchAdjust,
+                   SampleRecorder* recorder) {
 
 	fxChain.applyPending();
 
@@ -2250,12 +2222,6 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 	if (sourcesChanged) {
 		patcher.performPatching(sourcesChanged, this, paramManager);
 	}
-
-	// Setup some reverb-related stuff
-	int32_t reverbSendAmount =
-	    multiply_32x32_rshift32_rounded(reverbAmountAdjust,
-	                                    paramFinalValues[params::GLOBAL_REVERB_AMOUNT - params::FIRST_GLOBAL])
-	    << 5;
 
 	ModelStackWithSoundFlags* modelStackWithSoundFlags = modelStack->addSoundFlags();
 
@@ -2438,8 +2404,7 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 	          &postFXVolume, paramManager);
 	processStutter((StereoSample*)soundBuffer, numSamples, paramManager);
 
-	processReverbSendAndVolume((StereoSample*)soundBuffer, numSamples, reverbBuffer, postFXVolume, postReverbVolume,
-	                           0, 0, true);
+	processOutputVolume((StereoSample*)soundBuffer, numSamples, postFXVolume, postReverbVolume, 0, true);
 
 	q31_t compThreshold = paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
 	q31_t compBlend = paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_BLEND);
@@ -3916,10 +3881,6 @@ bool Sound::readParamTagFromFile(Deserializer& reader, char const* tagName, Para
 		patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_DELAY_FEEDBACK, readAutomationUpToPos);
 		reader.exitTag("delayFeedback");
 	}
-	else if (!strcmp(tagName, "reverbAmount")) {
-		patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_REVERB_AMOUNT, readAutomationUpToPos);
-		reader.exitTag("reverbAmount");
-	}
 	else if (!strcmp(tagName, "arpeggiatorRate")) {
 		patchedParams->readParam(reader, patchedParamsSummary, params::GLOBAL_ARP_RATE, readAutomationUpToPos);
 		reader.exitTag("arpeggiatorRate");
@@ -3994,8 +3955,6 @@ void Sound::writeParamsToFile(Serializer& writer, ParamManager* paramManager, bo
 
 	patchedParams->writeParamAsAttribute(writer, "delayRate", params::GLOBAL_DELAY_RATE, writeAutomation);
 	patchedParams->writeParamAsAttribute(writer, "delayFeedback", params::GLOBAL_DELAY_FEEDBACK, writeAutomation);
-
-	patchedParams->writeParamAsAttribute(writer, "reverbAmount", params::GLOBAL_REVERB_AMOUNT, writeAutomation);
 
 	patchedParams->writeParamAsAttribute(writer, "arpeggiatorRate", params::GLOBAL_ARP_RATE, writeAutomation);
 
@@ -4252,9 +4211,6 @@ void Sound::modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTime
 
 	// if top knob == Delay Rate && bottom knob == Delay Amount
 	// --> displayDelaySettings(on);
-
-	// if top knob == Sidechain && bottom knob == Reverb Amount
-	// --> displaySidechainAndReverbSettings(on);
 
 	// else --> display param name
 
@@ -4521,23 +4477,6 @@ bool Sound::modEncoderButtonAction(uint8_t whichModEncoder, bool on, ModelStackW
 			return false;
 		}
 	}
-	// Cycle through reverb presets
-	else if (ourModKnob->paramDescriptor.isSetToParamWithNoSource(params::GLOBAL_REVERB_AMOUNT)) {
-		if (on) {
-			view.cycleThroughReverbPresets();
-
-			// if mod button is pressed, update mod button pop up
-			if (Buttons::isButtonPressed(
-			        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-				displaySidechainAndReverbSettings(on);
-			}
-			else {
-				display->displayPopup(view.getReverbPresetDisplayName(view.getCurrentReverbPreset()));
-			}
-		}
-		return false;
-	}
-
 	// Switch sidechain sync level
 	else if (ourModKnob->paramDescriptor.hasJustOneSource()
 	         && ourModKnob->paramDescriptor.getTopLevelSource() == PatchSource::SIDECHAIN) {
@@ -4561,7 +4500,7 @@ bool Sound::modEncoderButtonAction(uint8_t whichModEncoder, bool on, ModelStackW
 			// if mod button is pressed, update mod button pop up
 			if (Buttons::isButtonPressed(
 			        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-				displaySidechainAndReverbSettings(on);
+				displaySidechainSettings(on);
 			}
 			else {
 				display->displayPopup(getSidechainDisplayName());

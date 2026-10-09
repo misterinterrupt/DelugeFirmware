@@ -33,10 +33,6 @@ public:
 	void writeCurrentValue() override {
 		soundEditor.currentSidechain->syncType = syncValueToSyncType(this->getValue());
 		soundEditor.currentSidechain->syncLevel = syncValueToSyncLevel(this->getValue());
-		AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
-	}
-	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
-		return !soundEditor.editingReverbSidechain() || AudioEngine::reverbSidechainVolume >= 0;
 	}
 };
 } // namespace deluge::gui::menu_item::sidechain

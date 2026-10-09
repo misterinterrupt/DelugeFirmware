@@ -41,10 +41,6 @@ public:
 	void modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTimeline* paramManager) override;
 	bool modEncoderButtonAction(uint8_t whichModEncoder, bool on, ModelStackWithThreeMainThings* modelStack) final;
 	virtual Output* toOutput() = 0;
-	void getThingWithMostReverb(Clip* activeClip, Sound** soundWithMostReverb,
-	                            ParamManager** paramManagerWithMostReverb,
-	                            GlobalEffectableForClip** globalEffectableWithMostReverb,
-	                            int32_t* highestReverbAmountFound);
 
 	inline void saturate(int32_t* data, uint32_t* workingValue) {
 		// Clipping
@@ -60,16 +56,15 @@ public:
 protected:
 	int32_t getParameterFromKnob(int32_t whichModEncoder) final;
 	void renderOutput(ModelStackWithTimelineCounter* modelStack, ParamManager* paramManagerForClip,
-	                  StereoSample* outputBuffer, int32_t numSamples, int32_t* reverbBuffer, int32_t reverbAmountAdjust,
-	                  int32_t sideChainHitPending, bool shouldLimitDelayFeedback, bool isClipActive,
-	                  OutputType outputType, SampleRecorder* recorder);
+	                  StereoSample* outputBuffer, int32_t numSamples, int32_t sideChainHitPending,
+	                  bool shouldLimitDelayFeedback, bool isClipActive, OutputType outputType,
+	                  SampleRecorder* recorder);
 
 	virtual bool renderGlobalEffectableForClip(ModelStackWithTimelineCounter* modelStack,
 	                                           StereoSample* globalEffectableBuffer, int32_t* bufferToTransferTo,
-	                                           int32_t numSamples, int32_t* reverbBuffer, int32_t reverbAmountAdjust,
-	                                           int32_t sideChainHitPending, bool shouldLimitDelayFeedback,
-	                                           bool isClipActive, int32_t pitchAdjust, int32_t amplitudeAtStart,
-	                                           int32_t amplitudeAtEnd) = 0;
+	                                           int32_t numSamples, int32_t sideChainHitPending,
+	                                           bool shouldLimitDelayFeedback, bool isClipActive, int32_t pitchAdjust,
+	                                           int32_t amplitudeAtStart, int32_t amplitudeAtEnd) = 0;
 
 	virtual bool willRenderAsOneChannelOnlyWhichWillNeedCopying() { return false; }
 

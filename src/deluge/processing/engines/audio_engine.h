@@ -48,7 +48,6 @@ class SoundDrum;
 class AbsValueFollower;
 
 namespace deluge::dsp {
-class Reverb;
 class FxChain;
 using MasterFxChain = FxChain;
 }
@@ -148,7 +147,8 @@ void unassignAllVoices(bool deletingSong = false);
 void logAction(char const* string);
 void logAction(int32_t number);
 
-void getReverbParamsFromSong(Song* song);
+/// Stages the modular master FX chain (routing + slots) from a loaded song's XML.
+void getMasterFxParamsFromSong(Song* song);
 
 VoiceSample* solicitVoiceSample();
 void voiceSampleUnassigned(VoiceSample* voiceSample);
@@ -181,14 +181,12 @@ int32_t getNumAudio();
 int32_t getNumVoices();
 
 bool doSomeOutputting();
-void updateReverbParams();
 
 extern bool headphonesPluggedIn;
 extern bool micPluggedIn;
 extern bool lineInPluggedIn;
 extern bool renderInStereo;
 extern uint32_t audioSampleTimer;
-extern bool mustUpdateReverbParamsBeforeNextRender;
 extern bool bypassCulling;
 extern uint32_t i2sTXBufferPos;
 extern uint32_t i2sRXBufferPos;
@@ -197,16 +195,10 @@ extern InputMonitoringMode inputMonitoringMode;
 extern bool audioRoutineLocked;
 extern bool routineBeenCalled;
 extern uint8_t numHopsEndedThisRoutineCall;
-extern SideChain reverbSidechain;
-extern uint32_t timeThereWasLastSomeReverb;
 extern VoiceVector activeVoices;
-extern deluge::dsp::Reverb reverb;
 extern deluge::dsp::MasterFxChain masterFxChain;
 extern uint32_t nextVoiceState;
 extern SoundDrum* sampleForPreview;
-extern int32_t reverbSidechainVolume;
-extern int32_t reverbSidechainShape;
-extern int32_t reverbPan;
 extern SampleRecorder* firstRecorder;
 extern Metronome metronome;
 extern RMSFeedbackCompressor mastercompressor;

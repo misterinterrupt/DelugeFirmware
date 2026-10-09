@@ -129,11 +129,6 @@ extern const int16_t oldResonanceCompensation[];
 extern const int16_t windowedSincKernel[][17][16];
 extern const int16_t windowedSincKernelBasicForWavetableBetweenCycles[];
 
-#define NUM_PRESET_REVERBS 3
-const uint8_t presetReverbRoomSize[NUM_PRESET_REVERBS] = {16, 30, 44};
-const uint8_t presetReverbDamping[NUM_PRESET_REVERBS] = {29, 36, 45};
-extern deluge::l10n::String presetReverbNames[NUM_PRESET_REVERBS];
-
 extern const uint8_t defaultClipGroupColours[];
 
 extern const uint8_t noteCodeToNoteLetter[];

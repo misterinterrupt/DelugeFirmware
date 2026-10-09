@@ -166,9 +166,8 @@ public:
 	void patchedParamPresetValueChanged(uint8_t p, ModelStackWithSoundFlags* modelStack, int32_t oldValue,
 	                                    int32_t newValue);
 	void render(ModelStackWithThreeMainThings* modelStack, StereoSample* outputBuffer, int32_t numSamples,
-	            int32_t* reverbBuffer, int32_t sideChainHitPending, int32_t reverbAmountAdjust = 134217728,
-	            bool shouldLimitDelayFeedback = false, int32_t pitchAdjust = kMaxSampleValue,
-	            SampleRecorder* recorder = nullptr);
+	            int32_t sideChainHitPending, bool shouldLimitDelayFeedback = false,
+	            int32_t pitchAdjust = kMaxSampleValue, SampleRecorder* recorder = nullptr);
 	void unassignAllVoices();
 
 	void ensureInaccessibleParamPresetValuesWithoutKnobsAreZero(Song* song) final; // Song may be NULL
@@ -255,9 +254,6 @@ public:
 	ModelStackWithAutoParam* getParamFromModEncoder(int32_t whichModEncoder, ModelStackWithThreeMainThings* modelStack,
 	                                                bool allowCreation = true) final;
 	void reassessRenderSkippingStatus(ModelStackWithSoundFlags* modelStack, bool shouldJustCutModFX = false);
-	void getThingWithMostReverb(Sound** soundWithMostReverb, ParamManager** paramManagerWithMostReverb,
-	                            GlobalEffectableForClip** globalEffectableWithMostReverb,
-	                            int32_t* highestReverbAmountFound, ParamManagerForTimeline* paramManager);
 	virtual bool readTagFromFile(Deserializer& reader, char const* tagName) = 0;
 	void detachSourcesFromAudioFiles();
 	void confirmNumVoices(char const* error);

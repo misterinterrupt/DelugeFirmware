@@ -77,10 +77,6 @@ using enum deluge::l10n::String;
 #include "gui/menu_item/midi/pgm.h"
 #include "gui/menu_item/midi/sub.h"
 #include "gui/menu_item/midi/y_axis_to_cc1.h"
-#include "gui/menu_item/reverb/damping.h"
-#include "gui/menu_item/reverb/pan.h"
-#include "gui/menu_item/reverb/room_size.h"
-#include "gui/menu_item/reverb/width.h"
 #include "gui/menu_item/sidechain/attack.h"
 #include "gui/menu_item/sidechain/release.h"
 #include "gui/menu_item/sidechain/send.h"
@@ -166,13 +162,7 @@ extern deluge::gui::menu_item::lfo::Rate lfo2RateMenu;
 extern deluge::gui::menu_item::lfo::Sync lfo2SyncMenu;
 extern deluge::gui::menu_item::lfo::Type lfo2TypeMenu;
 
-// FX: Reverb, Delay, ModFX, Distortion, Compressor
-extern deluge::gui::menu_item::reverb::RoomSize reverbRoomSizeMenu;
-extern deluge::gui::menu_item::reverb::Damping reverbDampingMenu;
-extern deluge::gui::menu_item::patched_param::Integer reverbAmountMenu;
-extern deluge::gui::menu_item::reverb::Width reverbWidthMenu;
-extern deluge::gui::menu_item::reverb::Pan reverbPanMenu;
-
+// FX: Delay, ModFX, Distortion, Compressor (reverb is FX BLOCS only)
 extern deluge::gui::menu_item::patched_param::Integer delayRateMenu;
 extern deluge::gui::menu_item::patched_param::Integer delayFeedbackMenu;
 extern deluge::gui::menu_item::delay::Sync delaySyncMenu;
@@ -235,7 +225,6 @@ extern deluge::gui::menu_item::UnpatchedParam globalDelayRateMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalDelayFeedbackMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalModFXRateMenu;
 extern deluge::gui::menu_item::mod_fx::Depth_Unpatched globalModFXDepthMenu;
-extern deluge::gui::menu_item::UnpatchedParam globalReverbSendAmountMenu;
 extern deluge::gui::menu_item::unpatched_param::UpdatingReverbParams globalSidechainVolumeMenu;
 
 // Audio Clip specifics

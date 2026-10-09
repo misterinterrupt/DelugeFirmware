@@ -82,7 +82,6 @@ int32_t getParamNeutralValue(int32_t p) {
 	case params::LOCAL_OSC_B_VOLUME:
 	case params::GLOBAL_VOLUME_POST_REVERB_SEND:
 	case params::LOCAL_NOISE_VOLUME:
-	case params::GLOBAL_REVERB_AMOUNT:
 	case params::GLOBAL_VOLUME_POST_FX:
 	case params::LOCAL_VOLUME:
 		return 134217728;

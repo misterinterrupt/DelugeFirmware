@@ -466,10 +466,9 @@ void setupBlankSong() {
 	currentSong = preLoadedSong;
 	preLoadedSong = NULL;
 
-	AudioEngine::getReverbParamsFromSong(currentSong);
+	AudioEngine::getMasterFxParamsFromSong(currentSong);
 
 	setUIForLoadedSong(currentSong);
-	AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
 }
 
 /// Can only happen after settings, which includes default settings, have been read

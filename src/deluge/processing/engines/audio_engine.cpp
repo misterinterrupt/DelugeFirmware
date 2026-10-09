@@ -18,7 +18,6 @@
 #include "processing/engines/audio_engine.h"
 #include "definitions_cxx.hpp"
 #include "dsp/fx_bloc/master_fx_chain.hpp"
-#include "dsp/reverb/reverb.hpp"
 #include "dsp/timestretch/time_stretcher.h"
 #include "extern.h"
 #include "gui/context_menu/sample_browser/kit.h"
@@ -133,13 +132,6 @@ constexpr int32_t direnessThreshold = numSamplesLimit - 30;
 // to the limit
 constexpr int MIN_VOICES = 7;
 
-// The global reverb wrapper embeds its engine variant (~521KB) and was the single
-// biggest internal-.bss resident — the code image had grown hard against
-// .program_stack. SDRAM placement is equivalent-safety to .bss here: resetprg
-// unconditionally zeroes .sdram_bss before IRQs are enabled (see 5a36d3f63), and
-// the ctor timing is identical in either section. DSP state only, no DMA touches it.
-PLACE_SDRAM_BSS dsp::Reverb reverb{};
-
 // Modular master FX chain (three FxBloc slots + selectable routing topology). Small
 // (~2.5KB — engines allocate lazily, right-sized, from SDRAM on selection). Kept in
 // internal .bss: .sdram_bss was unsafe for a constructed object until the resetprg
@@ -150,15 +142,6 @@ dsp::MasterFxChain masterFxChain{};
 // Incremented whenever the stem-export state fails its impossible-value check in the audio
 // routine — a live counter of memory-scribbler hits on that global (dumped by capture scripts).
 uint32_t scribbleCanaryTrips = 0;
-PLACE_INTERNAL_FRUNK SideChain reverbSidechain{};
-int32_t reverbSidechainVolume;
-int32_t reverbSidechainShape;
-int32_t reverbPan = 0;
-
-int32_t reverbSidechainVolumeInEffect; // Active right now - possibly overridden by the sound with the most reverb
-int32_t reverbSidechainShapeInEffect;
-
-bool mustUpdateReverbParamsBeforeNextRender = false;
 
 int32_t sideChainHitPending = false;
 
@@ -181,7 +164,6 @@ SampleRecorder* firstRecorder = NULL;
 // Let's keep these grouped - the stuff we're gonna access regularly during audio rendering
 int32_t cpuDireness = 0;
 uint32_t timeDirenessChanged;
-uint32_t timeThereWasLastSomeReverb = 0x8FFFFFFF;
 int32_t numSamplesLastTime = 0;
 uint32_t nextVoiceState = 1;
 bool renderInStereo = true;
@@ -206,7 +188,6 @@ LiveInputBuffer* liveInputBuffers[3];
 uint16_t lastRoutineTime;
 
 std::array<StereoSample, SSI_TX_BUFFER_NUM_SAMPLES> renderingBuffer __attribute__((aligned(CACHE_LINE_SIZE)));
-std::array<int32_t, 2 * SSI_TX_BUFFER_NUM_SAMPLES> reverbBuffer __attribute__((aligned(CACHE_LINE_SIZE)));
 
 StereoSample* renderingBufferOutputPos = renderingBuffer.begin();
 StereoSample* renderingBufferOutputEnd = renderingBuffer.begin();
@@ -415,7 +396,6 @@ extern uint16_t g_usb_usbmode;
 
 #if JFTRACE
 Debug::AverageDT aeCtr("audio", Debug::mS);
-Debug::AverageDT rvb("reverb", Debug::uS);
 #endif
 
 uint8_t numRoutines = 0;
@@ -540,7 +520,6 @@ void scheduleMidiGateOutISR(uint32_t saddrPosAtStart, int32_t unadjustedNumSampl
 void setMonitoringMode();
 void renderSongFX(size_t numSamples);
 void renderSamplePreview(size_t numSamples);
-void renderReverb(size_t numSamples);
 void tickSongFinalizeWindows(size_t& numSamples, int32_t& timeWithinWindowAtWhichMIDIOrGateOccurs);
 void flushMIDIGateBuffers();
 void renderAudio(size_t numSamples);
@@ -625,7 +604,6 @@ void renderAudio(size_t numSamples) {
 	masterFxChain.clearSendBusses(numSamples);
 
 	memset(&renderingBuffer, 0, numSamples * sizeof(StereoSample));
-	memset(&reverbBuffer, 0, numSamples * sizeof(StereoSample));
 
 	if (sideChainHitPending) {
 		timeLastSideChainHit = audioSampleTimer;
@@ -637,10 +615,8 @@ void renderAudio(size_t numSamples) {
 	// Render audio for song
 	if (currentSong) {
 
-		currentSong->renderAudio(renderingBuffer.data(), numSamples, reverbBuffer.data(), sideChainHitPending);
+		currentSong->renderAudio(renderingBuffer.data(), numSamples, sideChainHitPending);
 	}
-
-	renderReverb(numSamples);
 
 	renderSamplePreview(numSamples);
 
@@ -685,11 +661,10 @@ void renderAudio(size_t numSamples) {
 
 	renderSongFX(numSamples);
 
-	// Modular master FX chain — the final master insert, after the legacy chain
-	// (song FX / compressor / send-reverb) and before the metronome, so clicks stay
-	// dry and the RMS envelope reflects the post-chain signal. Dormant by default:
-	// all-EMPTY slots make isActive() false and this a pure skip, leaving legacy
-	// output bit-identical until blocs are selected via the FX BLOCS menus.
+	// Modular master FX chain — the final master insert, after the song FX and
+	// before the metronome, so clicks stay dry and the RMS envelope reflects the
+	// post-chain signal. Dormant by default: all-EMPTY slots make isActive() false
+	// and this a pure skip until blocs are selected via the FX BLOCS menus.
 	if (masterFxChain.isActive()) {
 		masterFxChain.process(renderingBuffer.data(), numSamples);
 	}
@@ -706,7 +681,6 @@ void renderAudio(size_t numSamples) {
 
 void renderAudioForStemExport(size_t numSamples) {
 	memset(&renderingBuffer, 0, numSamples * sizeof(StereoSample));
-	memset(&reverbBuffer, 0, numSamples * sizeof(StereoSample));
 
 	dsp::reverb::kSystemTempoBPM.store(
 	    currentSong ? playbackHandler.calculateBPM(currentSong->getTimePerTimerTickFloat()) : 120.0f,
@@ -724,11 +698,10 @@ void renderAudioForStemExport(size_t numSamples) {
 	// Render audio for song
 	if (currentSong) {
 
-		currentSong->renderAudio(renderingBuffer.data(), numSamples, reverbBuffer.data(), sideChainHitPending);
+		currentSong->renderAudio(renderingBuffer.data(), numSamples, sideChainHitPending);
 	}
 
 	if (stemExport.includeSongFX) {
-		renderReverb(numSamples);
 		renderSongFX(numSamples);
 		if (masterFxChain.isActive()) {
 			masterFxChain.process(renderingBuffer.data(), numSamples);
@@ -854,66 +827,6 @@ startAgain:
 		}
 	}
 }
-void renderReverb(size_t numSamples) {
-	// Safe point to apply UI-requested reverb model/param changes: before any access to the
-	// reverb object this block, so the underlying DSP is never mutated mid-process().
-	reverb.applyPending();
-
-	if (currentSong && mustUpdateReverbParamsBeforeNextRender) {
-		updateReverbParams();
-		mustUpdateReverbParamsBeforeNextRender = false;
-	}
-
-	// Render the reverb sidechain
-	int32_t sidechainOutput = 0;
-	if (reverbSidechainVolumeInEffect != 0) {
-		if (sideChainHitPending != 0) {
-			reverbSidechain.registerHit(sideChainHitPending);
-		}
-#if JFTRACE
-		rvb.begin();
-#endif
-
-		sidechainOutput = reverbSidechain.render(numSamples, reverbSidechainShapeInEffect);
-#if JFTRACE
-		rvb.note();
-#endif
-	}
-
-	int32_t reverbAmplitudeL;
-	int32_t reverbAmplitudeR;
-
-	// Stop reverb after 12 seconds of inactivity
-	bool reverbOn = ((uint32_t)(audioSampleTimer - timeThereWasLastSomeReverb) < kSampleRate * 12);
-	// around the mutable noise floor, ~70dB from peak
-	reverbOn |= (std::max(approxRMSLevel.l, approxRMSLevel.r) > 9);
-
-	if (reverbOn) {
-		// Patch that to reverb volume
-		int32_t positivePatchedValue =
-		    multiply_32x32_rshift32(sidechainOutput, reverbSidechainVolumeInEffect) + 0x20000000;
-		int32_t reverbOutputVolume = (positivePatchedValue >> 15) * (positivePatchedValue >> 14);
-
-		// Reverb panning
-		bool thisDoPanning = (renderInStereo && shouldDoPanning(reverbPan, &reverbAmplitudeL, &reverbAmplitudeR));
-
-		if (thisDoPanning) {
-			reverbAmplitudeL = multiply_32x32_rshift32(reverbAmplitudeL, reverbOutputVolume) << 2;
-			reverbAmplitudeR = multiply_32x32_rshift32(reverbAmplitudeR, reverbOutputVolume) << 2;
-		}
-		else {
-			reverbAmplitudeL = reverbAmplitudeR = reverbOutputVolume;
-		}
-
-		auto reverb_buffer_slice = std::span{reverbBuffer.data(), numSamples};
-		auto render_buffer_slice = std::span{renderingBuffer.data(), numSamples};
-
-		// Mix reverb into main render
-		reverb.setPanLevels(reverbAmplitudeL, reverbAmplitudeR);
-		reverb.process(reverb_buffer_slice, render_buffer_slice);
-		logAction("Reverb complete");
-	}
-}
 void renderSamplePreview(size_t numSamples) { // Previewing sample
 	if (getCurrentUI() == &sampleBrowser || getCurrentUI() == &gui::context_menu::sample_browser::kit
 	    || getCurrentUI() == &gui::context_menu::sample_browser::synth || getCurrentUI() == &slicer) {
@@ -922,8 +835,7 @@ void renderSamplePreview(size_t numSamples) { // Previewing sample
 		ModelStackWithThreeMainThings* modelStack = setupModelStackWithThreeMainThingsButNoNoteRow(
 		    modelStackMemory, currentSong, sampleForPreview, NULL, paramManagerForSamplePreview);
 
-		sampleForPreview->render(modelStack, renderingBuffer.data(), numSamples, reverbBuffer.data(),
-		                         sideChainHitPending);
+		sampleForPreview->render(modelStack, renderingBuffer.data(), numSamples, sideChainHitPending);
 	}
 }
 void renderSongFX(size_t numSamples) { // LPF and stutter for song (must happen after reverb mixed in, which is why it's
@@ -1356,77 +1268,6 @@ void dumpAudioLog() {
 #endif
 }
 
-void updateReverbParams() {
-
-	// If reverb sidechain on "auto" settings...
-	if (reverbSidechainVolume < 0) {
-
-		// Just leave everything as is if parts deleted cos loading new song
-		if (getCurrentUI() == &loadSongUI && loadSongUI.deletedPartsOfOldSong) {
-			return;
-		}
-
-		Sound* soundWithMostReverb = NULL;
-		ParamManager* paramManagerWithMostReverb = NULL;
-		GlobalEffectableForClip* globalEffectableWithMostReverb = NULL;
-
-		// Set the initial "highest amount found" to that of the song itself, which can't be affected by sidechain.
-		// If nothing found with more reverb, then we don't want the reverb affected by sidechain
-		int32_t highestReverbAmountFound =
-		    currentSong->paramManager.getUnpatchedParamSet()->getValue(params::UNPATCHED_REVERB_SEND_AMOUNT);
-
-		for (Output* thisOutput = currentSong->firstOutput; thisOutput; thisOutput = thisOutput->next) {
-			thisOutput->getThingWithMostReverb(&soundWithMostReverb, &paramManagerWithMostReverb,
-			                                   &globalEffectableWithMostReverb, &highestReverbAmountFound);
-		}
-
-		ModControllableAudio* modControllable;
-
-		if (soundWithMostReverb) {
-			modControllable = soundWithMostReverb;
-
-			ParamDescriptor paramDescriptor;
-			paramDescriptor.setToHaveParamOnly(params::GLOBAL_VOLUME_POST_REVERB_SEND);
-
-			PatchCableSet* patchCableSet = paramManagerWithMostReverb->getPatchCableSet();
-
-			int32_t whichCable = patchCableSet->getPatchCableIndex(PatchSource::SIDECHAIN, paramDescriptor);
-			if (whichCable != 255) {
-				reverbSidechainVolumeInEffect =
-				    patchCableSet->getModifiedPatchCableAmount(whichCable, params::GLOBAL_VOLUME_POST_REVERB_SEND);
-			}
-			else {
-				reverbSidechainVolumeInEffect = 0;
-			}
-			goto sidechainFound;
-		}
-		else if (globalEffectableWithMostReverb) {
-			modControllable = globalEffectableWithMostReverb;
-
-			reverbSidechainVolumeInEffect =
-			    globalEffectableWithMostReverb->getSidechainVolumeAmountAsPatchCableDepth(paramManagerWithMostReverb);
-
-sidechainFound:
-			reverbSidechainShapeInEffect =
-			    paramManagerWithMostReverb->getUnpatchedParamSet()->getValue(params::UNPATCHED_SIDECHAIN_SHAPE);
-			reverbSidechain.attack = modControllable->sidechain.attack;
-			reverbSidechain.release = modControllable->sidechain.release;
-			reverbSidechain.syncLevel = modControllable->sidechain.syncLevel;
-			return;
-		}
-
-		// Or if no thing has more reverb than the Song itself...
-		else {
-			reverbSidechainVolumeInEffect = 0;
-			return;
-		}
-	}
-
-	// Otherwise, use manually set params for reverb sidechain
-	reverbSidechainVolumeInEffect = reverbSidechainVolume;
-	reverbSidechainShapeInEffect = reverbSidechainShape;
-}
-
 void registerSideChainHit(int32_t strength) {
 	sideChainHitPending = combineHitStrengths(strength, sideChainHitPending);
 }
@@ -1462,19 +1303,8 @@ void stopAnyPreviewing() {
 	}
 }
 
-void getReverbParamsFromSong(Song* song) {
-	reverb.setModel(song->model);
-	reverb.setRoomSize(song->reverbRoomSize);
-	reverb.setDamping(song->reverbDamp);
-	reverb.setWidth(song->reverbWidth);
-	reverbPan = song->reverbPan;
-	reverbSidechainVolume = song->reverbSidechainVolume;
-	reverbSidechainShape = song->reverbSidechainShape;
-	reverbSidechain.attack = song->reverbSidechainAttack;
-	reverbSidechain.release = song->reverbSidechainRelease;
-	reverbSidechain.syncLevel = song->reverbSidechainSync;
-
-	// Modular master FX chain, staged from the same song XML. Loading always resets
+void getMasterFxParamsFromSong(Song* song) {
+	// Modular master FX chain, staged from the song XML. Loading always resets
 	// every slot first, so nothing from the previously-active song can bleed through;
 	// a model whose allocation fails degrades to passthrough rather than keeping the
 	// previous bloc. Saved params stage into the cache and flush at the next render

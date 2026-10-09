@@ -547,14 +547,10 @@ void ModControllableAudio::processFX(StereoSample* buffer, int32_t numSamples, M
 	delay.process({buffer, static_cast<size_t>(numSamples)}, delayWorkingState);
 }
 
-void ModControllableAudio::processReverbSendAndVolume(StereoSample* buffer, int32_t numSamples, int32_t* reverbBuffer,
-                                                      int32_t postFXVolume, int32_t postReverbVolume,
-                                                      int32_t reverbSendAmount, int32_t pan,
-                                                      bool doAmplitudeIncrement) {
+void ModControllableAudio::processOutputVolume(StereoSample* buffer, int32_t numSamples, int32_t postFXVolume,
+                                               int32_t postReverbVolume, int32_t pan, bool doAmplitudeIncrement) {
 
 	StereoSample* bufferEnd = buffer + numSamples;
-
-	int32_t reverbSendAmountAndPostFXVolume = multiply_32x32_rshift32(postFXVolume, reverbSendAmount) << 5;
 
 	int32_t postFXAndReverbVolumeL, postFXAndReverbVolumeR, amplitudeIncrementL, amplitudeIncrementR;
 	postFXAndReverbVolumeL = postFXAndReverbVolumeR = (multiply_32x32_rshift32(postReverbVolume, postFXVolume) << 5);
@@ -586,27 +582,17 @@ void ModControllableAudio::processReverbSendAndVolume(StereoSample* buffer, int3
 	do {
 		StereoSample processingSample = *inputSample;
 
-		// Send to reverb
-		if (reverbSendAmount != 0) {
-			*(reverbBuffer++) +=
-			    multiply_32x32_rshift32(processingSample.l + processingSample.r, reverbSendAmountAndPostFXVolume) << 1;
-		}
-
 		if (doAmplitudeIncrement) {
 			postFXAndReverbVolumeL += amplitudeIncrementL;
 			postFXAndReverbVolumeR += amplitudeIncrementR;
 		}
 
-		// Apply post-fx and post-reverb-send volume
+		// Apply post-fx and post-reverb-send volume (the tap the sidechain ducks)
 		inputSample->l = multiply_32x32_rshift32(processingSample.l, postFXAndReverbVolumeL) << 5;
 		inputSample->r = multiply_32x32_rshift32(processingSample.r, postFXAndReverbVolumeR) << 5;
 
 	} while (++inputSample != bufferEnd);
 
-	// We've generated some sound. If reverb is happening, make note
-	if (reverbSendAmount != 0) {
-		AudioEngine::timeThereWasLastSomeReverb = AudioEngine::audioSampleTimer;
-	}
 	postReverbVolumeLastTime = postReverbVolume;
 }
 
@@ -2027,19 +2013,13 @@ char const* ModControllableAudio::getDelayPingPongStatusDisplayName() {
 	}
 }
 
-void ModControllableAudio::displaySidechainAndReverbSettings(bool on) {
+void ModControllableAudio::displaySidechainSettings(bool on) {
 	// Sidechain
 	if (display->haveOLED()) {
 		if (on) {
 			DEF_STACK_STRING_BUF(popupMsg, 100);
-			// Sidechain
 			popupMsg.append("Sidechain: ");
 			popupMsg.append(getSidechainDisplayName());
-
-			popupMsg.append("\n");
-
-			// Reverb
-			popupMsg.append(view.getReverbPresetDisplayName(view.getCurrentReverbPreset()));
 
 			display->popupText(popupMsg.c_str());
 		}
@@ -2048,12 +2028,7 @@ void ModControllableAudio::displaySidechainAndReverbSettings(bool on) {
 		}
 	}
 	else {
-		if (on) {
-			display->displayPopup(getSidechainDisplayName());
-		}
-		else {
-			display->displayPopup(view.getReverbPresetDisplayName(view.getCurrentReverbPreset()));
-		}
+		display->displayPopup(getSidechainDisplayName());
 	}
 }
 

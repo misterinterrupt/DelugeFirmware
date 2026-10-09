@@ -84,8 +84,6 @@ bool Output::setActiveClip(ModelStackWithTimelineCounter* modelStack, PgmChangeS
 void Output::detachActiveClip(Song* song) {
 	activeClip = NULL;
 	inValidState = false;
-
-	AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
 }
 
 void Output::pickAnActiveClipIfPossible(ModelStack* modelStack, bool searchSessionClipsIfNeeded,

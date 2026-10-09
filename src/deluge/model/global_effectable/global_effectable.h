@@ -73,7 +73,7 @@ protected:
 
 private:
 	void ensureModFXParamIsValid();
-	void displayCompressorAndReverbSettings(bool on);
+	void displayCompressorSettings(bool on);
 	char const* getCompressorModeDisplayName();
 	char const* getCompressorParamDisplayName();
 	void displayModFXSettings(bool on);

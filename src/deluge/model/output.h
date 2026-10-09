@@ -109,11 +109,9 @@ public:
 
 	bool nextClipFoundShouldGetArmed; // Temp thing for Session::armClipsToStartOrSoloWithQuantization
 
-	// reverbAmountAdjust has "1" as 67108864
 	// Only gets called if there's an activeClip
 	virtual void renderOutput(ModelStack* modelStack, StereoSample* startPos, StereoSample* endPos, int32_t numSamples,
-	                          int32_t* reverbBuffer, int32_t reverbAmountAdjust, int32_t sideChainHitPending,
-	                          bool shouldLimitDelayFeedback, bool isClipActive) = 0;
+	                          int32_t sideChainHitPending, bool shouldLimitDelayFeedback, bool isClipActive) = 0;
 
 	virtual void setupWithoutActiveClip(ModelStack* modelStack);
 	virtual bool setActiveClip(
@@ -132,9 +130,6 @@ public:
 	bool isEmpty(bool displayPopup = true);
 	void clipLengthChanged(Clip* clip, int32_t oldLength);
 	virtual void cutAllSound() {}
-	virtual void getThingWithMostReverb(Sound** soundWithMostReverb, ParamManager** paramManagerWithMostReverb,
-	                                    GlobalEffectableForClip** globalEffectableWithMostReverb,
-	                                    int32_t* highestReverbAmountFound) {}
 	/// If there's a clip matching the name on this output, returns it.
 	Clip* getClipFromName(String* name);
 

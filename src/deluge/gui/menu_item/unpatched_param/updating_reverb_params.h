@@ -25,7 +25,6 @@ public:
 
 	void writeCurrentValue() override {
 		UnpatchedParam::writeCurrentValue();
-		AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
 	}
 };
 } // namespace deluge::gui::menu_item::unpatched_param

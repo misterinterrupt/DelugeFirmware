@@ -172,7 +172,7 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 
 			// Active highlight: invertArea()'s byte walk (image_[rowY][xMin] + width bytes)
 				// runs past the end of the canvas image for these coordinates and XORs
-				// display masks over adjacent .bss (stemExport, AudioEngine::reverb, ...),
+				// display masks over adjacent .bss (stemExport, masterFxChain, ...),
 				// which is what crashed the audio task. Use bounded line primitives instead.
 				if (s == activeHeldSlot) {
 					canvas.drawVerticalLine(colLeft + 1, top + 16, bottom);

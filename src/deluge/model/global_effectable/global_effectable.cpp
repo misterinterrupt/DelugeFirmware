@@ -70,7 +70,6 @@ void GlobalEffectable::initParams(ParamManager* paramManager) {
 	unpatchedParams->params[params::UNPATCHED_PAN].setCurrentValueBasicForSetup(0);
 
 	unpatchedParams->params[params::UNPATCHED_DELAY_AMOUNT].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
-	unpatchedParams->params[params::UNPATCHED_REVERB_SEND_AMOUNT].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
 
 	unpatchedParams->params[params::UNPATCHED_VOLUME].setCurrentValueBasicForSetup(889516852); // 3/4 of the way up
 	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_VOLUME].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
@@ -107,9 +106,9 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 	else if (whichModButton == 3) {
 		displayDelaySettings(on);
 	}
-	// Compressor / Reverb
+	// Compressor
 	else if (whichModButton == 4) {
-		displayCompressorAndReverbSettings(on);
+		displayCompressorSettings(on);
 	}
 	// Mod FX
 	else if (whichModButton == 5) {
@@ -176,7 +175,7 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 	}
 }
 
-void GlobalEffectable::displayCompressorAndReverbSettings(bool on) {
+void GlobalEffectable::displayCompressorSettings(bool on) {
 	if (display->haveOLED()) {
 		if (on) {
 			DEF_STACK_STRING_BUF(popupMsg, 100);
@@ -184,14 +183,8 @@ void GlobalEffectable::displayCompressorAndReverbSettings(bool on) {
 			popupMsg.append(getCompressorModeDisplayName());
 			popupMsg.append("\n");
 
-			if (editingComp) {
-				popupMsg.append("Comp Param: ");
-				popupMsg.append(getCompressorParamDisplayName());
-			}
-			else {
-				// Reverb
-				popupMsg.append(view.getReverbPresetDisplayName(view.getCurrentReverbPreset()));
-			}
+			popupMsg.append("Comp Param: ");
+			popupMsg.append(getCompressorParamDisplayName());
 
 			display->popupText(popupMsg.c_str());
 		}
@@ -204,12 +197,7 @@ void GlobalEffectable::displayCompressorAndReverbSettings(bool on) {
 			display->displayPopup(getCompressorModeDisplayName());
 		}
 		else {
-			if (editingComp) {
-				display->displayPopup(getCompressorParamDisplayName());
-			}
-			else {
-				display->displayPopup(view.getReverbPresetDisplayName(view.getCurrentReverbPreset()));
-			}
+			display->displayPopup(getCompressorParamDisplayName());
 		}
 	}
 }
@@ -490,36 +478,20 @@ bool GlobalEffectable::modEncoderButtonAction(uint8_t whichModEncoder, bool on,
 		}
 	}
 
-	// Reverb / compressor section
+	// Compressor section
 	else if (modKnobMode == 4) {
-		if (whichModEncoder == 0) { // Reverb
+		if (whichModEncoder == 0) { // Comp param select
 			if (on) {
-				// if we're in full mode/editingComp then we cycle through the comp params
-				// otherwise cycle reverb sizes
-				if (!editingComp) {
-					view.cycleThroughReverbPresets();
+				currentCompParam =
+				    static_cast<CompParam>((util::to_underlying(currentCompParam) + 1) % maxCompParam);
 
-					// if mod button is pressed, update mod button pop up
-					if (Buttons::isButtonPressed(
-					        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-						displayCompressorAndReverbSettings(on);
-					}
-					else {
-						display->displayPopup(view.getReverbPresetDisplayName(view.getCurrentReverbPreset()));
-					}
+				// if mod button is pressed, update mod button pop up
+				if (Buttons::isButtonPressed(
+				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
+					displayCompressorSettings(on);
 				}
 				else {
-					currentCompParam =
-					    static_cast<CompParam>((util::to_underlying(currentCompParam) + 1) % maxCompParam);
-
-					// if mod button is pressed, update mod button pop up
-					if (Buttons::isButtonPressed(
-					        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-						displayCompressorAndReverbSettings(on);
-					}
-					else {
-						display->displayPopup(getCompressorParamDisplayName());
-					}
+					display->displayPopup(getCompressorParamDisplayName());
 				}
 			}
 		}
@@ -530,7 +502,7 @@ bool GlobalEffectable::modEncoderButtonAction(uint8_t whichModEncoder, bool on,
 				// if mod button is pressed, update mod button pop up
 				if (Buttons::isButtonPressed(
 				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displayCompressorAndReverbSettings(on);
+					displayCompressorSettings(on);
 				}
 				else {
 					display->displayPopup(getCompressorModeDisplayName());
@@ -766,9 +738,8 @@ int32_t GlobalEffectable::getParameterFromKnob(int32_t whichModEncoder) {
 	}
 
 	else if (modKnobMode == 4) {
-		if (whichModEncoder == 0 && !editingComp) {
-			return params::UNPATCHED_REVERB_SEND_AMOUNT;
-		}
+		// Encoder 0 here selects comp params via clicks; no continuous param while
+		// not editing the compressor.
 	}
 	else if (modKnobMode == 5) {
 		if (whichModEncoder != 0) {
@@ -937,8 +908,6 @@ void GlobalEffectable::writeParamAttributesToFile(Serializer& writer, ParamManag
 
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
 
-	unpatchedParams->writeParamAsAttribute(writer, "reverbAmount", params::UNPATCHED_REVERB_SEND_AMOUNT,
-	                                       writeAutomation, false, valuesForOverride);
 	unpatchedParams->writeParamAsAttribute(writer, "volume", params::UNPATCHED_VOLUME, writeAutomation, false,
 	                                       valuesForOverride);
 	unpatchedParams->writeParamAsAttribute(writer, "pan", params::UNPATCHED_PAN, writeAutomation, false,
@@ -1078,12 +1047,6 @@ bool GlobalEffectable::readParamTagFromFile(Deserializer& reader, char const* ta
 			}
 		}
 		reader.exitTag("hpf");
-	}
-
-	else if (!strcmp(tagName, "reverbAmount")) {
-		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_REVERB_SEND_AMOUNT,
-		                           readAutomationUpToPos);
-		reader.exitTag("reverbAmount");
 	}
 
 	else if (!strcmp(tagName, "lpfMorph")) {

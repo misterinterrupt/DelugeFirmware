@@ -104,7 +104,6 @@ char const* getPatchedParamShortName(ParamType type) {
 	    [LOCAL_ENV_1_RELEASE]            = "Env2 rel",
 	    [GLOBAL_VOLUME_POST_FX]          = "POSTFXLVL",
 	    [GLOBAL_VOLUME_POST_REVERB_SEND] = "Side level",
-	    [GLOBAL_REVERB_AMOUNT]           = "Reverb amt",
 	    [GLOBAL_MOD_FX_DEPTH]            = "ModFXdepth",
 	    [GLOBAL_DELAY_FEEDBACK]          = "Delay feed",
 	    [GLOBAL_DELAY_RATE]              = "Delay rate",
@@ -165,7 +164,6 @@ char const* getPatchedParamDisplayName(int32_t p) {
 	    [LOCAL_ENV_1_RELEASE] = STRING_FOR_PARAM_LOCAL_ENV_1_RELEASE,
 	    [GLOBAL_VOLUME_POST_FX] = STRING_FOR_PARAM_GLOBAL_VOLUME_POST_FX,
 	    [GLOBAL_VOLUME_POST_REVERB_SEND] = STRING_FOR_PARAM_GLOBAL_VOLUME_POST_REVERB_SEND,
-	    [GLOBAL_REVERB_AMOUNT] = STRING_FOR_PARAM_GLOBAL_REVERB_AMOUNT,
 	    [GLOBAL_MOD_FX_DEPTH] = STRING_FOR_PARAM_GLOBAL_MOD_FX_DEPTH,
 	    [GLOBAL_DELAY_FEEDBACK] = STRING_FOR_PARAM_GLOBAL_DELAY_FEEDBACK,
 	    [GLOBAL_DELAY_RATE] = STRING_FOR_PARAM_GLOBAL_DELAY_RATE,
@@ -245,7 +243,6 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		    [UNPATCHED_HPF_FREQ - unc] = STRING_FOR_HPF_FREQUENCY,
 		    [UNPATCHED_HPF_RES - unc] = STRING_FOR_HPF_RESONANCE,
 		    [UNPATCHED_HPF_MORPH - unc] = STRING_FOR_HPF_MORPH,
-		    [UNPATCHED_REVERB_SEND_AMOUNT - unc] = STRING_FOR_REVERB_AMOUNT,
 		    [UNPATCHED_VOLUME - unc] = STRING_FOR_MASTER_LEVEL,
 		    [UNPATCHED_SIDECHAIN_VOLUME - unc] = STRING_FOR_SIDECHAIN_LEVEL,
 		    [UNPATCHED_PITCH_ADJUST - unc] = STRING_FOR_MASTER_PITCH,
@@ -264,7 +261,6 @@ bool paramNeedsLPF(ParamType p, bool fromAutomation) {
 	// so the new step is instantly at the right volume
 	case params::GLOBAL_VOLUME_POST_FX:
 	case params::GLOBAL_VOLUME_POST_REVERB_SEND:
-	case params::GLOBAL_REVERB_AMOUNT:
 	case params::LOCAL_VOLUME:
 	case params::LOCAL_PAN:
 	case params::LOCAL_LPF_FREQ:
@@ -349,9 +345,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 			return "hpfMorph";
 		case UNPATCHED_HPF_RES:
 			return "hpfResonance";
-
-		case UNPATCHED_REVERB_SEND_AMOUNT:
-			return "reverbAmount";
 
 		case UNPATCHED_VOLUME:
 			return "volume";
@@ -443,9 +436,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 
 		case GLOBAL_DELAY_FEEDBACK:
 			return "delayFeedback";
-
-		case GLOBAL_REVERB_AMOUNT:
-			return "reverbAmount";
 
 		case GLOBAL_MOD_FX_RATE:
 			return "modFXRate";

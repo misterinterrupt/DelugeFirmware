@@ -651,10 +651,6 @@ bool SoundEditor::beginScreen(MenuItem* oldMenuItem) {
 				for (int32_t y = 0; y < kDisplayHeight; y++) {
 					if (paramShortcutsForSounds[x][y] == currentItem) {
 
-						if (x == 10 && y < 6 && editingReverbSidechain()) {
-							goto stopThat;
-						}
-
 						if (currentParamShorcutX != 255 && (x & 1) && currentSourceIndex == 0) {
 							goto stopThat;
 						}
@@ -755,10 +751,6 @@ void SoundEditor::blinkShortcut() {
 	}
 
 	shortcutBlinkCounter++;
-}
-
-bool SoundEditor::editingReverbSidechain() {
-	return (getCurrentUI() == &soundEditor && currentSidechain == &AudioEngine::reverbSidechain);
 }
 
 ActionResult SoundEditor::horizontalEncoderAction(int32_t offset) {

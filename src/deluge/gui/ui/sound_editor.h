@@ -114,7 +114,6 @@ public:
 	void enterOrUpdateSoundEditor(bool on);
 	void blinkShortcut();
 	ActionResult potentialShortcutPadAction(int32_t x, int32_t y, bool on);
-	bool editingReverbSidechain();
 	MenuItem* getCurrentMenuItem();
 	bool inSettingsMenu();
 	bool setupKitGlobalFXMenu;

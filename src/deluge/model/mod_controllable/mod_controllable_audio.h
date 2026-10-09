@@ -64,9 +64,8 @@ public:
 	virtual deluge::dsp::FxChain* getFxChain() { return nullptr; }
 
 	void processStutter(StereoSample* buffer, int32_t numSamples, ParamManager* paramManager);
-	void processReverbSendAndVolume(StereoSample* buffer, int32_t numSamples, int32_t* reverbBuffer,
-	                                int32_t postFXVolume, int32_t postReverbVolume, int32_t reverbSendAmount,
-	                                int32_t pan = 0, bool doAmplitudeIncrement = false);
+	void processOutputVolume(StereoSample* buffer, int32_t numSamples, int32_t postFXVolume, int32_t postReverbVolume,
+	                         int32_t pan = 0, bool doAmplitudeIncrement = false);
 	void writeAttributesToFile(Serializer& writer);
 	void writeTagsToFile(Serializer& writer);
 	Error readTagFromFile(Deserializer& reader, char const* tagName, ParamManagerForTimeline* paramManager,
@@ -190,7 +189,7 @@ protected:
 
 	void displayFilterSettings(bool on, FilterType currentFilterType);
 	void displayDelaySettings(bool on);
-	void displaySidechainAndReverbSettings(bool on);
+	void displaySidechainSettings(bool on);
 	void displayOtherModKnobSettings(uint8_t whichModButton, bool on);
 
 private:

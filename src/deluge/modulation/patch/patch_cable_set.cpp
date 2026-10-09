@@ -1059,7 +1059,6 @@ void PatchCableSet::notifyParamModifiedInSomeWay(ModelStackWithAutoParam const* 
 		}
 	}
 
-	AudioEngine::mustUpdateReverbParamsBeforeNextRender = true; // Surely this could be more targeted?
 }
 
 void PatchCableSet::remotelySwapParamState(AutoParamState* state, ModelStackWithParamId* modelStack) {

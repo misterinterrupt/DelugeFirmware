@@ -469,11 +469,6 @@ void PatchedParamSet::notifyParamModifiedInSomeWay(ModelStackWithAutoParam const
 			    ->notifyValueChangeViaLPF(modelStack->paramId, true, modelStack, oldValue, currentValue, false);
 		}
 
-		if (!automatedNow) {
-			if (modelStack->paramId == params::GLOBAL_REVERB_AMOUNT) {
-				AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
-			}
-		}
 	}
 
 	// Because some patch cables are marked as "unusable" under certain circumstances, see if those circumstances have

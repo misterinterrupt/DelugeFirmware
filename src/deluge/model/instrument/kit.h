@@ -46,8 +46,7 @@ public:
 	Error loadAllAudioFiles(bool mayActuallyReadFiles) override;
 	void cutAllSound() override;
 	void renderOutput(ModelStack* modelStack, StereoSample* startPos, StereoSample* endPos, int32_t numSamples,
-	                  int32_t* reverbBuffer, int32_t reverbAmountAdjust, int32_t sideChainHitPending,
-	                  bool shouldLimitDelayFeedback, bool isClipActive) override;
+	                  int32_t sideChainHitPending, bool shouldLimitDelayFeedback, bool isClipActive) override;
 
 	void offerReceivedCC(ModelStackWithTimelineCounter* modelStackWithTimelineCounter, MIDIDevice* fromDevice,
 	                     uint8_t channel, uint8_t ccNumber, uint8_t value, bool* doingMidiThru) override;
@@ -113,9 +112,6 @@ public:
 	GateDrum* getGateDrumForChannel(int32_t gateChannel);
 	void resetDrumTempValues();
 	void setupWithoutActiveClip(ModelStack* modelStack);
-	void getThingWithMostReverb(Sound** soundWithMostReverb, ParamManager** paramManagerWithMostReverb,
-	                            GlobalEffectableForClip** globalEffectableWithMostReverb,
-	                            int32_t* highestReverbAmountFound);
 	uint8_t* getModKnobMode() { return &modKnobMode; }
 	Output* toOutput() { return this; }
 
@@ -130,8 +126,7 @@ public:
 	                          int32_t bendSemitones);
 
 	bool renderGlobalEffectableForClip(ModelStackWithTimelineCounter* modelStack, StereoSample* globalEffectableBuffer,
-	                                   int32_t* bufferToTransferTo, int32_t numSamples, int32_t* reverbBuffer,
-	                                   int32_t reverbAmountAdjust, int32_t sideChainHitPending,
+	                                   int32_t* bufferToTransferTo, int32_t numSamples, int32_t sideChainHitPending,
 	                                   bool shouldLimitDelayFeedback, bool isClipActive, int32_t pitchAdjust,
 	                                   int32_t amplitudeAtStart, int32_t amplitudeAtEnd);
 

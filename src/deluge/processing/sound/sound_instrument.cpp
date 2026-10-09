@@ -88,8 +88,8 @@ void SoundInstrument::cutAllSound() {
 }
 
 void SoundInstrument::renderOutput(ModelStack* modelStack, StereoSample* startPos, StereoSample* endPos,
-                                   int32_t numSamples, int32_t* reverbBuffer, int32_t reverbAmountAdjust,
-                                   int32_t sideChainHitPending, bool shouldLimitDelayFeedback, bool isClipActive) {
+                                   int32_t numSamples, int32_t sideChainHitPending, bool shouldLimitDelayFeedback,
+                                   bool isClipActive) {
 	// this should only happen in the rare case that this is called while replacing an instrument but after the clips
 	// have been cleared
 	if (!activeClip) [[unlikely]] {
@@ -104,8 +104,8 @@ void SoundInstrument::renderOutput(ModelStack* modelStack, StereoSample* startPo
 		compressor.gainReduction = 0;
 	}
 	else {
-		Sound::render(modelStackWithThreeMainThings, startPos, numSamples, reverbBuffer, sideChainHitPending,
-		              reverbAmountAdjust, shouldLimitDelayFeedback, kMaxSampleValue, recorder);
+		Sound::render(modelStackWithThreeMainThings, startPos, numSamples, sideChainHitPending,
+		              shouldLimitDelayFeedback, kMaxSampleValue, recorder);
 	}
 
 	if (playbackHandler.isEitherClockActive() && !playbackHandler.ticksLeftInCountIn && isClipActive) {
@@ -256,8 +256,6 @@ bool SoundInstrument::setActiveClip(ModelStackWithTimelineCounter* modelStack, P
 	bool clipChanged = MelodicInstrument::setActiveClip(modelStack, maySendMIDIPGMs);
 
 	if (clipChanged) {
-		AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
-
 		if (modelStack) {
 			ParamManager* paramManager = &modelStack->getTimelineCounter()->paramManager;
 			patcher.performInitialPatching(this, paramManager);
@@ -475,15 +473,6 @@ int32_t SoundInstrument::doTickForwardForArp(ModelStack* modelStack, int32_t cur
 	}
 
 	return ticksTilNextArpEvent;
-}
-
-void SoundInstrument::getThingWithMostReverb(Sound** soundWithMostReverb, ParamManager** paramManagerWithMostReverb,
-                                             GlobalEffectableForClip** globalEffectableWithMostReverb,
-                                             int32_t* highestReverbAmountFound) {
-	if (activeClip) {
-		Sound::getThingWithMostReverb(soundWithMostReverb, paramManagerWithMostReverb, globalEffectableWithMostReverb,
-		                              highestReverbAmountFound, &activeClip->paramManager);
-	}
 }
 
 ArpeggiatorBase* SoundInstrument::getArp() {

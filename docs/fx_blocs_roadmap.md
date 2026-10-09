@@ -11,6 +11,16 @@ selection via full-width pages, dynamic per-bloc params.
 **User directive (2026-10-03): the KDFX engines are the most important work.**
 Stock wrapping is a convenience; the manual's algorithms are the product.
 
+**User directive (2026-10-09): the end state is ALL effects as blocs.** The synth
+engine keeps its osc/sampler sources and the signal path; every original effect
+(reverb done, then delay, mod FX, EQ/filters, compressor, distortion) becomes a
+module in the FX BLOCS chains and the stock implementations go away. **No legacy
+support from here on** — old songs keep loading (unknown tags/params are skipped
+by the readers) but stock-effect settings in them are ignored. Modulation
+routing to FX params and some MIDI features will break mid-migration; that is
+accepted. The low-level machinery (SDRAM management, lazy engine allocation,
+render windows, sequencer) is what stays hard and stays.
+
 | Commit | What |
 |---|---|
 | 432073ac1 | visual menu rows fitted to the 48-row panel (was drawing to row 68 + OOB .bss spray) |
@@ -37,6 +47,8 @@ Stock wrapping is a convenience; the manual's algorithms are the product.
 | 6d6f433f1 | bloc selector auto-deselect after one change fixed (rebuild no longer wipes held slots); RT60 DECAY capped at ~1 S and compressor RATIO at 1.0 fixed — ParamDef ranges are display units, engine conversions live in the curves |
 | d404bfa66 | **regression fixes + coarse/fine swap**: percent params had collapsed to 0-1 (LEVEL read 0%/1%) — explicit 0-100 ranges; unshifted = coarse nice-number steps (span in ~100 detents), shift = fine; compact readouts (7.0K, 1480) never truncated; manual ch.5 parameter audit table in docs/kdfx_coverage.md |
 | (this push) | **Track reverb shortcuts removed**; **Per-bloc IN-GN (input gain)** (-96dB/-INF to +3dB, default 0dB) on all blocs; **MST SEND bloc** (`GLOBAL_SEND`) to send track audio into master FX busses (BUS 1/2/3) across all routing topologies |
+| (uncommitted, same session) | **stock reverb UI retired — reverb is FX BLOCS only**: `reverbMenu` (per-sound), `globalReverbMenu` (audio-clip / song view / kit global FX / performance view), the reverb sidechain submenu, and the reverb cells in the four pad shortcut tables deleted; dead externs in visual_menu_data.cpp cleaned. Chain-side reverb (FREEVERB / MUTABLE / KDFX_REVERB) carries LEVEL + IN-GN as the amount. Engine still present at this point — removed in the next row |
+| (this change) | **stock reverb ENGINE deleted** (2026-10-09 directive: no legacy support): `AudioEngine::reverb` (~521KB SDRAM tank, bss −525KB), `renderReverb`, the `reverbBuffer` send buffer and its threading through Song/Clip/Output/Kit/Sound render signatures, `reverbAmountAdjust`, `GLOBAL_REVERB_AMOUNT` + `UNPATCHED_REVERB_SEND_AMOUNT` params (XML is name-keyed, old files skip cleanly), reverb sidechain globals + `updateReverbParams` + the `getThingWithMostReverb` machinery, reverb preset cycling (gold knobs), song `<reverb>` XML section, stock `dsp::Reverb` class + the old reverb menu_item headers. Kept: `GLOBAL_VOLUME_POST_REVERB_SEND` (sidechain duck tap), per-sound sidechain, `getMasterFxParamsFromSong` (renamed from getReverbParamsFromSong, now master-FX-only). NEXT per directive: delay → bloc, then mod FX / EQ / comp / crush |
 
 **Not yet hardware-verified:** everything from ecd715ad9 onward. Flash
 `build/Release/deluge.bin` (22:00 or later).

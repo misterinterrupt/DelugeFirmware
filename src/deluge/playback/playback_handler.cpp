@@ -1311,12 +1311,11 @@ void PlaybackHandler::doSongSwap(bool preservePlayPosition) {
 	AudioEngine::unassignAllVoices(true);
 	midiFollow.clearStoredClips(); // need to clear clip pointers stored for previous song
 	currentSong = preLoadedSong;
-	AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
 	preLoadedSong = NULL;
 	loadSongUI.deletedPartsOfOldSong = false;
 
 	currentSong->sendAllMIDIPGMs();
-	AudioEngine::getReverbParamsFromSong(currentSong);
+	AudioEngine::getMasterFxParamsFromSong(currentSong);
 
 	// Some more "if we're playing" stuff - this needs to happen after currentSong is swapped over, because
 	// resyncInternalTicksToInputTicks() references it

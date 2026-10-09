@@ -514,8 +514,7 @@ void Kit::cutAllSound() {
 
 // Beware - unlike usual, modelStack, a ModelStackWithThreeMainThings*,  might have a NULL timelineCounter
 bool Kit::renderGlobalEffectableForClip(ModelStackWithTimelineCounter* modelStack, StereoSample* globalEffectableBuffer,
-                                        int32_t* bufferToTransferTo, int32_t numSamples, int32_t* reverbBuffer,
-                                        int32_t reverbAmountAdjust, int32_t sideChainHitPending,
+                                        int32_t* bufferToTransferTo, int32_t numSamples, int32_t sideChainHitPending,
                                         bool shouldLimitDelayFeedback, bool isClipActive, int32_t pitchAdjust,
                                         int32_t amplitudeAtStart, int32_t amplitudeAtEnd) {
 	bool rendered = false;
@@ -557,9 +556,8 @@ bool Kit::renderGlobalEffectableForClip(ModelStackWithTimelineCounter* modelStac
 		ModelStackWithThreeMainThings* modelStackWithThreeMainThings =
 		    modelStack->addNoteRow(noteRowIndex, thisNoteRow)->addOtherTwoThings(soundDrum, drumParamManager);
 
-		soundDrum->render(modelStackWithThreeMainThings, globalEffectableBuffer, numSamples, reverbBuffer,
-		                  sideChainHitPending, reverbAmountAdjust, shouldLimitDelayFeedback, pitchAdjust,
-		                  nullptr); // According to our volume, we tell Drums to send less reverb
+		soundDrum->render(modelStackWithThreeMainThings, globalEffectableBuffer, numSamples, sideChainHitPending,
+		                  shouldLimitDelayFeedback, pitchAdjust, nullptr);
 		rendered = true;
 	}
 
@@ -648,8 +646,8 @@ yesTickParamManager:
 }
 
 void Kit::renderOutput(ModelStack* modelStack, StereoSample* outputBuffer, StereoSample* outputBufferEnd,
-                       int32_t numSamples, int32_t* reverbBuffer, int32_t reverbAmountAdjust,
-                       int32_t sideChainHitPending, bool shouldLimitDelayFeedback, bool isClipActive) {
+                       int32_t numSamples, int32_t sideChainHitPending, bool shouldLimitDelayFeedback,
+                       bool isClipActive) {
 
 	ParamManager* paramManager = getParamManager(modelStack->song);
 
@@ -657,8 +655,8 @@ void Kit::renderOutput(ModelStack* modelStack, StereoSample* outputBuffer, Stere
 	// Beware - modelStackWithThreeMainThings might have a NULL timelineCounter
 
 	GlobalEffectableForClip::renderOutput(modelStackWithTimelineCounter, paramManager, outputBuffer, numSamples,
-	                                      reverbBuffer, reverbAmountAdjust, sideChainHitPending,
-	                                      shouldLimitDelayFeedback, isClipActive, OutputType::KIT, recorder);
+	                                      sideChainHitPending, shouldLimitDelayFeedback, isClipActive, OutputType::KIT,
+	                                      recorder);
 }
 
 // offer the CC to kit gold knobs without also offering to all drums
@@ -892,8 +890,6 @@ bool Kit::setActiveClip(ModelStackWithTimelineCounter* modelStack, PgmChangeSend
 				thisDrum->drumWontBeRenderedForAWhile();
 			}
 		}
-
-		AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
 	}
 	return clipChanged;
 }
@@ -1009,28 +1005,6 @@ GateDrum* Kit::getGateDrumForChannel(int32_t gateChannel) {
 void Kit::resetDrumTempValues() {
 	for (Drum* thisDrum = firstDrum; thisDrum; thisDrum = thisDrum->next) {
 		thisDrum->noteRowAssignedTemp = 0;
-	}
-}
-
-void Kit::getThingWithMostReverb(Sound** soundWithMostReverb, ParamManager** paramManagerWithMostReverb,
-                                 GlobalEffectableForClip** globalEffectableWithMostReverb,
-                                 int32_t* highestReverbAmountFound) {
-
-	GlobalEffectableForClip::getThingWithMostReverb(activeClip, soundWithMostReverb, paramManagerWithMostReverb,
-	                                                globalEffectableWithMostReverb, highestReverbAmountFound);
-
-	if (activeClip) {
-
-		for (int32_t i = 0; i < ((InstrumentClip*)activeClip)->noteRows.getNumElements(); i++) {
-			NoteRow* thisNoteRow = ((InstrumentClip*)activeClip)->noteRows.getElement(i);
-			if (!thisNoteRow->drum || thisNoteRow->drum->type != DrumType::SOUND) {
-				continue;
-			}
-			((SoundDrum*)thisNoteRow->drum)
-			    ->getThingWithMostReverb(soundWithMostReverb, paramManagerWithMostReverb,
-			                             globalEffectableWithMostReverb, highestReverbAmountFound,
-			                             &thisNoteRow->paramManager);
-		}
 	}
 }
 

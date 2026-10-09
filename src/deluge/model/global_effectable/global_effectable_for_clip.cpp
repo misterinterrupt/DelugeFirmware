@@ -49,8 +49,7 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 // Beware - unlike usual, modelStack might have a NULL timelineCounter.
 [[gnu::hot]] void GlobalEffectableForClip::renderOutput(ModelStackWithTimelineCounter* modelStack,
                                                         ParamManager* paramManagerForClip, StereoSample* outputBuffer,
-                                                        int32_t numSamples, int32_t* reverbBuffer,
-                                                        int32_t reverbAmountAdjust, int32_t sideChainHitPending,
+                                                        int32_t numSamples, int32_t sideChainHitPending,
                                                         bool shouldLimitDelayFeedback, bool isClipActive,
                                                         OutputType outputType, SampleRecorder* recorder) {
 	fxChain.applyPending();
@@ -74,8 +73,6 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 		volumePostFX += (volumeAdjustment >> 2);
 	}
 
-	int32_t reverbAmountAdjustForDrums = multiply_32x32_rshift32_rounded(reverbAmountAdjust, volumeAdjustment) << 5;
-
 	int32_t pitchAdjust =
 	    getFinalParameterValueExp(kMaxSampleValue, unpatchedParams->getValue(params::UNPATCHED_PITCH_ADJUST) >> 3);
 
@@ -86,10 +83,6 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 	}
 
 	setupFilterSetConfig(&volumePostFX, paramManagerForClip);
-
-	int32_t reverbSendAmount = getFinalParameterValueVolume(
-	    reverbAmountAdjust,
-	    cableToLinearParamShortcut(unpatchedParams->getValue(params::UNPATCHED_REVERB_SEND_AMOUNT)));
 
 	int32_t pan = unpatchedParams->getValue(params::UNPATCHED_PAN) >> 1;
 
@@ -125,9 +118,9 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 	memset(globalEffectableBuffer, 0, sizeof(StereoSample) * numSamples);
 
 	// Render actual Drums / AudioClip
-	renderedLastTime = renderGlobalEffectableForClip(
-	    modelStack, globalEffectableBuffer, NULL, numSamples, reverbBuffer, reverbAmountAdjustForDrums,
-	    sideChainHitPending, shouldLimitDelayFeedback, isClipActive, pitchAdjust, 134217728, 134217728);
+	renderedLastTime = renderGlobalEffectableForClip(modelStack, globalEffectableBuffer, NULL, numSamples,
+	                                                 sideChainHitPending, shouldLimitDelayFeedback, isClipActive,
+	                                                 pitchAdjust, 134217728, 134217728);
 
 	// Render saturation
 	if (clippingAmount) {
@@ -154,8 +147,7 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 		recorder->feedAudio((int32_t*)globalEffectableBuffer, numSamples, true, 2);
 	}
 
-	processReverbSendAndVolume(globalEffectableBuffer, numSamples, reverbBuffer, volumePostFX, postReverbVolume,
-	                           0, pan, true);
+	processOutputVolume(globalEffectableBuffer, numSamples, volumePostFX, postReverbVolume, pan, true);
 	if (compBlend > 0) {
 		compressor.renderVolNeutral(globalEffectableBuffer, numSamples, volumePostFX);
 	}
@@ -203,7 +195,7 @@ int32_t GlobalEffectableForClip::getParameterFromKnob(int32_t whichModEncoder) {
 
 void GlobalEffectableForClip::modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTimeline* paramManager) {
 	if (whichModButton == 4) {
-		displaySidechainAndReverbSettings(on);
+		displaySidechainSettings(on);
 		return;
 	}
 
@@ -235,23 +227,10 @@ bool GlobalEffectableForClip::modEncoderButtonAction(uint8_t whichModEncoder, bo
 				// if mod button is pressed, update mod button pop up
 				if (Buttons::isButtonPressed(
 				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displaySidechainAndReverbSettings(on);
+					displaySidechainSettings(on);
 				}
 				else {
 					display->displayPopup(getSidechainDisplayName());
-				}
-				return true;
-			}
-			else if (whichModEncoder == 0) { // reverb
-				view.cycleThroughReverbPresets();
-
-				// if mod button is pressed, update mod button pop up
-				if (Buttons::isButtonPressed(
-				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displaySidechainAndReverbSettings(on);
-				}
-				else {
-					display->displayPopup(view.getReverbPresetDisplayName(view.getCurrentReverbPreset()));
 				}
 				return true;
 			}
@@ -259,31 +238,4 @@ bool GlobalEffectableForClip::modEncoderButtonAction(uint8_t whichModEncoder, bo
 	}
 
 	return GlobalEffectable::modEncoderButtonAction(whichModEncoder, on, modelStack);
-}
-
-// We pass activeClip into this because although each child of GlobalEffectableForClip inherits Output, one of them does
-// so via Instrument, so we can't make GlobalEffectableForClip inherit directly from Output, so no access to activeClip
-void GlobalEffectableForClip::getThingWithMostReverb(Clip* activeClip, Sound** soundWithMostReverb,
-                                                     ParamManager** paramManagerWithMostReverb,
-                                                     GlobalEffectableForClip** globalEffectableWithMostReverb,
-                                                     int32_t* highestReverbAmountFound) {
-
-	if (activeClip) {
-
-		ParamManagerForTimeline* activeParamManager = &activeClip->paramManager;
-
-		UnpatchedParamSet* unpatchedParams = activeParamManager->getUnpatchedParamSet();
-
-		if (!unpatchedParams->params[params::UNPATCHED_REVERB_SEND_AMOUNT].isAutomated()
-		    && unpatchedParams->params[params::UNPATCHED_REVERB_SEND_AMOUNT].containsSomething(-2147483648)) {
-
-			int32_t reverbHere = unpatchedParams->getValue(params::UNPATCHED_REVERB_SEND_AMOUNT);
-			if (*highestReverbAmountFound < reverbHere) {
-				*highestReverbAmountFound = reverbHere;
-				*soundWithMostReverb = NULL;
-				*paramManagerWithMostReverb = activeParamManager;
-				*globalEffectableWithMostReverb = this;
-			}
-		}
-	}
 }

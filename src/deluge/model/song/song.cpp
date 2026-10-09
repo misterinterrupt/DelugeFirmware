@@ -19,7 +19,6 @@
 #include "definitions_cxx.hpp"
 #include "dsp/fx_bloc/fx_bloc.hpp"
 #include "dsp/fx_bloc/master_fx_chain.hpp"
-#include "dsp/reverb/reverb.hpp"
 #include "gui/l10n/l10n.h"
 #include "gui/ui/browser/browser.h"
 #include "gui/ui/load/load_instrument_preset_ui.h"
@@ -170,17 +169,6 @@ Song::Song() : backedUpParamManagers(sizeof(BackedUpParamManager)) {
 	arrangerAutoScrollModeActive = false;
 
 	paramsInAutomationMode = false;
-
-	// Setup reverb temp variables
-	reverbRoomSize = (float)30 / 50;
-	reverbDamp = (float)36 / 50;
-	reverbHPF = 0;
-	reverbWidth = 1;
-	reverbPan = 0;
-	reverbSidechainVolume = getParamFromUserValue(params::STATIC_SIDECHAIN_VOLUME, -1);
-	reverbSidechainShape = -601295438;
-	reverbSidechainSync = SYNC_LEVEL_8TH;
-	model = deluge::dsp::Reverb::Model::FREEVERB;
 
 	// Master FX chain defaults to the dormant all-EMPTY state.
 	masterFxRouting = 0;
@@ -1146,36 +1134,6 @@ weAreInArrangementEditorOrInClipInstance:
 	}
 	writer.writeClosingTag("modeNotes");
 
-	writer.writeOpeningTagBeginning("reverb");
-	deluge::dsp::Reverb::Model model = AudioEngine::reverb.getModel();
-	uint32_t roomSize = AudioEngine::reverb.getRoomSize() * (uint32_t)2147483648u;
-	uint32_t damping = AudioEngine::reverb.getDamping() * (uint32_t)2147483648u;
-	uint32_t width = AudioEngine::reverb.getWidth() * (uint32_t)2147483648u;
-	uint32_t hpf = AudioEngine::reverb.getHPF() * (uint32_t)2147483648u;
-
-	roomSize = std::min(roomSize, (uint32_t)2147483647);
-	damping = std::min(damping, (uint32_t)2147483647);
-	width = std::min(width, (uint32_t)2147483647);
-	hpf = std::min(hpf, (uint32_t)2147483647);
-
-	writer.writeAttribute("roomSize", roomSize);
-	writer.writeAttribute("dampening", damping);
-	writer.writeAttribute("width", width);
-	writer.writeAttribute("hpf", hpf);
-	writer.writeAttribute("pan", AudioEngine::reverbPan);
-	writer.writeAttribute("model", util::to_underlying(model));
-	writer.writeOpeningTagEnd();
-
-	writer.writeOpeningTagBeginning("compressor");
-	writer.writeAttribute("attack", AudioEngine::reverbSidechain.attack);
-	writer.writeAttribute("release", AudioEngine::reverbSidechain.release);
-	writer.writeAttribute("volume", AudioEngine::reverbSidechainVolume);
-	writer.writeAttribute("shape", AudioEngine::reverbSidechainShape);
-	writer.writeAttribute("syncLevel", AudioEngine::reverbSidechain.syncLevel);
-	writer.closeTag();
-
-	writer.writeClosingTag("reverb");
-
 	// Modular master FX chain. Only non-EMPTY slots are written, so legacy songs and
 	// the default all-EMPTY chain stay byte-identical. Param order: kPersistParams.
 	{
@@ -1383,87 +1341,9 @@ Error Song::readFromFile(Deserializer& reader) {
 
 	uint64_t newTimePerTimerTick = (uint64_t)1 << 32; // TODO: make better!
 
-	// reverb mode is freeverb for songs that predate having multiple options. New songs will set it to mutable anyway
-	// so this is only used as a fallback
-	model = deluge::dsp::Reverb::Model::FREEVERB;
-
 	while (*(tagName = reader.readNextTagOrAttributeName())) {
 		// D_PRINTLN(tagName); delayMS(30);
 		switch (*(uint32_t*)tagName) {
-
-		// "reve" -> reverb
-		case 0x65766572:
-			if (!strcmp(tagName, "reverb")) {
-				while (*(tagName = reader.readNextTagOrAttributeName())) {
-					if (!strcmp(tagName, "model")) {
-						model = static_cast<deluge::dsp::Reverb::Model>(reader.readTagOrAttributeValueInt());
-						reader.exitTag("model");
-					}
-					else if (!strcmp(tagName, "roomSize")) {
-						reverbRoomSize = (float)reader.readTagOrAttributeValueInt() / 2147483648u;
-						reader.exitTag("roomSize");
-					}
-					else if (!strcmp(tagName, "dampening")) {
-						reverbDamp = (float)reader.readTagOrAttributeValueInt() / 2147483648u;
-						reader.exitTag("dampening");
-					}
-					else if (!strcmp(tagName, "width")) {
-						int32_t widthInt = reader.readTagOrAttributeValueInt();
-						if (widthInt == -2147483648) {
-							widthInt = 2147483647; // Was being saved incorrectly in V2.1.0-beta1 and alphas, so we fix
-							                       // it on read here!
-						}
-						reverbWidth = (float)widthInt / 2147483648u;
-						reader.exitTag("width");
-					}
-					else if (!strcmp(tagName, "hpf")) {
-						reverbHPF = (float)reader.readTagOrAttributeValueInt() / 2147483648u;
-						reader.exitTag("hpf");
-					}
-					else if (!strcmp(tagName, "pan")) {
-						reverbPan = reader.readTagOrAttributeValueInt();
-						reader.exitTag("pan");
-					}
-					else if (!strcmp(tagName, "compressor")) {
-						while (*(tagName = reader.readNextTagOrAttributeName())) {
-							if (!strcmp(tagName, "attack")) {
-								reverbSidechainAttack = reader.readTagOrAttributeValueInt();
-								reader.exitTag("attack");
-							}
-							else if (!strcmp(tagName, "release")) {
-								reverbSidechainRelease = reader.readTagOrAttributeValueInt();
-								reader.exitTag("release");
-							}
-							else if (!strcmp(tagName, "volume")) {
-								reverbSidechainVolume = reader.readTagOrAttributeValueInt();
-								reader.exitTag("volume");
-							}
-							else if (!strcmp(tagName, "shape")) {
-								reverbSidechainShape = reader.readTagOrAttributeValueInt();
-								reader.exitTag("shape");
-							}
-							else if (!strcmp(tagName, "syncLevel")) {
-								reverbSidechainSync = (SyncLevel)convertSyncLevelFromFileValueToInternalValue(
-								    reader.readTagOrAttributeValueInt());
-								reverbSidechainSync = (SyncLevel)std::min((uint8_t)reverbSidechainSync, (uint8_t)9);
-								reader.exitTag("syncLevel");
-							}
-							else {
-								reader.exitTag(tagName);
-							}
-						}
-						reader.exitTag("compressor");
-					}
-			else {
-				reader.exitTag(tagName);
-			}
-		}
-	}
-			else {
-				goto unknownTag;
-			}
-			reader.exitTag();
-			break;
 
 		// "mast" -> masterFx
 		case 0x7473616D:
@@ -2453,8 +2333,7 @@ void Song::deleteSoundsWhichWontSound() {
 	deleteAllBackedUpParamManagersWithClips();
 }
 
-void Song::renderAudio(StereoSample* outputBuffer, int32_t numSamples, int32_t* reverbBuffer,
-                       int32_t sideChainHitPending) {
+void Song::renderAudio(StereoSample* outputBuffer, int32_t numSamples, int32_t sideChainHitPending) {
 
 	// int32_t volumePostFX = getParamNeutralValue(params::GLOBAL_VOLUME_POST_FX);
 	int32_t volumePostFX =
@@ -2479,8 +2358,8 @@ void Song::renderAudio(StereoSample* outputBuffer, int32_t numSamples, int32_t* 
 		    (output->getActiveClip() && isClipActive(output->getActiveClip()->getClipBeingRecordedFrom()));
 		DISABLE_ALL_INTERRUPTS();
 		if (output->shouldRenderInSong()) {
-			output->renderOutput(modelStack, outputBuffer, outputBuffer + numSamples, numSamples, reverbBuffer,
-			                     volumePostFX >> 1, sideChainHitPending, !isClipActiveNow, isClipActiveNow);
+			output->renderOutput(modelStack, outputBuffer, outputBuffer + numSamples, numSamples, sideChainHitPending,
+			                     !isClipActiveNow, isClipActiveNow);
 		}
 		ENABLE_INTERRUPTS();
 #if DO_AUDIO_LOG
@@ -2509,13 +2388,8 @@ void Song::renderAudio(StereoSample* outputBuffer, int32_t numSamples, int32_t* 
 	                                              delayWorkingState);
 
 	int32_t postReverbVolume = paramNeutralValues[params::GLOBAL_VOLUME_POST_REVERB_SEND];
-	int32_t reverbSendAmount =
-	    getFinalParameterValueVolume(paramNeutralValues[params::GLOBAL_REVERB_AMOUNT],
-	                                 cableToLinearParamShortcut(paramManager.getUnpatchedParamSet()->getValue(
-	                                     params::UNPATCHED_REVERB_SEND_AMOUNT)));
 
-	globalEffectable.processReverbSendAndVolume(outputBuffer, numSamples, reverbBuffer, volumePostFX, postReverbVolume,
-	                                            reverbSendAmount >> 1);
+	globalEffectable.processOutputVolume(outputBuffer, numSamples, volumePostFX, postReverbVolume);
 
 	if (playbackHandler.isEitherClockActive() && !playbackHandler.ticksLeftInCountIn
 	    && currentPlaybackMode == &arrangement) {
@@ -3320,8 +3194,6 @@ int32_t Song::removeOutputFromMainList(
 
 	*prevPointer = output->next;
 
-	AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
-
 	int32_t bottomYDisplay = -arrangementYScroll;
 	int32_t topYDisplay = bottomYDisplay + getNumOutputs();
 
@@ -3467,7 +3339,6 @@ traverseClips:
 	if (outputRecordingOldOutput) {
 		((AudioOutput*)outputRecordingOldOutput)->setOutputRecordingFrom(newOutput, true);
 	}
-	AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
 }
 
 // NOTE: for Instruments not currently in any list
@@ -5183,8 +5054,6 @@ void Song::replaceOutputLowLevel(Output* newOutput, Output* oldOutput) {
 
 	// Properly do away with the oldInstrument
 	deleteOrAddToHibernationListOutput(oldOutput);
-
-	AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
 }
 
 void Song::getNoteLengthName(StringBuf& buffer, uint32_t noteLength, char const* const notesString,
@@ -5343,9 +5212,6 @@ lookAtNextOne:
 	if (forceClipsAboveToMoveVertically || amountOfStuffAbove > amountOfStuffBelow) {
 		songViewYScroll--;
 	}
-
-	AudioEngine::mustUpdateReverbParamsBeforeNextRender =
-	    true; // Necessary? Maybe the Instrument would get deleted from the master list?
 }
 
 // Please stop the Clip from soloing before calling this

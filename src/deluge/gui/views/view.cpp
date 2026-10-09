@@ -18,7 +18,6 @@
 #include "gui/views/view.h"
 #include "definitions_cxx.hpp"
 #include "deluge/model/settings/runtime_feature_settings.h"
-#include "dsp/reverb/reverb.hpp"
 #include "extern.h"
 #include "gui/colour/colour.h"
 #include "gui/context_menu/clear_song.h"
@@ -1975,42 +1974,6 @@ void View::setModRegion(uint32_t pos, uint32_t length, int32_t noteRowId) {
 void View::pretendModKnobsUntouchedForAWhile() {
 	encoders::timeModEncoderLastTurned[0] = encoders::timeModEncoderLastTurned[1] =
 	    AudioEngine::audioSampleTimer - kSampleRate;
-}
-
-void View::cycleThroughReverbPresets() {
-
-	int32_t currentPreset = getCurrentReverbPreset();
-
-	int32_t newPreset = currentPreset + 1;
-	if (newPreset >= NUM_PRESET_REVERBS) {
-		newPreset = 0;
-	}
-
-	AudioEngine::reverb.setRoomSize((float)presetReverbRoomSize[newPreset] / 50);
-	AudioEngine::reverb.setDamping((float)presetReverbDamping[newPreset] / 50);
-}
-
-int32_t View::getCurrentReverbPreset() {
-	int32_t currentRoomSize = AudioEngine::reverb.getRoomSize() * 50;
-	int32_t currentDamping = AudioEngine::reverb.getDamping() * 50;
-
-	// See which preset we're the closest to currently
-	int32_t lowestDifferentness = 1000;
-	int32_t currentPreset;
-	for (int32_t p = 0; p < NUM_PRESET_REVERBS; p++) {
-		int32_t differentness =
-		    std::abs(currentRoomSize - presetReverbRoomSize[p]) + std::abs(currentDamping - presetReverbDamping[p]);
-		if (differentness < lowestDifferentness) {
-			lowestDifferentness = differentness;
-			currentPreset = p;
-		}
-	}
-
-	return currentPreset;
-}
-
-char const* View::getReverbPresetDisplayName(int32_t preset) {
-	return deluge::l10n::get(presetReverbNames[preset]);
 }
 
 void View::displayOutputName(Output* output, bool doBlink, Clip* clip) {

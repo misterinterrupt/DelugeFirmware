@@ -8,6 +8,7 @@
 #include "song_mock.h"
 #else
 #include "hid/display/display.h"
+#include "gui/l10n/l10n.h"
 #include "model/song/song.h"
 #include "util/functions.h"
 #endif

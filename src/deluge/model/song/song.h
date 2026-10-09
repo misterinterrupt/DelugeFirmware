@@ -18,7 +18,6 @@
 #pragma once
 
 #include "definitions_cxx.hpp"
-#include "gui/menu_item/reverb/model.h"
 #include "io/midi/learned_midi.h"
 #include "model/clip/clip.h"
 #include "model/clip/clip_array.h"
@@ -276,8 +275,7 @@ public:
 	Error readFromFile(Deserializer& reader);
 	void writeToFile(StorageManager& bdsm);
 	void loadAllSamples(bool mayActuallyReadFiles = true);
-	void renderAudio(StereoSample* outputBuffer, int32_t numSamples, int32_t* reverbBuffer,
-	                 int32_t sideChainHitPending);
+	void renderAudio(StereoSample* outputBuffer, int32_t numSamples, int32_t sideChainHitPending);
 	bool isYNoteAllowed(int32_t yNote, bool inKeyMode);
 	Clip* syncScalingClip;
 	void setTimePerTimerTick(uint64_t newTimeBig, bool shouldLogAction = false);
@@ -393,23 +391,11 @@ public:
 	void expectEvent() override;
 	TimelineCounter* getTimelineCounterToRecordTo() override;
 
-	// Reverb params to be stored here between loading and song being made the active one
-	dsp::Reverb::Model model;
-	float reverbRoomSize;
-	float reverbHPF;
-	float reverbDamp;
-	float reverbWidth;
-	int32_t reverbPan;
-	int32_t reverbSidechainVolume;
-	int32_t reverbSidechainShape;
-	int32_t reverbSidechainAttack;
-	int32_t reverbSidechainRelease;
-	SyncLevel reverbSidechainSync;
-
-	// Modular master FX chain, staged from XML between loading and the song being made
-	// active; applied by AudioEngine::getReverbParamsFromSong(). Slot params are
-	// indexed by dsp::FxBloc::Param; masterFxParamSeen marks which were present in
-	// the file (the rest take the engine's own defaults).
+	// Modular master FX chain, staged from XML between loading and the song being
+	// made active; applied in Song::renderAudio's caller via masterFxChain.applyPending()
+	// and the staged setters. Slot params are indexed by dsp::FxBloc::Param;
+	// masterFxParamSeen marks which were present in the file (the rest take the
+	// engine's own defaults).
 	static constexpr int32_t kMasterFxNumParams = 60; // dsp::FxBloc::Param::kNumParams
 	int32_t masterFxRouting = 0;                      // dsp::MasterFxChain::Routing
 	int32_t masterFxModels[3] = {0, 0, 0};            // dsp::FxBloc::Model per slot

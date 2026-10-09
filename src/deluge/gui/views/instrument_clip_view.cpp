@@ -692,8 +692,6 @@ doOther:
 
 					currentUIMode = UI_MODE_NONE;
 
-					AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
-
 					break;
 				}
 			}
@@ -3425,7 +3423,6 @@ doRenderRow:
 		}
 
 		noteRow->setDrum(newDrum, getCurrentKit(), modelStackWithNoteRow);
-		AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
 		setSelectedDrum(newDrum, true);
 		goto doRenderRow;
 	}
@@ -3746,7 +3743,6 @@ Drum* InstrumentClipView::getAuditionedDrum(int32_t velocity, int32_t yDisplay, 
 						ModelStackWithNoteRow* modelStackWithNoteRow =
 						    modelStackWithTimelineCounter->addNoteRow(noteRowIndex, newNoteRow);
 						newNoteRow->setDrum(drumForNewNoteRow, (Kit*)instrument, modelStackWithNoteRow);
-						AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
 					}
 				}
 				if (display->haveOLED()) {
@@ -4101,8 +4097,6 @@ void InstrumentClipView::deleteDrum(SoundDrum* drum) {
 	void* toDealloc = dynamic_cast<void*>(drum);
 	drum->~SoundDrum();
 	delugeDealloc(toDealloc);
-
-	AudioEngine::mustUpdateReverbParamsBeforeNextRender = true;
 
 	// We should repopulateNoteRowsOnscreen() and everything, but this will only be called just before the UI
 	// sessions starts again anyway
