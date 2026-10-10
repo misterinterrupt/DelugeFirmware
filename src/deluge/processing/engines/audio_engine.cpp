@@ -18,6 +18,7 @@
 #include "processing/engines/audio_engine.h"
 #include "definitions_cxx.hpp"
 #include "dsp/fx_bloc/master_fx_chain.hpp"
+#include "dsp/fx_bloc/engine_arena.hpp"
 #include "dsp/timestretch/time_stretcher.h"
 #include "extern.h"
 #include "gui/context_menu/sample_browser/kit.h"
@@ -212,6 +213,10 @@ Voice* firstUnassignedVoice = staticVoices.begin();
 
 // You must set up dynamic memory allocation before calling this, because of its call to setupWithPatching()
 void init() {
+	// Carve the FX-engine arena while the sample cache is still empty — engine
+	// picks then never have to steal cache clusters (audible audio stall).
+	dsp::fx_arena::init();
+
 	paramManagerForSamplePreview = new ((void*)paramManagerForSamplePreviewMemory) ParamManagerForTimeline();
 	paramManagerForSamplePreview->setupWithPatching(); // Shouldn't be an error at init time...
 	Sound::initParams(paramManagerForSamplePreview);

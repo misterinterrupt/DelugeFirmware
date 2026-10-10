@@ -42,6 +42,7 @@
 #include "dsp/reverb/kdfx/tubeamp.hpp"
 #include "dsp/reverb/mutable/reverb.hpp"
 #include "dsp/stereo_sample.h"
+#include "dsp/fx_bloc/engine_arena.hpp"
 #include "memory/general_memory_allocator.h"
 #include <algorithm>
 #include <array>
@@ -110,6 +111,7 @@ public:
 		destroyEngine(engine_);
 		destroyEngine(pendingEngine_);
 		destroyEngine(retiredEngine_);
+		destroyEngine(retiredOlder_);
 	}
 
 	Model getModel() const { return pendingSwap_ ? pendingModel_ : model_; }
@@ -496,9 +498,16 @@ public:
 		renderGeneration_++;
 		if (pendingSwap_) {
 			pendingSwap_ = false;
-			// Retire whatever the renderer may currently be inside of; it becomes
-			// freeable once a FURTHER boundary has passed (see reclaimRetired).
-			destroyEngine(retiredEngine_);
+			// Retire whatever the renderer may currently be inside of. Its memory is
+			// freed ONLY on the UI thread (reclaimRetired / the destructor) — the arena
+			// is single-threaded by design, and this also keeps the audio thread free
+			// of dealloc work.
+			if (retiredEngine_ != nullptr) {
+				// The UI reclaim didn't run between swaps (sub-millisecond double-pick).
+				// The displaced engine is at least one full boundary dead by now; park it
+				// one slot deeper where the next UI reclaim frees it unconditionally.
+				retiredOlder_ = retiredEngine_;
+			}
 			retiredEngine_ = engine_;
 			retiredAtGeneration_ = renderGeneration_;
 			engine_ = pendingEngine_;
@@ -1023,7 +1032,12 @@ private:
 			size = sizeof(reverb::Freeverb);
 			break;
 		}
-		void* memory = GeneralMemoryAllocator::get().allocLowSpeed(size);
+		// Engine-sized requests come from the boot-time FX arena (no free-list walk,
+		// no sample-cache eviction); the general allocator is only the fallback.
+		void* memory = fx_arena::alloc(size);
+		if (memory == nullptr) {
+			memory = GeneralMemoryAllocator::get().allocLowSpeed(size);
+		}
 		if (memory == nullptr) {
 			return nullptr;
 		}
@@ -1113,7 +1127,12 @@ private:
 	static void destroyEngine(reverb::Base*& e) {
 		if (e != nullptr) {
 			e->~Base(); // virtual: destroys the concrete engine
-			GeneralMemoryAllocator::get().dealloc(e);
+			if (fx_arena::owns(e)) {
+				fx_arena::free(e); // UI thread only (see engine_arena.hpp)
+			}
+			else {
+				GeneralMemoryAllocator::get().dealloc(e);
+			}
 			e = nullptr;
 		}
 	}
@@ -1122,6 +1141,8 @@ private:
 	/// least one further render boundary since the swap, so no in-flight process() can
 	/// still be inside it.
 	void reclaimRetired() {
+		destroyEngine(retiredOlder_);
+		retiredOlder_ = nullptr;
 		if (retiredEngine_ != nullptr && renderGeneration_ > retiredAtGeneration_) {
 			destroyEngine(retiredEngine_);
 		}
@@ -1143,6 +1164,7 @@ private:
 	reverb::Base* engine_ = nullptr;
 	reverb::Base* pendingEngine_ = nullptr;
 	reverb::Base* retiredEngine_ = nullptr;
+	reverb::Base* retiredOlder_ = nullptr;
 
 	/// Bumped by the audio side every applyPending(); read by the UI side for the
 	/// retirement grace check. Torn reads are impossible (aligned uint32) and a stale
