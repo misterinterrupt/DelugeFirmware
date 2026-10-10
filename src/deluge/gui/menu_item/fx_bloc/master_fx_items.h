@@ -54,6 +54,10 @@ public:
 	    dsp::FxBloc::Model::KDFX_QNT_FLG, dsp::FxBloc::Model::KDFX_SPEC4,
 	    dsp::FxBloc::Model::KDFX_CHO_4TAP, dsp::FxBloc::Model::KDFX_CHO_X_4TAP,
 	    dsp::FxBloc::Model::KDFX_FLG_4TAP, dsp::FxBloc::Model::KDFX_FLG_X_4TAP,
+	    dsp::FxBloc::Model::KDFX_REV_COMP, dsp::FxBloc::Model::KDFX_TUB_FLANG,
+	    dsp::FxBloc::Model::KDFX_PITCHER, dsp::FxBloc::Model::KDFX_FLG_PTCHR,
+	    dsp::FxBloc::Model::KDFX_PTCHR_CHO, dsp::FxBloc::Model::KDFX_PTCHR_FLG,
+	    dsp::FxBloc::Model::KDFX_PTCHR_CHO_DLY, dsp::FxBloc::Model::KDFX_PTCHR_FLG_DLY,
 	    dsp::FxBloc::Model::COMPRESSOR,
 	    dsp::FxBloc::Model::GLOBAL_SEND,
 	};
@@ -62,7 +66,9 @@ public:
 	    "KDFX FLANGER", "KDFX PHASER", "KDFX TREMOLO", "KDFX PAN", "KDFX DIST", "KDFX TUBEAMP",
 	    "KDFX LASER", "CHO+DLY", "CHO+REV", "FLG+DLY", "FLG+REV", "FLG+LASER", "TONE+REV",
 	    "RESFILT", "ENVFILT", "LFOFILT", "RINGMOD", "QUANT", "QNT+FLG", "SPEC 4-TAP",
-	    "CHO+4TAP", "CHO<>4TAP", "FLG+4TAP", "FLG<>4TAP", "COMPRESSOR", "MST SEND",
+	    "CHO+4TAP", "CHO<>4TAP", "FLG+4TAP", "FLG<>4TAP", "REV<>COMP", "TUBAMP<>FLG",
+	    "PTCHR", "FLG<>PTCHR", "MNPTCHR+CHO", "MNPTCHR+FLN", "PTCHR+CHO+DLY", "PTCHR+FLN+DLY",
+	    "COMPRESSOR", "MST SEND",
 	};
 
 	// The names and models are a hand-maintained parallel pair — when they last
@@ -338,21 +344,26 @@ public:
 			return;
 		}
 		// Real-unit readout from the fine value space, compacted to fit a 32px
-		// column (~5 chars): shed a decimal, then switch to K-notation for large
-		// values, then drop the unit rather than truncate ("7.0K", "-24DB").
+		// column (~5 chars). Compaction order matters for the decimal cursor:
+		// shed a decimal, then drop the unit, and only then switch to
+		// K-notation. K-notation writes a pseudo-decimal ("3.7K") that the
+		// caret code can't map to the digit the encoder actually steps — with
+		// the unit dropped first, frequency params like 7019 keep every digit
+		// on screen and the selected place matches the changing number.
 		const char* unit = d.unit != nullptr ? d.unit : "%";
 		char num[12];
 		snprintf(num, sizeof(num), "%.*f%s", d.decimals, real, unit);
 		if (strlen(num) > 5) {
 			snprintf(num, sizeof(num), "%.*f%s", std::max(0, d.decimals - 1), real, unit);
-			if (strlen(num) > 5) {
-				if (std::fabs(real) >= 995.0f) {
-					snprintf(num, sizeof(num), "%.*fK", 1, real / 1000.0f);
-				}
-				if (strlen(num) > 5) {
-					snprintf(num, sizeof(num), "%.0f", real);
-				}
-			}
+		}
+		if (strlen(num) > 5) {
+			snprintf(num, sizeof(num), "%.*f", std::max(0, d.decimals - 1), real); // drop the unit
+		}
+		if (strlen(num) > 5 && std::fabs(real) >= 995.0f) {
+			snprintf(num, sizeof(num), "%.1fK", real / 1000.0f);
+		}
+		if (strlen(num) > 5) {
+			snprintf(num, sizeof(num), "%.0f", real);
 		}
 		snprintf(outBuffer, bufferSize, "%s", num);
 	}

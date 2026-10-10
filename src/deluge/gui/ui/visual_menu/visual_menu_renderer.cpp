@@ -137,8 +137,13 @@ void VisualMenuRenderer::renderPage(deluge::hid::display::oled_canvas::Canvas& c
 			// Decimal cursor if active
 			if (s == decimalCursorSlot && decimalEditPos >= 0 && slot.item->numDecimalPositions() > 1) {
 				const char* dot = strchr(valBuf, '.');
-				int32_t targetCharIdx = -1;
+				bool kNotation = false; // "3.7K": the dot is a thousands separator, not a decimal point
 				if (dot != nullptr) {
+					size_t dotIdx = static_cast<size_t>(dot - valBuf);
+					kNotation = valBuf[dotIdx + 1] != '\0' && (valBuf[dotIdx + 1] == 'K' || valBuf[dotIdx + 2] == 'K');
+				}
+				int32_t targetCharIdx = -1;
+				if (dot != nullptr && !kNotation) {
 					int32_t dotIdx = static_cast<int32_t>(dot - valBuf);
 					if (decimalEditPos == 0) {
 						targetCharIdx = dotIdx - 1;

@@ -89,8 +89,14 @@ Flash the latest build. In order:
 - **KDFX filter bank 900–906**: Resonant, Envelope, Triggered, LFO Sweep filters as
   native insert engines (Freq 16-8372 HZ, Res 0-50 DB; Env adds sweep ±100% + rates
   0-300 DB/S per the manual).
-- Then: special FX (Ring Modulator 907, quantizer for 714, Pitcher 908 — the hard one),
-  comp/gate refinements 950-957, reverb voicings, studio tools.
+- Then: comp/gate refinements 950-957, reverb voicings, studio tools.
+- **Pitcher 908 + combos DONE** (see `docs/pitcher_bloc_spec.md`): PTCHR,
+  FLG<>PTCHR (712), MNPTCHR+CHO/+FLN (720/721), PTCHR+CHO+DLY / +FLN+DLY
+  (722/723 — the manual table numbers; the spec doc's "910/911" is a
+  transcription slip). Deviations from the spec: the resonator voice is the
+  Chamberlin two-pole SVF (unity peak, same voice as the Spectral 4-Tap comb
+  after the audibility fix), and the triples are a dedicated three-slot
+  engine rather than a nested pair.
 
 ### 2. Track FX — milestone 2a/2b: BANKED, awaiting device verification
 Per-track FxChains (3 slots each, all engines), FX BLOCS pages resolving the chain

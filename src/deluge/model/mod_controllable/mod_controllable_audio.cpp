@@ -458,8 +458,11 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 					}
 				}
 				if (chain != nullptr && slotIndex >= 0 && slotIndex < (int32_t)dsp::FxChain::kNumSlots) {
-					auto model = static_cast<dsp::FxBloc::Model>(
-					    std::clamp<int32_t>(modelVal, 0, util::to_underlying(dsp::FxBloc::Model::COMPRESSOR)));
+				// <model> persists as the Model enum's ordinal; the ceiling is the
+				// LAST valid model, not COMPRESSOR — clamping to COMPRESSOR (=1)
+				// made every saved bloc >= FREEVERB load as COMPRESSOR.
+				auto model = static_cast<dsp::FxBloc::Model>(
+				    std::clamp<int32_t>(modelVal, 0, util::to_underlying(dsp::FxBloc::Model::KDFX_PTCHR_FLG_DLY)));
 					bool ok = chain->slot(slotIndex).setModel(model);
 					if (!ok) {
 						// Budget/RAM limit: gracefully degrade to EMPTY

@@ -22,7 +22,15 @@ namespace deluge::dsp::reverb {
 
 class KdfxSpectral4Tap : public Base {
 public:
-	KdfxSpectral4Tap() = default;
+	KdfxSpectral4Tap() {
+		// Tune from the declared defaults — cache seeding only reads getters, so
+		// the coefficient fields must match the *_val_ defaults from birth.
+		for (int t = 0; t < 4; t++) {
+			setTapPitch(t, pitch_[t]);
+			setTapAmt(t, amt_[t]);
+			setTapShapr(t, shapr_[t]);
+		}
+	}
 	~KdfxSpectral4Tap() override = default;
 
 	void process(std::span<int32_t> in, std::span<StereoSample> output) override {
@@ -86,13 +94,13 @@ public:
 					shapedR = shapeTap(tapR, shaperGain_[t]);
 				}
 
-				// Comb filter: one-pole tuned resonator at the tap's pitch.
-				// A comb at frequency f over tap delay T is a delay of
-				// sampleRate/f samples; approximate with a one-pole
-				// resonant bandpass (half-bandwidth fixed Q) whose gain
-				// is set by PtAmt.
-				q31_t combL = runComb(combLP_[t], combHP_[t], shapedL, combCoeff_[t]);
-				q31_t combR = runComb(combLP2_[t], combHP2_[t], shapedR, combCoeff_[t]);
+				// Comb filter: a Chamberlin two-pole resonator tuned at the tap's
+				// pitch, unity peak gain (bp x damp) — a real tuned peak the
+				// PtAmt mix can drive to the front. The old one-pole LP-minus-HP
+				// pseudo-bandpass was near-inaudible, which made the P (pitch)
+				// and A (PtAmt) params feel dead.
+				q31_t combL = runComb(combLP_[t], combBP_[t], shapedL, combF_[t], combDamp_[t]);
+				q31_t combR = runComb(combLP2_[t], combBP2_[t], shapedR, combF_[t], combDamp_[t]);
 				q31_t amt = ptAmtQ31_[t];
 				shapedL = add_saturation(kdfx::q31_mul(shapedL, ONE_Q31 - amt), kdfx::q31_mul(combL, amt));
 				shapedR = add_saturation(kdfx::q31_mul(shapedR, ONE_Q31 - amt), kdfx::q31_mul(combR, amt));
@@ -172,29 +180,37 @@ public:
 	void setDelayTimeR(float v) override { setTapAmt(3, v); }
 	[[nodiscard]] float getDelayTimeR() const override { return amt_[3]; }
 
-	// Per-tap Shapr (0..1 -> 0.10-6.00x). S2-S4 ride the int-param ids
-	// (ChorusVoices/ShaperMode/ComboCfg) but arrive as continuous 0..1
-	// cache values — the FxBloc flush casts them, the value itself is 0..1.
+	// Per-tap Shapr (0..1 -> 0.10-6.00x). S2-S4 ride the Mod* float ids — they
+	// used to ride the int-param ids (ChorusVoices/ShaperMode/ComboCfg), whose
+	// flush casts the cache to int32 and truncated the continuous 0..1 to a
+	// dead 0: the taps 2-4 shapers never left their 0.10x floor.
 	void setDelayDrive(float v) override { setTapShapr(0, v); }
 	[[nodiscard]] float getDelayDrive() const override { return shapr_[0]; }
-	void setChorusVoices(int32_t v) override { setTapShapr(1, std::clamp<int32_t>(v, 0, 1)); }
-	void setShaperMode(int32_t v) override { setTapShapr(2, std::clamp<int32_t>(v, 0, 1)); }
-	void setComboCfg(int32_t v) override { setTapShapr(3, std::clamp<int32_t>(v, 0, 1)); }
+	void setModRate(float v) override { setTapShapr(1, v); }
+	[[nodiscard]] float getModRate() const override { return shapr_[1]; }
+	void setModDepth(float v) override { setTapShapr(2, v); }
+	[[nodiscard]] float getModDepth() const override { return shapr_[2]; }
+	void setModFdbk(float v) override { setTapShapr(3, v); }
+	[[nodiscard]] float getModFdbk() const override { return shapr_[3]; }
 
 	[[nodiscard]] uint32_t tailSamples() const override {
-		if (feedback_val_ < 0.0001f) {
-			return 0;
+		uint32_t loopTail = 0;
+		if (feedback_val_ >= 0.0001f) {
+			constexpr uint32_t kCeiling = 60u * 44100u;
+			if (feedback_val_ >= 0.9999f) {
+				loopTail = kCeiling;
+			}
+			else {
+				float n = 6.0f / -std::log(feedback_val_);
+				double tail = static_cast<double>(n) * static_cast<double>(loopDelay_);
+				loopTail = tail >= static_cast<double>(kCeiling) ? kCeiling : static_cast<uint32_t>(tail);
+			}
 		}
-		constexpr uint32_t kCeiling = 60u * 44100u;
-		if (feedback_val_ >= 0.9999f) {
-			return kCeiling;
+		uint32_t ring = 0;
+		for (int t = 0; t < 4; t++) {
+			ring = std::max(ring, combRing_[t]);
 		}
-		float n = 6.0f / -std::log(feedback_val_);
-		double tail = static_cast<double>(n) * static_cast<double>(loopDelay_);
-		if (tail >= static_cast<double>(kCeiling)) {
-			return kCeiling;
-		}
-		return static_cast<uint32_t>(tail);
+		return std::max(loopTail, ring);
 	}
 
 private:
@@ -209,24 +225,38 @@ private:
 		return kdfx::shaperClamp(y);
 	}
 
-	// One-pole resonant bandpass (LP then subtract HP of LP) — the comb voice
-	q31_t runComb(q31_t& lp, q31_t& hp, q31_t x, q31_t coeff) {
-		kdfx::smoothDamp(lp, x, coeff);
-		kdfx::smoothDamp(hp, lp, coeff >> 1);
-		return lp - hp;
+	// Chamberlin two-pole resonator, unity peak gain (bp x damp).
+	static q31_t runComb(q31_t& lp, q31_t& bp, q31_t x, q31_t f, q31_t damp) {
+		q31_t hp = add_saturation(add_saturation(-lp, -kdfx::q31_mul(damp, bp)), x);
+		bp += kdfx::q31_mul(f, hp);
+		lp += kdfx::q31_mul(f, bp);
+		return kdfx::q31_mul(bp, damp);
 	}
 
 	void setTapPitch(int t, float v) {
 		pitch_[t] = std::clamp(v, 0.0f, 1.0f);
-		// C-1 (8.18Hz at 44.1k? manual: semitone steps from C-1) to C8 (~4186Hz)
+		// C-1 (8.18Hz) to C8 (~4186Hz), semitone steps
 		float semis = pitch_[t] * 108.0f; // 9 octaves
 		float hz = 8.175f * std::pow(2.0f, semis / 12.0f);
-		float fc_n = std::clamp(hz / float(kSampleRate), 0.0002f, 0.45f);
-		combCoeff_[t] = static_cast<q31_t>(fc_n / (1.0f + fc_n) * ONE_Q31f);
+		float fc_n = std::clamp(hz / float(kSampleRate), 0.0002f, 0.35f);
+		// f = 2 sin(pi fc/sr), damp = 1/Q held at >= f/2 for stability
+		float f = std::clamp(2.0f * std::sin(3.14159265f * fc_n), 0.0f, 1.5f);
+		float damp = std::max(1.0f / 8.0f, f * 0.5f);
+		combF_[t] = static_cast<q31_t>(f * ONE_Q31f);
+		combDamp_[t] = static_cast<q31_t>(damp * ONE_Q31f);
+		tapHz_[t] = hz;
+		updateTapRing(t);
+	}
+	void updateTapRing(int t) {
+		// Resonator ring-out, for the tails shutdown: ~8 cycles of decay
+		combRing_[t] = amt_[t] > 0.0f
+		                   ? static_cast<uint32_t>(std::min(1.0f, 10.0f / std::max(tapHz_[t], 1.0f)) * kSampleRate)
+		                   : 0;
 	}
 	void setTapAmt(int t, float v) {
 		amt_[t] = std::clamp(v, 0.0f, 1.0f);
 		ptAmtQ31_[t] = static_cast<q31_t>(amt_[t] * ONE_Q31f);
+		updateTapRing(t);
 	}
 	void setTapShapr(int t, float v) {
 		shapr_[t] = std::clamp(v, 0.0f, 1.0f);
@@ -254,7 +284,10 @@ private:
 	float pitch_[4] = {0.5f, 0.6f, 0.7f, 0.8f};
 	float amt_[4] = {0.5f, 0.5f, 0.5f, 0.5f};
 	float shapr_[4] = {0.f, 0.f, 0.f, 0.f};
-	q31_t combCoeff_[4] = {};
+	q31_t combF_[4] = {};
+	q31_t combDamp_[4] = {};
+	float tapHz_[4] = {261.6f, 523.3f, 1046.5f, 2093.0f};
+	uint32_t combRing_[4] = {};
 	q31_t ptAmtQ31_[4] = {};
 	int32_t shaperGain_[4] = {4096, 4096, 4096, 4096};
 	q31_t balQ31_[4] = {};
@@ -262,7 +295,7 @@ private:
 	                     static_cast<q31_t>(0.5f * ONE_Q31f), static_cast<q31_t>(0.5f * ONE_Q31f)};
 
 	q31_t diffL_ = 0, diffR_ = 0, hpL_ = 0, hpR_ = 0, lpL_ = 0, lpR_ = 0;
-	q31_t combLP_[4] = {}, combHP_[4] = {}, combLP2_[4] = {}, combHP2_[4] = {};
+	q31_t combLP_[4] = {}, combBP_[4] = {}, combLP2_[4] = {}, combBP2_[4] = {};
 };
 
 } // namespace deluge::dsp::reverb

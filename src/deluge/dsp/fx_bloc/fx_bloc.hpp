@@ -32,6 +32,7 @@
 #include "dsp/reverb/kdfx/laser.hpp"
 #include "dsp/reverb/kdfx/pair.hpp"
 #include "dsp/reverb/kdfx/phaser.hpp"
+#include "dsp/reverb/kdfx/pitcher.hpp"
 #include "dsp/reverb/kdfx/ringmod.hpp"
 #include "dsp/reverb/kdfx/quantize.hpp"
 #include "dsp/reverb/kdfx/spectral4.hpp"
@@ -92,6 +93,14 @@ public:
 		KDFX_REV_COMP,
 		KDFX_TUB_FLANG,
 		GLOBAL_SEND,
+		// Appended AFTER GLOBAL_SEND: <model> persists as this enum's ordinal,
+		// so existing saves must keep their numbering (see the fxChain reader).
+		KDFX_PITCHER,
+		KDFX_FLG_PTCHR,
+		KDFX_PTCHR_CHO,
+		KDFX_PTCHR_FLG,
+		KDFX_PTCHR_CHO_DLY,
+		KDFX_PTCHR_FLG_DLY,
 	};
 
 	static constexpr size_t kMaxChunk = 64;
@@ -283,6 +292,11 @@ public:
 	static constexpr const char* kShaperOptionStrings[] = {"SOFT", "TAPE", "HARD", "FOLD"};
 	static constexpr const char* kPhaseOptionStrings[] = {"OFF", "ON"};
 	static constexpr const char* kCfgOptionStrings[] = {"AMP>MOD", "MOD>AMP"};
+	// 712 Flange<>Pitcher — cfg swaps which half leads
+	static constexpr const char* kPtFlgCfgStrings[] = {"PT>FLG", "FLG>PT"};
+	// 719 Reverb<>Compress / 730 TubeAmp<>MD>Flan (our pair: TubeAmp<>Flan)
+	static constexpr const char* kRevCmpCfgStrings[] = {"RVB>CMP", "CMP>RVB"};
+	static constexpr const char* kTubFlgCfgStrings[] = {"TUB>FLG", "FLG>TUB"};
 	// The subtractive-mode filter set (the synth's LPF mode menu order).
 	static constexpr const char* kFiltTypeStrings[] = {"12L-L", "24L-L", "12L", "24L", "24L-DR", "SVF-B", "SVF-N"};
 	static constexpr const char* kRmModeStrings[] = {"L*R", "OSC"};
@@ -296,6 +310,9 @@ public:
 	static constexpr const char* const* kShaperOptions() { return kShaperOptionStrings; }
 	static constexpr const char* const* kPhaseOptions() { return kPhaseOptionStrings; }
 	static constexpr const char* const* kCfgOptions() { return kCfgOptionStrings; }
+	static constexpr const char* const* kPtFlgCfgOptions() { return kPtFlgCfgStrings; }
+	static constexpr const char* const* kRevCmpCfgOptions() { return kRevCmpCfgStrings; }
+	static constexpr const char* const* kTubFlgCfgOptions() { return kTubFlgCfgStrings; }
 	static constexpr const char* const* kFiltTypeOptions() { return kFiltTypeStrings; }
 	static constexpr const char* const* kRmModeOptions() { return kRmModeStrings; }
 	static constexpr const char* const* kRmShapeOptions() { return kRmShapeStrings; }
@@ -959,6 +976,24 @@ private:
 		case Model::KDFX_SPEC4:
 			size = sizeof(reverb::KdfxSpectral4Tap);
 			break;
+		case Model::KDFX_PITCHER:
+			size = sizeof(reverb::KdfxPitcher);
+			break;
+		case Model::KDFX_FLG_PTCHR:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::PITCHER, reverb::PairEngine::Kind::FLANGER, true>);
+			break;
+		case Model::KDFX_PTCHR_CHO:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::PITCHER, reverb::PairEngine::Kind::CHORUS, false>);
+			break;
+		case Model::KDFX_PTCHR_FLG:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::PITCHER, reverb::PairEngine::Kind::FLANGER, false>);
+			break;
+		case Model::KDFX_PTCHR_CHO_DLY:
+			size = sizeof(reverb::KdfxPitcherTriple<reverb::PairEngine::Kind::CHORUS>);
+			break;
+		case Model::KDFX_PTCHR_FLG_DLY:
+			size = sizeof(reverb::KdfxPitcherTriple<reverb::PairEngine::Kind::FLANGER>);
+			break;
 		case Model::KDFX_CHO_4TAP:
 			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::CHORUS, reverb::PairEngine::Kind::DELAY, true>);
 			break;
@@ -975,7 +1010,7 @@ private:
 			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::REVERB, reverb::PairEngine::Kind::COMPRESSOR, true>);
 			break;
 		case Model::KDFX_TUB_FLANG:
-			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::TUBEAMP, reverb::PairEngine::Kind::FLANGER, false>);
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::TUBEAMP, reverb::PairEngine::Kind::FLANGER, true>);
 			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
@@ -1040,6 +1075,18 @@ private:
 			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::QUANT, reverb::PairEngine::Kind::FLANGER, false>();
 		case Model::KDFX_SPEC4:
 			return new (memory) reverb::KdfxSpectral4Tap();
+		case Model::KDFX_PITCHER:
+			return new (memory) reverb::KdfxPitcher();
+		case Model::KDFX_FLG_PTCHR:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::PITCHER, reverb::PairEngine::Kind::FLANGER, true>();
+		case Model::KDFX_PTCHR_CHO:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::PITCHER, reverb::PairEngine::Kind::CHORUS, false>();
+		case Model::KDFX_PTCHR_FLG:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::PITCHER, reverb::PairEngine::Kind::FLANGER, false>();
+		case Model::KDFX_PTCHR_CHO_DLY:
+			return new (memory) reverb::KdfxPitcherTriple<reverb::PairEngine::Kind::CHORUS>();
+		case Model::KDFX_PTCHR_FLG_DLY:
+			return new (memory) reverb::KdfxPitcherTriple<reverb::PairEngine::Kind::FLANGER>();
 		case Model::KDFX_CHO_4TAP:
 			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::CHORUS, reverb::PairEngine::Kind::DELAY, true>();
 		case Model::KDFX_CHO_X_4TAP:
@@ -1051,7 +1098,7 @@ private:
 		case Model::KDFX_REV_COMP:
 			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::REVERB, reverb::PairEngine::Kind::COMPRESSOR, true>();
 		case Model::KDFX_TUB_FLANG:
-			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::TUBEAMP, reverb::PairEngine::Kind::FLANGER, false>();
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::TUBEAMP, reverb::PairEngine::Kind::FLANGER, true>();
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:
@@ -1295,6 +1342,34 @@ constexpr FxBloc::ParamDef kDefsKdfxShprRev[11] = {
     FxBloc::rt60(FxBloc::Param::ModDepth, "DCAY", 0.6f, 999.f),
     {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
 };
+/// 719 Reverb<>Compress — reverb leads with its natural ids; the compressor
+/// half rides the Mod* trio (THRSH/RATIO/ATK); CFG swaps the order.
+constexpr FxBloc::ParamDef kDefsKdfxRevComp[9] = {
+    FxBloc::INGAIN_DEF(),
+    FxBloc::ms(FxBloc::Param::RoomSize, "SIZE", 3.f, 48.f, 0),
+    FxBloc::rt60(FxBloc::Param::Decay, "DCAY", 0.6f, 999.f),
+    FxBloc::hz(FxBloc::Param::Damping, "DAMP", 351.f, 7019.f, 0),
+    FxBloc::LEVEL_DEF(),
+    {FxBloc::Param::ModRate, "THRSH", false, 0, 1, nullptr, "DB", 0.f, -48.f, 1, false},
+    {FxBloc::Param::ModDepth, "RATIO", false, 0, 1, nullptr, "", 0.1f, 128.f, 1, false, 3, 1.5f},
+    {FxBloc::Param::ModFdbk, "ATK", false, 0, 1, nullptr, "MS", 0.5f, 100.f, 1, false, 2, 1.5f},
+    {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kRevCmpCfgOptions()},
+};
+/// 730 TubeAmp<>MD>Flan (our pair: TubeAmp<>Flan) — tubeamp leads with its
+/// natural ids; the flanger rides the Mod* trio; CFG swaps the order.
+constexpr FxBloc::ParamDef kDefsKdfxTubFlg[11] = {
+    FxBloc::INGAIN_DEF(),
+    FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
+    {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
+    FxBloc::hz(FxBloc::Param::LoCut, "LOCUT", 20.f, 300.f, 0),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::pct(FxBloc::Param::CabSim, "CAB"),
+    FxBloc::hz(FxBloc::Param::HiCut, "HCUT", 1000.f, 16000.f, 0),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+    {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kTubFlgCfgOptions()},
+};
 // Resonant filter bank (manual 900/902/903): common TYPE/FREQ/RES; the env
 // variant adds at-rest MIN Freq + bipolar SWEEP + dB/sec rates, the LFO variant
 // rides the Mod* trio (rate 0.01-10 HZ, depth in octaves).
@@ -1410,14 +1485,113 @@ constexpr FxBloc::ParamDef kDefsKdfxSpectral4[23] = {
     {FxBloc::Param::AirShelf, "A3", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
     {FxBloc::Param::DelayTimeR, "A4", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
     {FxBloc::Param::DelayDrive, "S1", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
-    {FxBloc::Param::ChorusVoices, "S2", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
-    {FxBloc::Param::ShaperMode, "S3", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
-    {FxBloc::Param::ComboCfg, "S4", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
+    {FxBloc::Param::ModRate, "S2", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
+    {FxBloc::Param::ModDepth, "S3", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
+    {FxBloc::Param::ModFdbk, "S4", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
     {FxBloc::Param::Width, "T1", false, 0, 1, nullptr, "%", 2.f, 100.f, 0, false},
     {FxBloc::Param::PreDelay, "T2", false, 0, 1, nullptr, "%", 2.f, 100.f, 0, false},
     {FxBloc::Param::ERLevel, "T3", false, 0, 1, nullptr, "%", 2.f, 100.f, 0, false},
     {FxBloc::Param::BassDecay, "T4", false, 0, 1, nullptr, "%", 2.f, 100.f, 0, false},
 };
+/// Pitcher (manual 908) — the tuned harmonic resonator bank: PITCH (C-1..G9,
+/// MIDI note numbers), PTCH-OFF ±12.0 ST (the FXMod target), then the four
+/// drawbars that shape the response (ODD / PAIR / QTR / HALF Wts).
+constexpr FxBloc::ParamDef kDefsKdfxPitcher[8] = {
+    FxBloc::INGAIN_DEF(),
+    {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
+    {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
+    FxBloc::pct(FxBloc::Param::TrebleGain, "ODD"),
+    FxBloc::pct(FxBloc::Param::TrebleFreq, "PAIR"),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
+    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+};
+/// 712 Flange<>Pitcher — pitcher leads (its natural ids), flanger rides the
+/// Mod* trio, CFG swaps the order.
+constexpr FxBloc::ParamDef kDefsKdfxFlgPtchr[12] = {
+    FxBloc::INGAIN_DEF(),
+    {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
+    {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
+    FxBloc::pct(FxBloc::Param::TrebleGain, "ODD"),
+    FxBloc::pct(FxBloc::Param::TrebleFreq, "PAIR"),
+    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
+    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+    {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kPtFlgCfgOptions()},
+};
+/// 720 MonoPitcher+Chor / 721 MonoPitcher+Flan — fixed order (no CFG): the
+/// pitcher then the modulated half.
+constexpr FxBloc::ParamDef kDefsKdfxPtchrCho[11] = {
+    FxBloc::INGAIN_DEF(),
+    {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
+    {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
+    FxBloc::pct(FxBloc::Param::TrebleGain, "ODD"),
+    FxBloc::pct(FxBloc::Param::TrebleFreq, "PAIR"),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
+    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 15.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 10.f),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+};
+constexpr FxBloc::ParamDef kDefsKdfxPtchrFlan[11] = {
+    FxBloc::INGAIN_DEF(),
+    {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
+    {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
+    FxBloc::pct(FxBloc::Param::TrebleGain, "ODD"),
+    FxBloc::pct(FxBloc::Param::TrebleFreq, "PAIR"),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
+    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+};
+/// 722 Pitcher+Chor+Dly — the triples: pitcher params, the Mod* trio, then
+/// the delay half (TIME/FDBK/TONE/XFEED/HPF/PHASE). Fixed order, no CFG.
+constexpr FxBloc::ParamDef kDefsKdfxPtchrChoDly[17] = {
+    FxBloc::INGAIN_DEF(),
+    {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
+    {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
+    FxBloc::pct(FxBloc::Param::BassGain, "ODD"),
+    FxBloc::pct(FxBloc::Param::BassFreq, "PAIR"),
+    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
+    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 15.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 10.f),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+    FxBloc::ms(FxBloc::Param::Width, "TIME", 1.f, 1480.f, 0),
+    {FxBloc::Param::TrebleGain, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+    FxBloc::hz(FxBloc::Param::TrebleFreq, "TONE", 351.f, 7019.f, 0),
+    FxBloc::pct(FxBloc::Param::Diffusion, "XFEED"),
+    FxBloc::hz(FxBloc::Param::HPF, "HPF", 20.f, 1000.f, 0),
+    {FxBloc::Param::DelayPhase, "PHASE", true, 0, 1, FxBloc::kPhaseOptions()},
+};
+/// 723 — same with the flanger's mod ranges.
+constexpr FxBloc::ParamDef kDefsKdfxPtchrFlanDly[17] = {
+    FxBloc::INGAIN_DEF(),
+    {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
+    {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
+    FxBloc::pct(FxBloc::Param::BassGain, "ODD"),
+    FxBloc::pct(FxBloc::Param::BassFreq, "PAIR"),
+    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
+    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+    FxBloc::LEVEL_DEF(),
+    FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
+    FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
+    FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
+    FxBloc::ms(FxBloc::Param::Width, "TIME", 1.f, 1480.f, 0),
+    {FxBloc::Param::TrebleGain, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+    FxBloc::hz(FxBloc::Param::TrebleFreq, "TONE", 351.f, 7019.f, 0),
+    FxBloc::pct(FxBloc::Param::Diffusion, "XFEED"),
+    FxBloc::hz(FxBloc::Param::HPF, "HPF", 20.f, 1000.f, 0),
+    {FxBloc::Param::DelayPhase, "PHASE", true, 0, 1, FxBloc::kPhaseOptions()},
+};
+
 
 constexpr FxBloc::ParamDef kDefsGlobalSend[5] = {
     FxBloc::INGAIN_DEF(),
@@ -1455,6 +1629,15 @@ static_assert(sizeof(kDefsKdfxResFilt) / sizeof(FxBloc::ParamDef) <= FxBloc::kMa
 static_assert(sizeof(kDefsKdfxReverb) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxReverb exceeds kMaxSlotParams");
 static_assert(sizeof(kDefsKdfxRingMod) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxRingMod exceeds kMaxSlotParams");
 static_assert(sizeof(kDefsKdfxShprRev) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxShprRev exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxRevComp) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxRevComp exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxTubFlg) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxTubFlg exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxSpectral4) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxSpectral4 exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxPitcher) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxPitcher exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxFlgPtchr) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxFlgPtchr exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxPtchrCho) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxPtchrCho exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxPtchrFlan) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxPtchrFlan exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxPtchrChoDly) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxPtchrChoDly exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxPtchrFlanDly) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxPtchrFlanDly exceeds kMaxSlotParams");
 static_assert(sizeof(kDefsKdfxTone) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxTone exceeds kMaxSlotParams");
 static_assert(sizeof(kDefsKdfxTremolo) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxTremolo exceeds kMaxSlotParams");
 static_assert(sizeof(kDefsKdfxTubeAmp) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxTubeAmp exceeds kMaxSlotParams");
@@ -1489,12 +1672,18 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_QUANT: return kDefsKdfxQuant;
 	case Model::KDFX_QNT_FLG: return kDefsKdfxQntFlg;
 	case Model::KDFX_SPEC4: return kDefsKdfxSpectral4;
+	case Model::KDFX_PITCHER: return kDefsKdfxPitcher;
+	case Model::KDFX_FLG_PTCHR: return kDefsKdfxFlgPtchr;
+	case Model::KDFX_PTCHR_CHO: return kDefsKdfxPtchrCho;
+	case Model::KDFX_PTCHR_FLG: return kDefsKdfxPtchrFlan;
+	case Model::KDFX_PTCHR_CHO_DLY: return kDefsKdfxPtchrChoDly;
+	case Model::KDFX_PTCHR_FLG_DLY: return kDefsKdfxPtchrFlanDly;
 	case Model::KDFX_CHO_4TAP:
 	case Model::KDFX_CHO_X_4TAP:
 	case Model::KDFX_FLG_4TAP:
 	case Model::KDFX_FLG_X_4TAP: return kDefsKdfxChoDly;
-	case Model::KDFX_REV_COMP:
-	case Model::KDFX_TUB_FLANG: return kDefsKdfxShprRev;
+	case Model::KDFX_REV_COMP: return kDefsKdfxRevComp;
+	case Model::KDFX_TUB_FLANG: return kDefsKdfxTubFlg;
 	case Model::GLOBAL_SEND: return kDefsGlobalSend;
 	case Model::EMPTY:
 	default: return kDefsEmpty;
