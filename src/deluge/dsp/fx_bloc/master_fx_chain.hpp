@@ -119,6 +119,15 @@ public:
 		return t;
 	}
 
+	/// Panic-kill every slot's wet tail (short fade, then silent-dry).
+	/// Safe from the UI thread: only bloc scalars are touched; the audio
+	/// thread performs the fade on its next blocks.
+	void killTails() {
+		for (auto& s : slots_) {
+			s.killTail();
+		}
+	}
+
 	/// In-place stereo processing through the configured topology.
 	void process(StereoSample* buffer, size_t numSamples) {
 		for (size_t done = 0; done < numSamples;) {

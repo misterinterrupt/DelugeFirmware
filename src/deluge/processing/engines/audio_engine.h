@@ -150,6 +150,11 @@ void logAction(int32_t number);
 /// Stages the modular master FX chain (routing + slots) from a loaded song's XML.
 void getMasterFxParamsFromSong(Song* song);
 
+/// Panic kill: fades the wet output of the master chain and every output's
+/// track FX chain to silence (~100ms), tails reported done. A touched param
+/// or bloc re-selection revives the bloc at its settings.
+void killAllFxTails();
+
 VoiceSample* solicitVoiceSample();
 void voiceSampleUnassigned(VoiceSample* voiceSample);
 

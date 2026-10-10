@@ -422,6 +422,8 @@ public:
 		pendingEngine_ = replacement;
 		pendingModel_ = m;
 		pendingSwap_ = true;
+		killed_ = false;
+		killFade_ = 0;
 
 		// Seed the param cache from the fresh engine's own defaults so the menu shows
 		// values matching what will actually render, and nothing needs pushing until
@@ -497,8 +499,21 @@ public:
 
 	/// Wet tail still pending in this bloc's engine, in samples (0 = none).
 	[[nodiscard]] uint32_t tailSamples() const {
-		return (engine_ != nullptr) ? engine_->tailSamples() : 0;
+		return killed_ ? 0 : ((engine_ != nullptr) ? engine_->tailSamples() : 0);
 	}
+
+	/// Panic kill: fades this bloc's wet output to silence over ~100ms (no
+	/// click), then leaves it silent-dry and tail-less until any param is
+	/// touched or the model re-selected. Audio thread only — call via
+	/// FxChain::killTails() from the render side, or defer.
+	void killTail() {
+		if (model_ == Model::GLOBAL_SEND || engine_ == nullptr) {
+			return;
+		}
+		killFade_ = kKillFadeSamples;
+	}
+
+	static constexpr uint32_t kKillFadeSamples = 4410; // ~100ms
 
 	/// UI thread. Cache-and-defer for the bloc's params — mirrors the deferred
 	/// application the global reverb wrapper uses. Floats are 0..1 normalized;
@@ -513,6 +528,13 @@ public:
 	void setParam(Param p, float v) {
 		if (p == Param::None || p >= Param::kNumParams) {
 			return;
+		}
+		if (killed_) {
+			// A touched param revives the bloc from a panic kill: re-apply the
+			// cached LEVEL so the wet path comes back at its setting.
+			killed_ = false;
+			killFade_ = 0;
+			dirty_ |= (1ull << util::to_underlying(Param::Level));
 		}
 		cache_[util::to_underlying(p)] = v;
 		dirty_ |= (1ull << util::to_underlying(p));
@@ -542,6 +564,28 @@ public:
 			return false;
 		}
 
+		if (killFade_ != 0) {
+			// Ramp the wet contribution down over the fade window, chunk by
+			// chunk, then latch the kill (wet fully muted, tail reported none).
+			uint32_t n2 = std::min<uint32_t>(numSamples, killFade_);
+			float k = static_cast<float>(n2) / static_cast<float>(kKillFadeSamples);
+			if (!engine_->isInsert()) {
+				int32_t pan = static_cast<int32_t>(k * 134217728.0f); // k x 2^27 (unity wet)
+				engine_->setPanLevels(pan, pan);
+			}
+			else {
+				float level = std::clamp(cache_[util::to_underlying(Param::Level)], 0.0f, 1.0f) * k;
+				insertKillLevel_ = static_cast<q31_t>(level * ONE_Q31f);
+			}
+			killFade_ -= n2;
+			if (killFade_ == 0) {
+				killed_ = true;
+				if (!engine_->isInsert()) {
+					engine_->setPanLevels(0, 0);
+				}
+			}
+		}
+
 		// Input volume attenuation (down to silence) or boost up to +3dB (default 0dB)
 		float inGainDb = displayValue(INGAIN_DEF(), cache_[util::to_underlying(Param::InGain)]);
 		float inGainLin = (inGainDb <= -95.0f) ? 0.0f : std::pow(10.0f, inGainDb / 20.0f);
@@ -568,7 +612,7 @@ public:
 			}
 			// Wet/dry blend: dry + level × (processed − dry), chunked against the
 			// fixed dry scratch.
-			q31_t levelQ31 = static_cast<q31_t>(level * ONE_Q31f);
+			q31_t levelQ31 = (killFade_ != 0) ? insertKillLevel_ : static_cast<q31_t>(level * ONE_Q31f);
 			for (size_t done = 0; done < numSamples;) {
 				size_t n = std::min(kMaxChunk, numSamples - done);
 				StereoSample* buf = buffer + done;
@@ -905,7 +949,10 @@ private:
 	/// Param cache indexed by Param id. UI thread writes + the render boundary reads;
 	/// floats for continuous params, plain integers stored as floats for int params.
 	float cache_[util::to_underlying(Param::kNumParams)]{};
-	uint64_t dirty_ = 0; // bit per param id — UI writes, audio reads+clears
+	uint64_t dirty_ = 0;
+	uint32_t killFade_ = 0;   // remaining wet-fade samples of a panic kill
+	bool killed_ = false;     // kill latched: silent-dry, tail reported none
+	q31_t insertKillLevel_ = 0; // bit per param id — UI writes, audio reads+clears
 
 	reverb::Base* engine_ = nullptr;
 	reverb::Base* pendingEngine_ = nullptr;

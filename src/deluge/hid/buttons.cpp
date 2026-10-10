@@ -43,6 +43,7 @@ uint32_t timeRecordButtonPressed;
  * long shift presses, for sticky keys.
  */
 uint32_t timeShiftButtonPressed;
+uint32_t timePlayButtonPressed; // press time, for the hold-to-kill-FX gesture
 
 /**
  * Whether or not the shift button is currently depressed (either physically or because a sticky shift has occured)
@@ -157,6 +158,17 @@ ActionResult buttonAction(deluge::hid::Button b, bool on, bool inCardRoutine) {
 
 	// Play button
 	if (b == PLAY) {
+		if (on) {
+			timePlayButtonPressed = AudioEngine::audioSampleTimer;
+		}
+		// Hold play/stop: panic-kill all FX tails (master + every track chain).
+		// Tap behaviour is unchanged — the transport toggled at press time; the
+		// hold adds the kill on release, ~100ms wet fade, revived by touching
+		// any bloc param.
+		else if (AudioEngine::audioSampleTimer - timePlayButtonPressed > kSampleRate / 3) {
+			AudioEngine::killAllFxTails();
+			display->displayPopup("FX KILL");
+		}
 		if (on) {
 
 			if (audioRecorder.recordingSource > AudioInputChannel::NONE && isButtonPressed(RECORD)) {

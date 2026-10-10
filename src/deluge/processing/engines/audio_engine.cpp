@@ -1303,6 +1303,21 @@ void stopAnyPreviewing() {
 	}
 }
 
+void killAllFxTails() {
+	masterFxChain.killTails();
+	if (currentSong != nullptr) {
+		for (Output* thisOutput = currentSong->firstOutput; thisOutput; thisOutput = thisOutput->next) {
+			ModControllableAudio* mc = static_cast<ModControllableAudio*>(thisOutput->toModControllable());
+			if (mc != nullptr) {
+				auto* chain = mc->getFxChain();
+				if (chain != nullptr) {
+					chain->killTails();
+				}
+			}
+		}
+	}
+}
+
 void getMasterFxParamsFromSong(Song* song) {
 	// Modular master FX chain, staged from the song XML. Loading always resets
 	// every slot first, so nothing from the previously-active song can bleed through;
