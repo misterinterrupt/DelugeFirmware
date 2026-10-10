@@ -386,7 +386,7 @@ MasterSlotParam masterParamMenus[3][dsp::FxBloc::kMaxSlotParams] = {
 // slot, where N follows the selected bloc's real param count (4 per page, the
 // last page may be partial). Rebuilt whenever the song-mode menu is opened and
 // whenever a slot's bloc changes — see rebuildFxBlocPages().
-static VisualPage fxBlocRuntimePages[2 + 3 * (1 + dsp::FxBloc::kMaxSlotParams / 4)];
+static VisualPage fxBlocRuntimePages[1 + 3 * (1 + dsp::FxBloc::kMaxSlotParams / 4)];
 static size_t fxBlocRuntimePageCount = 0;
 static char fxBlocRuntimeTitles[sizeof(fxBlocRuntimePages) / sizeof(VisualPage)][12];
 
@@ -407,16 +407,11 @@ void rebuildFxBlocPages() {
 	auto nextTitle = [&p]() { return fxBlocRuntimeTitles[p]; };
 
 	fxBlocRuntimePages[p++] = VisualPage{
-	    .title = "FX Gate",
-	    .titleString = EMPTY_STRING,
-	    .slots = {VisualSlot{&::fxCutoffMenu, "CUTOFF", -1, 4}, VisualSlot{nullptr, "", -1, 0},
-	              VisualSlot{nullptr, "", -1, 0}, VisualSlot{nullptr, "", -1, 0}}};
-
-	fxBlocRuntimePages[p++] = VisualPage{
 	    .title = "Chain",
 	    .titleString = EMPTY_STRING,
-	    .slots = {VisualSlot{&masterRoutingMenu, "ROUTE", -1, 4}, VisualSlot{nullptr, "", -1, 0},
-	              VisualSlot{nullptr, "", -1, 0}, VisualSlot{nullptr, "", -1, 0}}};
+	    .slots = {VisualSlot{&masterRoutingMenu, "ROUTE", -1, 2},
+	              VisualSlot{&::fxCutoffMenu, "TAILS", -1, 2}, VisualSlot{nullptr, "", -1, 0},
+	              VisualSlot{nullptr, "", -1, 0}}};
 
 	auto* chain = getCurrentFxChain();
 	for (int32_t s = 0; s < 3; s++) {
