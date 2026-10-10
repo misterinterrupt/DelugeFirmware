@@ -158,8 +158,7 @@ void PatchCables::blinkShortcuts() {
 	ParamDescriptor desc = cable->destinationParamDescriptor;
 	int dest = desc.getJustTheParam();
 
-	if (dest == deluge::modulation::params::GLOBAL_VOLUME_POST_REVERB_SEND
-	    || dest == deluge::modulation::params::LOCAL_VOLUME) {
+	if (dest == deluge::modulation::params::LOCAL_VOLUME) {
 		dest = deluge::modulation::params::GLOBAL_VOLUME_POST_FX;
 	}
 

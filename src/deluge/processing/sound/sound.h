@@ -28,7 +28,6 @@
 #include "modulation/params/param_manager.h"
 #include "modulation/params/param_set.h"
 #include "modulation/patch/patcher.h"
-#include "modulation/sidechain/sidechain.h"
 #include "processing/source.h"
 #include "util/misc.h"
 
@@ -39,6 +38,7 @@ class Kit;
 class ParamManagerForTimeline;
 class TimelineCounter;
 class Clip;
+class Song;
 class GlobalEffectableForClip;
 class ModelStackWithThreeMainThings;
 class ModelStackWithSoundFlags;

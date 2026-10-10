@@ -39,7 +39,7 @@ extern "C" {
 namespace params = deluge::modulation::params;
 
 GlobalEffectableForClip::GlobalEffectableForClip() {
-	postReverbVolumeLastTime = paramNeutralValues[params::GLOBAL_VOLUME_POST_REVERB_SEND];
+	postReverbVolumeLastTime = 134217728;
 
 	lastSaturationTanHWorkingValue[0] = 2147483648;
 	lastSaturationTanHWorkingValue[1] = 2147483648;
@@ -79,23 +79,7 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 	int32_t pan = unpatchedParams->getValue(params::UNPATCHED_PAN) >> 1;
 
 	// Render sidechain
-	int32_t sidechainVolumeParam = unpatchedParams->getValue(params::UNPATCHED_SIDECHAIN_VOLUME);
-	int32_t postReverbVolume = paramNeutralValues[params::GLOBAL_VOLUME_POST_REVERB_SEND];
-	if (sidechainVolumeParam != -2147483648) {
-		if (sideChainHitPending != 0) {
-			sidechain.registerHit(sideChainHitPending);
-		}
-		int32_t sidechainOutput =
-		    sidechain.render(numSamples, unpatchedParams->getValue(params::UNPATCHED_SIDECHAIN_SHAPE));
-
-		int32_t positivePatchedValue =
-		    multiply_32x32_rshift32(sidechainOutput, getSidechainVolumeAmountAsPatchCableDepth(paramManagerForClip))
-		    + 536870912;
-		postReverbVolume = (positivePatchedValue >> 15)
-		                   * (positivePatchedValue
-		                      >> 16); // This is tied to getParamNeutralValue(params::GLOBAL_VOLUME_POST_REVERB_SEND)
-		                              // returning 134217728
-	}
+	int32_t postReverbVolume = 134217728;
 	q31_t compThreshold = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
 	q31_t compBlend = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_BLEND);
 	compressor.setThreshold(compThreshold);
@@ -201,65 +185,21 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 	}
 }
 
-int32_t GlobalEffectableForClip::getSidechainVolumeAmountAsPatchCableDepth(ParamManager* paramManager) {
-	int32_t sidechainVolumeParam = paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_SIDECHAIN_VOLUME);
-	return (sidechainVolumeParam >> 2) + 536870912;
-}
-
 int32_t GlobalEffectableForClip::getParameterFromKnob(int32_t whichModEncoder) {
 
 	int32_t modKnobMode = *getModKnobMode();
 
-	if (modKnobMode == 4 && whichModEncoder) {
-		return params::UNPATCHED_SIDECHAIN_VOLUME;
-	}
+
 
 	return GlobalEffectable::getParameterFromKnob(whichModEncoder);
 }
 
 void GlobalEffectableForClip::modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTimeline* paramManager) {
-	if (whichModButton == 4) {
-		displaySidechainSettings(on);
-		return;
-	}
-
 	return GlobalEffectable::modButtonAction(whichModButton, on, paramManager);
 }
 
 bool GlobalEffectableForClip::modEncoderButtonAction(uint8_t whichModEncoder, bool on,
                                                      ModelStackWithThreeMainThings* modelStack) {
-
-	if (on && !Buttons::isShiftButtonPressed()) {
-		int32_t modKnobMode = *getModKnobMode();
-		if (modKnobMode == 4) {
-			if (whichModEncoder == 1) { // Sidechain
-				int32_t insideWorldTickMagnitude;
-				if (currentSong) { // Bit of a hack just referring to currentSong in here...
-					insideWorldTickMagnitude =
-					    (currentSong->insideWorldTickMagnitude + currentSong->insideWorldTickMagnitudeOffsetFromBPM);
-				}
-				else {
-					insideWorldTickMagnitude = FlashStorage::defaultMagnitude;
-				}
-				if (sidechain.syncLevel == (SyncLevel)(7 - insideWorldTickMagnitude)) {
-					sidechain.syncLevel = (SyncLevel)(9 - insideWorldTickMagnitude);
-				}
-				else {
-					sidechain.syncLevel = (SyncLevel)(7 - insideWorldTickMagnitude);
-				}
-
-				// if mod button is pressed, update mod button pop up
-				if (Buttons::isButtonPressed(
-				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displaySidechainSettings(on);
-				}
-				else {
-					display->displayPopup(getSidechainDisplayName());
-				}
-				return true;
-			}
-		}
-	}
 
 	return GlobalEffectable::modEncoderButtonAction(whichModEncoder, on, modelStack);
 }

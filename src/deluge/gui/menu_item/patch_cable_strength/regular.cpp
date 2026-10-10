@@ -61,7 +61,6 @@ MenuPermission Regular::checkPermissionToBeginSession(ModControllableAudio* modC
 		if (sound->maySourcePatchToParam(getS(), soundEditor.patchingParamSelected,
 		                                 ((ParamManagerForTimeline*)soundEditor.currentParamManager))
 		    == PatchCableAcceptance::DISALLOWED) {
-			soundEditor.patchingParamSelected = deluge::modulation::params::GLOBAL_VOLUME_POST_REVERB_SEND;
 			if (sound->maySourcePatchToParam(getS(), soundEditor.patchingParamSelected,
 			                                 ((ParamManagerForTimeline*)soundEditor.currentParamManager))
 			    == PatchCableAcceptance::DISALLOWED) {

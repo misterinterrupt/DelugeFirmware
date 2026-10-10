@@ -120,7 +120,6 @@ enum Global : ParamType {
 	FIRST_GLOBAL = LOCAL_LAST,
 	// Global (linear) params begin
 	GLOBAL_VOLUME_POST_FX = FIRST_GLOBAL,
-	GLOBAL_VOLUME_POST_REVERB_SEND,
 
 	// Global non-volume params begin
 	FIRST_GLOBAL_NON_VOLUME,
@@ -158,7 +157,6 @@ static_assert(UNPATCHED_START > PLACEHOLDER_RANGE, "UNPATCHED params collide wit
 /// ANY TIME YOU UPDATE THIS LIST! paramNameForFile() in param.cpp
 enum UnpatchedShared : ParamType {
 	UNPATCHED_STUTTER_RATE,
-	UNPATCHED_SIDECHAIN_SHAPE,
 	UNPATCHED_COMPRESSOR_THRESHOLD,
 	UNPATCHED_COMPRESSOR_RATIO,
 	UNPATCHED_COMPRESSOR_ATTACK,
@@ -185,21 +183,12 @@ enum UnpatchedSound : ParamType {
 enum UnpatchedGlobal : ParamType {
 	UNPATCHED_PAN = UNPATCHED_NUM_SHARED,
 	UNPATCHED_VOLUME,
-	UNPATCHED_SIDECHAIN_VOLUME,
 	UNPATCHED_PITCH_ADJUST,
 	UNPATCHED_TEMPO,
 	UNPATCHED_GLOBAL_MAX_NUM,
 };
 
 constexpr ParamType STATIC_START = 162;
-
-enum Static : ParamType {
-	STATIC_SIDECHAIN_ATTACK = STATIC_START,
-	STATIC_SIDECHAIN_RELEASE,
-
-	// Only used for the reverb sidechain. Normally this is done with patching
-	STATIC_SIDECHAIN_VOLUME,
-};
 
 /// Special case for representing patch cables
 constexpr ParamType PATCH_CABLE = 190;
@@ -283,7 +272,7 @@ const uint32_t unpatchedNonGlobalParamShortcuts[kDisplayWidth][kDisplayHeight] =
     {UNPATCHED_PORTAMENTO, kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
-    {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, UNPATCHED_SIDECHAIN_SHAPE , kNoParamID                     , kNoParamID       , kNoParamID},
+    {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID , kNoParamID                     , kNoParamID       , kNoParamID},
     {kNoParamID          , kNoParamID, UNPATCHED_ARP_GATE, kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID     , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID               , kNoParamID                     , kNoParamID           , kNoParamID},
     {kNoParamID          , kNoParamID, kNoParamID        , kNoParamID, kNoParamID                , kNoParamID                     , kNoParamID           , kNoParamID},
@@ -306,7 +295,7 @@ const uint32_t unpatchedGlobalParamShortcuts[kDisplayWidth][kDisplayHeight] = {
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID				   , kNoParamID			   		 	, kNoParamID            , kNoParamID},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID	   , kNoParamID						, kNoParamID     , kNoParamID},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID	   , kNoParamID						, kNoParamID     , kNoParamID},
-    {kNoParamID          , kNoParamID            , UNPATCHED_SIDECHAIN_VOLUME, kNoParamID                  , UNPATCHED_SIDECHAIN_SHAPE , kNoParamID			   			, kNoParamID        , kNoParamID},
+    {kNoParamID          , kNoParamID            , kNoParamID, kNoParamID                  , kNoParamID , kNoParamID			   			, kNoParamID        , kNoParamID},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID				   , kNoParamID			   		 	, kNoParamID      , kNoParamID},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                  , kNoParamID               , kNoParamID                     , kNoParamID            , kNoParamID},
     {kNoParamID          , kNoParamID            , kNoParamID                , kNoParamID                 , kNoParamID				   , kNoParamID			   		 	, kNoParamID            , kNoParamID},

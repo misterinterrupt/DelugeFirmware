@@ -264,7 +264,11 @@ public:
 	/// Per-model menu/persistence table, variable length. IN-GN leads every
 	/// table (user directive); the menu lays params out 4 per page, as many
 	/// pages as the table needs.
-	static constexpr size_t kMaxSlotParams = 16; // menu item pool per slot
+	// Menu item / page pool sizing: every paramDefs table must fit. RINGMOD is
+	// the largest at 17 (IN-GN + 16); 20 leaves headroom. The static_asserts by
+	// the tables enforce this at compile time — exceeding it corrupts the
+	// runtime page array (device: white column artifacts, frozen UI).
+	static constexpr size_t kMaxSlotParams = 20; // menu item pool per slot
 
 	// Display option strings for the int params, and the LEVEL / INGAIN column definitions.
 	static constexpr const char* kWaveformOptionStrings[] = {"SINE", "TRI", "S&H"};
@@ -1265,6 +1269,38 @@ constexpr FxBloc::ParamDef kDefsGlobalSend[5] = {
 };
 
 constexpr FxBloc::ParamDef kDefsEmpty[1] = {{}};
+
+
+// Every table must fit the menu/page pools (see kMaxSlotParams) — a larger
+// bloc silently overflows the runtime page array otherwise.
+static_assert(sizeof(kDefsCompressor) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsCompressor exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsEmpty) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsEmpty exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsFreeverb) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsFreeverb exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsGlobalSend) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsGlobalSend exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxAutoPan) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxAutoPan exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxChoDly) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxChoDly exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxChoRev) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxChoRev exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxChorus) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxChorus exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxDelay) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxDelay exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxDist) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxDist exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxEnvFilt) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxEnvFilt exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxFlanger) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxFlanger exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxFlgDly) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxFlgDly exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxFlgLaser) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxFlgLaser exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxFlgRev) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxFlgRev exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxLaser) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxLaser exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxLfoFilt) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxLfoFilt exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxPhaser) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxPhaser exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxQntFlg) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxQntFlg exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxQuant) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxQuant exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxResFilt) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxResFilt exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxReverb) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxReverb exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxRingMod) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxRingMod exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxShprRev) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxShprRev exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxTone) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxTone exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxTremolo) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxTremolo exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsKdfxTubeAmp) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsKdfxTubeAmp exceeds kMaxSlotParams");
+static_assert(sizeof(kDefsMutable) / sizeof(FxBloc::ParamDef) <= FxBloc::kMaxSlotParams, "kDefsMutable exceeds kMaxSlotParams");
 
 constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	switch (m) {

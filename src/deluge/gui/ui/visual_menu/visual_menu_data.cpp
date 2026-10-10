@@ -70,11 +70,6 @@ using enum deluge::l10n::String;
 #include "gui/menu_item/midi/pgm.h"
 #include "gui/menu_item/midi/sub.h"
 #include "gui/menu_item/midi/y_axis_to_cc1.h"
-#include "gui/menu_item/sidechain/attack.h"
-#include "gui/menu_item/sidechain/release.h"
-#include "gui/menu_item/sidechain/send.h"
-#include "gui/menu_item/sidechain/sync.h"
-#include "gui/menu_item/sidechain/volume.h"
 #include "gui/menu_item/unpatched_param/updating_reverb_params.h"
 #include "gui/menu_item/audio_clip/attack.h"
 #include "gui/menu_item/audio_clip/reverse.h"
@@ -167,13 +162,6 @@ extern deluge::gui::menu_item::audio_compressor::MakeupGain compMakeupGain;
 extern deluge::gui::menu_item::audio_compressor::SideHPF compHPF;
 extern deluge::gui::menu_item::audio_compressor::Blend compBlend;
 
-// Sidechain
-extern deluge::gui::menu_item::sidechain::VolumeShortcut sidechainVolumeShortcutMenu;
-extern deluge::gui::menu_item::sidechain::Attack sidechainAttackMenu;
-extern deluge::gui::menu_item::sidechain::Release sidechainReleaseMenu;
-extern deluge::gui::menu_item::sidechain::Sync sidechainSyncMenu;
-extern deluge::gui::menu_item::sidechain::Send sidechainSendMenu;
-extern deluge::gui::menu_item::unpatched_param::UpdatingReverbParams sidechainShapeMenu;
 
 // Arpeggiator
 extern deluge::gui::menu_item::arpeggiator::PresetMode arpPresetModeMenu;
@@ -199,7 +187,6 @@ extern deluge::gui::menu_item::UnpatchedParam globalLPFMorphMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalHPFFreqMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalHPFResMenu;
 extern deluge::gui::menu_item::UnpatchedParam globalHPFMorphMenu;
-extern deluge::gui::menu_item::unpatched_param::UpdatingReverbParams globalSidechainVolumeMenu;
 
 // Audio Clip specifics
 extern deluge::gui::menu_item::audio_clip::Reverse audioClipReverseMenu;
@@ -280,10 +267,6 @@ static const VisualPage synthFxPages[] = {
      {{{&compThreshold, "THRESH"}, {&compRatio, "RATIO"}, {&compAttack, "ATK"}, {&compRelease, "REL"}}}},
     {"Compressor 2", STRING_FOR_COMMUNITY_FEATURE_MASTER_COMPRESSOR,
      {{{&compInputGain, "IN-GN"}, {&compMakeupGain, "MAKEUP"}, {&compHPF, "HPF"}, {&compBlend, "BLEND"}}}},
-    {"Sidechain", STRING_FOR_SIDECHAIN,
-     {{{&sidechainVolumeShortcutMenu, "VOL"}, {&sidechainAttackMenu, "ATK"}, {&sidechainReleaseMenu, "REL"}, {&sidechainSyncMenu, "SYNC"}}}},
-    {"Sidechain Send", STRING_FOR_SIDECHAIN,
-     {{{&sidechainSendMenu, "SEND"}, {&sidechainShapeMenu, "SHAPE"}, {nullptr, ""}, {nullptr, ""}}}},
 };
 
 static const VisualPage synthArpPages[] = {
@@ -320,8 +303,6 @@ static const VisualPage audioClipMasterPages[] = {
 static const VisualPage audioClipFxPages[] = {
     {"Distortion", STRING_FOR_DISTORTION,
      {{{&clippingMenu, "CLIP"}, {nullptr, ""}, {nullptr, ""}, {nullptr, ""}}}},
-    {"Sidechain", STRING_FOR_SIDECHAIN,
-     {{{&globalSidechainVolumeMenu, "VOL"}, {&sidechainAttackMenu, "ATK"}, {&sidechainReleaseMenu, "REL"}, {&sidechainSyncMenu, "SYNC"}}}},
 };
 
 static const VisualCategory audioClipCategories[] = {
@@ -374,19 +355,20 @@ MasterRouting masterRoutingMenu{};
 // Per-slot param item pool: defIndex is the absolute index into the bloc's
 // paramDefs() table; the page layout below decides which are on screen.
 MasterSlotParam masterParamMenus[3][dsp::FxBloc::kMaxSlotParams] = {
-    {{0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 5}, {0, 6}, {0, 7}, {0, 8}, {0, 9}, {0, 10}, {0, 11}, {0, 12},
-     {0, 13}, {0, 14}, {0, 15}},
-    {{1, 0}, {1, 1}, {1, 2}, {1, 3}, {1, 4}, {1, 5}, {1, 6}, {1, 7}, {1, 8}, {1, 9}, {1, 10}, {1, 11}, {1, 12},
-     {1, 13}, {1, 14}, {1, 15}},
-    {{2, 0}, {2, 1}, {2, 2}, {2, 3}, {2, 4}, {2, 5}, {2, 6}, {2, 7}, {2, 8}, {2, 9}, {2, 10}, {2, 11}, {2, 12},
-     {2, 13}, {2, 14}, {2, 15}},
+	{{0, 0}, {0, 1}, {0, 2}, {0, 3}, {0, 4}, {0, 5}, {0, 6}, {0, 7}, {0, 8}, {0, 9}, {0, 10}, {0, 11}, {0, 12}, {0, 13}, {0, 14}, {0, 15}, {0, 16}, {0, 17}, {0, 18}, {0, 19}},
+	{{1, 0}, {1, 1}, {1, 2}, {1, 3}, {1, 4}, {1, 5}, {1, 6}, {1, 7}, {1, 8}, {1, 9}, {1, 10}, {1, 11}, {1, 12}, {1, 13}, {1, 14}, {1, 15}, {1, 16}, {1, 17}, {1, 18}, {1, 19}},
+	{{2, 0}, {2, 1}, {2, 2}, {2, 3}, {2, 4}, {2, 5}, {2, 6}, {2, 7}, {2, 8}, {2, 9}, {2, 10}, {2, 11}, {2, 12}, {2, 13}, {2, 14}, {2, 15}, {2, 16}, {2, 17}, {2, 18}, {2, 19}},
 };
 
 // FX BLOCS pages are built at runtime: Chain + (Bloc page + N param pages) per
 // slot, where N follows the selected bloc's real param count (4 per page, the
 // last page may be partial). Rebuilt whenever the song-mode menu is opened and
 // whenever a slot's bloc changes — see rebuildFxBlocPages().
-static VisualPage fxBlocRuntimePages[1 + 3 * (1 + dsp::FxBloc::kMaxSlotParams / 4)];
+// Chain page + per slot: 1 BLOC page + ceil(kMaxSlotParams / 4) param pages.
+// rebuildFxBlocPages computes the same expression from the live param count;
+// the static_asserts in fx_bloc.hpp guarantee the live count never exceeds
+// kMaxSlotParams, so this bound holds.
+static VisualPage fxBlocRuntimePages[1 + 3 * (1 + (dsp::FxBloc::kMaxSlotParams + 3) / 4)];
 static size_t fxBlocRuntimePageCount = 0;
 static char fxBlocRuntimeTitles[sizeof(fxBlocRuntimePages) / sizeof(VisualPage)][12];
 

@@ -61,7 +61,6 @@ public:
 	int8_t currentSourceIndex;
 	Source* currentSource;
 	ParamManagerForTimeline* currentParamManager;
-	SideChain* currentSidechain;
 	ArpeggiatorSettings* currentArpSettings;
 	MultiRange* currentMultiRange;
 	SampleControls* currentSampleControls;

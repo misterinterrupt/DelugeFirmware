@@ -96,7 +96,6 @@ Sound::Sound() : patcher(&patchableInfoForSound) {
 
 	numVoicesAssigned = 0;
 
-	sideChainSendLevel = 0;
 	polyphonic = PolyphonyMode::POLY;
 	lastNoteCode = -2147483648;
 
@@ -132,8 +131,6 @@ Sound::Sound() : patcher(&patchableInfoForSound) {
 
 	modKnobs[5][1].paramDescriptor.setToHaveParamOnly(params::GLOBAL_LFO_FREQ);
 
-	modKnobs[4][1].paramDescriptor.setToHaveParamAndSource(params::GLOBAL_VOLUME_POST_REVERB_SEND,
-	                                                       PatchSource::SIDECHAIN);
 	modKnobs[5][0].paramDescriptor.setToHaveParamAndSource(params::LOCAL_PITCH_ADJUST, PatchSource::LFO_GLOBAL);
 
 	modKnobs[6][1].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_STUTTER_RATE);
@@ -172,7 +169,6 @@ void Sound::initParams(ParamManager* paramManager) {
 	patchedParams->params[params::LOCAL_OSC_B_VOLUME].setCurrentValueBasicForSetup(2147483647);
 	patchedParams->params[params::GLOBAL_VOLUME_POST_FX].setCurrentValueBasicForSetup(
 	    getParamFromUserValue(params::GLOBAL_VOLUME_POST_FX, 40));
-	patchedParams->params[params::GLOBAL_VOLUME_POST_REVERB_SEND].setCurrentValueBasicForSetup(0);
 	patchedParams->params[params::LOCAL_FOLD].setCurrentValueBasicForSetup(-2147483648);
 	patchedParams->params[params::LOCAL_HPF_RESONANCE].setCurrentValueBasicForSetup(-2147483648);
 	patchedParams->params[params::LOCAL_HPF_FREQ].setCurrentValueBasicForSetup(-2147483648);
@@ -1032,11 +1028,6 @@ Error Sound::readTagFromFile(Deserializer& reader, char const* tagName, ParamMan
 		// No resync for LFO2
 	}
 
-	else if (!strcmp(tagName, "sideChainSend")) {
-		sideChainSendLevel = reader.readTagOrAttributeValueInt();
-		reader.exitTag("sideChainSend");
-	}
-
 	else if (!strcmp(tagName, "lpf")) {
 		bool switchedOn = true; // For backwards compatibility with pre November 2015 files
 		while (*(tagName = reader.readNextTagOrAttributeName())) {
@@ -1233,13 +1224,9 @@ Error Sound::readTagFromFile(Deserializer& reader, char const* tagName, ParamMan
 void Sound::ensureKnobReferencesCorrectVolume(Knob* knob) {
 	int32_t p = knob->paramDescriptor.getJustTheParam();
 
-	if (p == params::GLOBAL_VOLUME_POST_REVERB_SEND || p == params::GLOBAL_VOLUME_POST_FX
-	    || p == params::LOCAL_VOLUME) {
+	if (p == params::GLOBAL_VOLUME_POST_FX || p == params::LOCAL_VOLUME) {
 		if (knob->paramDescriptor.isJustAParam()) {
 			knob->paramDescriptor.setToHaveParamOnly(params::GLOBAL_VOLUME_POST_FX);
-		}
-		else if (knob->paramDescriptor.getTopLevelSource() == PatchSource::SIDECHAIN) {
-			knob->paramDescriptor.changeParam(params::GLOBAL_VOLUME_POST_REVERB_SEND);
 		}
 		else {
 			knob->paramDescriptor.changeParam(params::LOCAL_VOLUME);
@@ -1384,11 +1371,6 @@ PatchCableAcceptance Sound::maySourcePatchToParam(PatchSource s, uint8_t p, Para
 		}
 		break;
 
-	case params::GLOBAL_VOLUME_POST_REVERB_SEND: // Only the sidechain can patch to here
-		if (s != PatchSource::SIDECHAIN) {
-			return PatchCableAcceptance::DISALLOWED;
-		}
-		break;
 
 		// In a perfect world, we'd only allow patching to LFO rates if the LFO as a source is itself patched somewhere
 		// usable
@@ -1533,10 +1515,6 @@ justUnassign:
 			    modelStack); // Since we potentially just changed numVoicesAssigned from 0 to 1.
 
 			newVoice->randomizeOscPhases(this);
-		}
-
-		if (sideChainSendLevel != 0) [[unlikely]] {
-			AudioEngine::registerSideChainHit(sideChainSendLevel);
 		}
 
 		ModelStackWithVoice* modelStackWithVoice = modelStack->addVoice(newVoice);
@@ -2083,21 +2061,6 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 		}
 	}
 
-	// Do sidechain
-	if (paramManager->getPatchCableSet()->isSourcePatchedToSomething(PatchSource::SIDECHAIN)) {
-		if (sideChainHitPending) {
-			sidechain.registerHit(sideChainHitPending);
-		}
-
-		const auto patchSourceSidechainUnderlying = util::to_underlying(PatchSource::SIDECHAIN);
-
-		int32_t old = globalSourceValues[patchSourceSidechainUnderlying];
-		globalSourceValues[patchSourceSidechainUnderlying] = sidechain.render(
-		    numSamples, paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_SIDECHAIN_SHAPE));
-		uint32_t anyChange = (old != globalSourceValues[patchSourceSidechainUnderlying]);
-		sourcesChanged |= anyChange << patchSourceSidechainUnderlying;
-	}
-
 	// Perform the actual patching
 	if (sourcesChanged) {
 		patcher.performPatching(sourcesChanged, this, paramManager);
@@ -2254,7 +2217,7 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 	}
 
 	int32_t postFXVolume = paramFinalValues[params::GLOBAL_VOLUME_POST_FX - params::FIRST_GLOBAL];
-	int32_t postReverbVolume = paramFinalValues[params::GLOBAL_VOLUME_POST_REVERB_SEND - params::FIRST_GLOBAL];
+	int32_t postReverbVolume = 134217728; // neutral post-FX (the duck tap is gone with the sidechain)
 
 	if (postReverbVolumeLastTime == -1) {
 		postReverbVolumeLastTime = postReverbVolume;
@@ -2354,13 +2317,6 @@ void Sound::stopSkippingRendering(ArpeggiatorSettings* arpSettings) {
 			// Do arp
 			getArpBackInTimeAfterSkippingRendering(arpSettings);
 
-			// Do sidechain
-			// if (paramManager->getPatchCableSet()->isSourcePatchedToSomething(PatchSource::SIDECHAIN)) {
-			if (AudioEngine::sizeLastSideChainHit) {
-				sidechain.registerHitRetrospectively(AudioEngine::sizeLastSideChainHit,
-				                                     AudioEngine::audioSampleTimer - AudioEngine::timeLastSideChainHit);
-				//}
-			}
 			// Special state to make it grab the actual value the first time it's rendered
 			postReverbVolumeLastTime = -1;
 		}
@@ -3026,9 +2982,6 @@ Error Sound::createParamManagerForLoading(ParamManagerForTimeline* paramManager)
 	}
 
 	initParams(paramManager);
-
-	paramManager->getUnpatchedParamSet()->params[params::UNPATCHED_SIDECHAIN_SHAPE].setCurrentValueBasicForSetup(
-	    2147483647); // Hmm, why this here? Obviously I had some reason...
 	return Error::NONE;
 }
 
@@ -3510,12 +3463,6 @@ bool Sound::readParamTagFromFile(Deserializer& reader, char const* tagName, Para
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_PORTAMENTO, readAutomationUpToPos);
 		reader.exitTag("portamento");
 	}
-	else if (!strcmp(tagName, "compressorShape")) {
-		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_SIDECHAIN_SHAPE,
-		                           readAutomationUpToPos);
-		reader.exitTag("compressorShape");
-	}
-
 	else if (!strcmp(tagName, "noiseVolume")) {
 		patchedParams->readParam(reader, patchedParamsSummary, params::LOCAL_NOISE_VOLUME, readAutomationUpToPos);
 		reader.exitTag("noiseVolume");
@@ -3711,9 +3658,6 @@ void Sound::writeParamsToFile(Serializer& writer, ParamManager* paramManager, bo
 
 	unpatchedParams->writeParamAsAttribute(writer, "arpeggiatorGate", params::UNPATCHED_ARP_GATE, writeAutomation);
 	unpatchedParams->writeParamAsAttribute(writer, "portamento", params::UNPATCHED_PORTAMENTO, writeAutomation);
-	unpatchedParams->writeParamAsAttribute(writer, "compressorShape", params::UNPATCHED_SIDECHAIN_SHAPE,
-	                                       writeAutomation);
-
 	patchedParams->writeParamAsAttribute(writer, "oscAVolume", params::LOCAL_OSC_A_VOLUME, writeAutomation);
 	patchedParams->writeParamAsAttribute(writer, "oscAPulseWidth", params::LOCAL_OSC_A_PHASE_WIDTH, writeAutomation);
 	patchedParams->writeParamAsAttribute(writer, "oscAWavetablePosition", params::LOCAL_OSC_A_WAVE_INDEX,
@@ -3805,9 +3749,6 @@ void Sound::writeToFile(Serializer& writer, bool savingSong, ParamManager* param
 	writer.writeAttribute("voicePriority", util::to_underlying(voicePriority));
 
 	// Send level
-	if (sideChainSendLevel != 0) {
-		writer.writeAttribute("sideChainSend", sideChainSendLevel);
-	}
 
 	writer.writeAttribute("mode", (char*)synthModeToString(synthMode));
 
@@ -4194,41 +4135,6 @@ bool Sound::modEncoderButtonAction(uint8_t whichModEncoder, bool on, ModelStackW
 			return false;
 		}
 	}
-	// Switch sidechain sync level
-	else if (ourModKnob->paramDescriptor.hasJustOneSource()
-	         && ourModKnob->paramDescriptor.getTopLevelSource() == PatchSource::SIDECHAIN) {
-		if (on) {
-			int32_t insideWorldTickMagnitude;
-			if (currentSong) { // Bit of a hack just referring to currentSong in here...
-				insideWorldTickMagnitude =
-				    (currentSong->insideWorldTickMagnitude + currentSong->insideWorldTickMagnitudeOffsetFromBPM);
-			}
-			else {
-				insideWorldTickMagnitude = FlashStorage::defaultMagnitude;
-			}
-
-			if (sidechain.syncLevel == (SyncLevel)(7 - insideWorldTickMagnitude)) {
-				sidechain.syncLevel = (SyncLevel)(9 - insideWorldTickMagnitude);
-			}
-			else {
-				sidechain.syncLevel = (SyncLevel)(7 - insideWorldTickMagnitude);
-			}
-
-			// if mod button is pressed, update mod button pop up
-			if (Buttons::isButtonPressed(
-			        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-				displaySidechainSettings(on);
-			}
-			else {
-				display->displayPopup(getSidechainDisplayName());
-			}
-			return true;
-		}
-		else {
-			return false;
-		}
-	}
-
 	// Switching between LPF, HPF and EQ
 	else if (ourModKnob->paramDescriptor.isSetToParamWithNoSource(params::LOCAL_LPF_FREQ)) {
 		if (on && synthMode != SynthMode::FM) {
@@ -4313,7 +4219,6 @@ void Sound::wontBeRenderedForAWhile() {
 	                     // Instrumentclip::detachFromInstrument()
 
 	getArp()->reset(); // Surely this shouldn't be quite necessary?
-	sidechain.status = EnvelopeStage::OFF;
 
 	reassessRenderSkippingStatus(NULL);
 

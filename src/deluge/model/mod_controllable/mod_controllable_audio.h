@@ -18,6 +18,7 @@
 #pragma once
 
 #include "definitions_cxx.hpp"
+#include "model/sync.h"
 #include "dsp/compressor/rms_feedback.h"
 #include "hid/button.h"
 #include "model/fx/stutterer.h"
@@ -26,7 +27,6 @@
 #include "modulation/lfo.h"
 #include "modulation/midi/midi_knob_array.h"
 #include "modulation/params/param_descriptor.h"
-#include "modulation/sidechain/sidechain.h"
 
 struct Grain {
 	int32_t length;     // in samples 0=OFF
@@ -41,6 +41,7 @@ struct Grain {
 };
 
 class Clip;
+class Song;
 class Knob;
 class MIDIDevice;
 class ModelStack;
@@ -119,8 +120,6 @@ public:
 	StereoSample grabbedSample;
 	StereoSample lastGrabbedSample;
 
-	SideChain sidechain; // Song doesn't use this, despite extending this class
-
 	MidiKnobArray midiKnobArray;
 	int32_t postReverbVolumeLastTime;
 
@@ -138,10 +137,8 @@ protected:
 	char const* getFilterModeDisplayName(FilterType currentFilterType);
 	char const* getLPFModeDisplayName();
 	char const* getHPFModeDisplayName();
-	char const* getSidechainDisplayName();
 
 	void displayFilterSettings(bool on, FilterType currentFilterType);
-	void displaySidechainSettings(bool on);
 	void displayOtherModKnobSettings(uint8_t whichModButton, bool on);
 
 private:

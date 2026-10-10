@@ -103,7 +103,6 @@ char const* getPatchedParamShortName(ParamType type) {
 	    [LOCAL_ENV_0_RELEASE]            = "Env1 rel",
 	    [LOCAL_ENV_1_RELEASE]            = "Env2 rel",
 	    [GLOBAL_VOLUME_POST_FX]          = "POSTFXLVL",
-	    [GLOBAL_VOLUME_POST_REVERB_SEND] = "Side level",
 	    [FIRST_GLOBAL_NON_VOLUME]        = "", // enum anchor: no named param lives here (tables must stay gap-free)
 	    [GLOBAL_LFO_FREQ]                = "LFO1 rate",
 	    [GLOBAL_ARP_RATE]                = "Arp. rate",
@@ -160,7 +159,6 @@ char const* getPatchedParamDisplayName(int32_t p) {
 	    [LOCAL_ENV_0_RELEASE] = STRING_FOR_PARAM_LOCAL_ENV_0_RELEASE,
 	    [LOCAL_ENV_1_RELEASE] = STRING_FOR_PARAM_LOCAL_ENV_1_RELEASE,
 	    [GLOBAL_VOLUME_POST_FX] = STRING_FOR_PARAM_GLOBAL_VOLUME_POST_FX,
-	    [GLOBAL_VOLUME_POST_REVERB_SEND] = STRING_FOR_PARAM_GLOBAL_VOLUME_POST_REVERB_SEND,
 	    [FIRST_GLOBAL_NON_VOLUME] = STRING_FOR_NONE, // enum anchor, tables must stay gap-free
 	    [GLOBAL_LFO_FREQ] = STRING_FOR_PARAM_GLOBAL_LFO_FREQ,
 	    [GLOBAL_ARP_RATE] = STRING_FOR_PARAM_GLOBAL_ARP_RATE,
@@ -184,7 +182,6 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 	if ((kind == Kind::UNPATCHED_SOUND || kind == Kind::UNPATCHED_GLOBAL) && p < (UNPATCHED_NUM_SHARED)) {
 		static l10n::String const NAMES[UNPATCHED_NUM_SHARED] = {
 		    [UNPATCHED_STUTTER_RATE] = STRING_FOR_STUTTER_RATE,
-		    [UNPATCHED_SIDECHAIN_SHAPE] = STRING_FOR_SIDECHAIN_SHAPE,
 		    [UNPATCHED_COMPRESSOR_THRESHOLD] = STRING_FOR_THRESHOLD,
 		    [UNPATCHED_COMPRESSOR_RATIO] = STRING_FOR_RATIO,
 		    [UNPATCHED_COMPRESSOR_ATTACK] = STRING_FOR_ATTACK,
@@ -195,9 +192,6 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		return l10n::get(NAMES[p]);
 	}
 
-	if (p == static_cast<int32_t>(UnpatchedGlobal::UNPATCHED_SIDECHAIN_VOLUME)) {
-		return l10n::get(STRING_FOR_SIDECHAIN_LEVEL);
-	}
 
 	constexpr ParamType unc = UNPATCHED_NUM_SHARED;
 
@@ -220,7 +214,6 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		static l10n::String const NAMES[UNPATCHED_GLOBAL_MAX_NUM - unc]{
 		    [UNPATCHED_PAN - unc] = STRING_FOR_PAN,
 		    [UNPATCHED_VOLUME - unc] = STRING_FOR_MASTER_LEVEL,
-		    [UNPATCHED_SIDECHAIN_VOLUME - unc] = STRING_FOR_SIDECHAIN_LEVEL,
 		    [UNPATCHED_PITCH_ADJUST - unc] = STRING_FOR_MASTER_PITCH,
 		};
 		return l10n::get(NAMES[p - unc]);
@@ -236,7 +229,6 @@ bool paramNeedsLPF(ParamType p, bool fromAutomation) {
 	// so we don't get stepping, but if it's from step automation, we do want it to adjust instantly,
 	// so the new step is instantly at the right volume
 	case params::GLOBAL_VOLUME_POST_FX:
-	case params::GLOBAL_VOLUME_POST_REVERB_SEND:
 	case params::LOCAL_VOLUME:
 	case params::LOCAL_PAN:
 	case params::LOCAL_LPF_FREQ:
@@ -297,8 +289,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 		case UNPATCHED_VOLUME:
 			return "volume";
 
-		case UNPATCHED_SIDECHAIN_VOLUME:
-			return "sidechainCompressorVolume";
 
 		case UNPATCHED_PITCH_ADJUST:
 			return "pitchAdjust";
@@ -313,8 +303,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 		case UNPATCHED_STUTTER_RATE:
 			return "stutterRate";
 
-		case UNPATCHED_SIDECHAIN_SHAPE:
-			return "compressorShape";
 
 		case UNPATCHED_COMPRESSOR_THRESHOLD:
 			return "compressorThreshold";
@@ -352,8 +340,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 		case GLOBAL_VOLUME_POST_FX:
 			return "volumePostFX";
 
-		case GLOBAL_VOLUME_POST_REVERB_SEND:
-			return "volumePostReverbSend";
 
 		case GLOBAL_ARP_RATE:
 			return "arpRate";

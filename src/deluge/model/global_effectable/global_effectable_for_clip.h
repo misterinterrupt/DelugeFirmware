@@ -37,7 +37,6 @@ public:
 	deluge::dsp::FxChain fxChain;
 	deluge::dsp::FxChain* getFxChain() override { return &fxChain; }
 
-	int32_t getSidechainVolumeAmountAsPatchCableDepth(ParamManager* paramManager);
 	void modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTimeline* paramManager) override;
 	bool modEncoderButtonAction(uint8_t whichModEncoder, bool on, ModelStackWithThreeMainThings* modelStack) final;
 	virtual Output* toOutput() = 0;

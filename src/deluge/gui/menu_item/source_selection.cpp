@@ -247,10 +247,6 @@ bool SourceSelection::sourceIsAllowed(PatchSource source) {
 		    || soundEditor.currentSound->maySourcePatchToParam(
 		           source, deluge::modulation::params::LOCAL_VOLUME,
 		           (ParamManagerForTimeline*)soundEditor.currentParamManager)
-		           != PatchCableAcceptance::DISALLOWED
-		    || soundEditor.currentSound->maySourcePatchToParam(
-		           source, deluge::modulation::params::GLOBAL_VOLUME_POST_REVERB_SEND,
-		           (ParamManagerForTimeline*)soundEditor.currentParamManager)
 		           != PatchCableAcceptance::DISALLOWED);
 	}
 	else {

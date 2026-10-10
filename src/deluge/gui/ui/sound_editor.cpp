@@ -1538,7 +1538,6 @@ doMIDIOrCV:
 	currentModControllable = newModControllable;
 
 	if (currentModControllable) {
-		currentSidechain = &currentModControllable->sidechain;
 	}
 
 	if (currentSound) {

@@ -2382,7 +2382,7 @@ void Song::renderAudio(StereoSample* outputBuffer, int32_t numSamples, int32_t s
 	}
 
 
-	int32_t postReverbVolume = paramNeutralValues[params::GLOBAL_VOLUME_POST_REVERB_SEND];
+	int32_t postReverbVolume = 134217728;
 
 	globalEffectable.processOutputVolume(outputBuffer, numSamples, volumePostFX, postReverbVolume);
 

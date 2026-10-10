@@ -76,7 +76,6 @@ void ModControllableAudio::cloneFrom(ModControllableAudio* other) {
 	hpfMode = other->hpfMode;
 	clippingAmount = other->clippingAmount;
 	filterRoute = other->filterRoute;
-	sidechain.cloneFrom(&other->sidechain);
 	midiKnobArray.cloneFrom(&other->midiKnobArray); // Could fail if no RAM... not too big a concern
 	if (other->getFxChain() != nullptr && getFxChain() != nullptr) {
 		getFxChain()->cloneFrom(*other->getFxChain());
@@ -89,7 +88,6 @@ void ModControllableAudio::initParams(ParamManager* paramManager) {
 
 	Stutterer::initParams(paramManager);
 
-	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_SHAPE].setCurrentValueBasicForSetup(-601295438);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_THRESHOLD].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RATIO].setCurrentValueBasicForSetup(1073741824);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_ATTACK].setCurrentValueBasicForSetup(0);
@@ -194,15 +192,6 @@ void ModControllableAudio::writeTagsToFile(Serializer& writer) {
 		}
 		writer.writeClosingTag("midiKnobs");
 	}
-
-	// Sidechain (renamed from "compressor" from the official firmware)
-	writer.writeOpeningTagBeginning("sidechain");
-	writer.writeAttribute("attack", sidechain.attack);
-	writer.writeAttribute("release", sidechain.release);
-	writer.writeAbsoluteSyncLevelToFile(currentSong, "syncLevel", sidechain.syncLevel, true);
-	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
-	writer.writeSyncTypeToFile(currentSong, "syncType", sidechain.syncType, true);
-	writer.closeTag();
 
 	// Audio compressor (this section is all new so we write it at the end)
 	writer.writeOpeningTagBeginning("audioCompressor");
@@ -394,37 +383,6 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 		reader.exitTag("AudioCompressor");
 	}
 	// this is actually the sidechain but pre c1.1 songs save it as compressor
-	else if (!strcmp(tagName, "compressor") || !strcmp(tagName, "sidechain")) { // Remember, Song doesn't use this
-		// Set default values in case they are not configured
-		const char* name = tagName;
-		sidechain.syncType = SYNC_TYPE_EVEN;
-		sidechain.syncLevel = SYNC_LEVEL_NONE;
-
-		while (*(tagName = reader.readNextTagOrAttributeName())) {
-			if (!strcmp(tagName, "attack")) {
-				sidechain.attack = reader.readTagOrAttributeValueInt();
-				reader.exitTag("attack");
-			}
-			else if (!strcmp(tagName, "release")) {
-				sidechain.release = reader.readTagOrAttributeValueInt();
-				reader.exitTag("release");
-			}
-			else if (!strcmp(tagName, "syncType")) {
-				sidechain.syncType = (SyncType)reader.readTagOrAttributeValueInt();
-				reader.exitTag("syncType");
-			}
-			else if (!strcmp(tagName, "syncLevel")) {
-				sidechain.syncLevel =
-				    (SyncLevel)song->convertSyncLevelFromFileValueToInternalValue(reader.readTagOrAttributeValueInt());
-				reader.exitTag("syncLevel");
-			}
-			else {
-				reader.exitTag(tagName);
-			}
-		}
-		reader.exitTag(name);
-	}
-
 	else if (!strcmp(tagName, "midiKnobs")) {
 
 		while (*(tagName = reader.readNextTagOrAttributeName())) {
@@ -1112,42 +1070,7 @@ void ModControllableAudio::displayFilterSettings(bool on, FilterType currentFilt
 	}
 }
 
-void ModControllableAudio::displaySidechainSettings(bool on) {
-	// Sidechain
-	if (display->haveOLED()) {
-		if (on) {
-			DEF_STACK_STRING_BUF(popupMsg, 100);
-			popupMsg.append("Sidechain: ");
-			popupMsg.append(getSidechainDisplayName());
 
-			display->popupText(popupMsg.c_str());
-		}
-		else {
-			display->cancelPopup();
-		}
-	}
-	else {
-		display->displayPopup(getSidechainDisplayName());
-	}
-}
-
-char const* ModControllableAudio::getSidechainDisplayName() {
-	int32_t insideWorldTickMagnitude;
-	if (currentSong) { // Bit of a hack just referring to currentSong in here...
-		insideWorldTickMagnitude =
-		    (currentSong->insideWorldTickMagnitude + currentSong->insideWorldTickMagnitudeOffsetFromBPM);
-	}
-	else {
-		insideWorldTickMagnitude = FlashStorage::defaultMagnitude;
-	}
-	using enum deluge::l10n::String;
-	if (sidechain.syncLevel == (SyncLevel)(7 - insideWorldTickMagnitude)) {
-		return l10n::get(STRING_FOR_SLOW);
-	}
-	else {
-		return l10n::get(STRING_FOR_FAST);
-	}
-}
 
 /// displays names of parameters assigned to gold knobs
 void ModControllableAudio::displayOtherModKnobSettings(uint8_t whichModButton, bool on) {

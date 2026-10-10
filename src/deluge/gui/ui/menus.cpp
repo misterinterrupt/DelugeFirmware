@@ -127,11 +127,6 @@
 #include "gui/menu_item/sample/transpose.h"
 #include "gui/menu_item/sequence/direction.h"
 #include "gui/menu_item/shortcuts/version.h"
-#include "gui/menu_item/sidechain/attack.h"
-#include "gui/menu_item/sidechain/release.h"
-#include "gui/menu_item/sidechain/send.h"
-#include "gui/menu_item/sidechain/sync.h"
-#include "gui/menu_item/sidechain/volume.h"
 #include "gui/menu_item/song_macros/configure.h"
 #include "gui/menu_item/source/patched_param/fm.h"
 #include "gui/menu_item/stem_export/start.h"
@@ -142,7 +137,6 @@
 #include "gui/menu_item/submenu/bend.h"
 #include "gui/menu_item/submenu/envelope.h"
 #include "gui/menu_item/submenu/modulator.h"
-#include "gui/menu_item/submenu/sidechain.h"
 #include "gui/menu_item/submenu_referring_to_one_thing.h"
 #include "gui/menu_item/swing/interval.h"
 #include "gui/menu_item/synth_mode.h"
@@ -290,29 +284,6 @@ submenu::Bend bendMenu{
     },
 };
 
-// Sidechain-----------------------------------------------------------------------
-
-sidechain::Send sidechainSendMenu{STRING_FOR_SEND_TO_SIDECHAIN, STRING_FOR_SEND_TO_SIDECH_MENU_TITLE};
-sidechain::VolumeShortcut sidechainVolumeShortcutMenu{STRING_FOR_VOLUME_DUCKING, params::GLOBAL_VOLUME_POST_REVERB_SEND,
-                                                      PatchSource::SIDECHAIN};
-sidechain::Sync sidechainSyncMenu{STRING_FOR_SYNC, STRING_FOR_SIDECHAIN_SYNC};
-sidechain::Attack sidechainAttackMenu{STRING_FOR_ATTACK, STRING_FOR_SIDECH_ATTACK_MENU_TITLE};
-sidechain::Release sidechainReleaseMenu{STRING_FOR_RELEASE, STRING_FOR_SIDECH_RELEASE_MENU_TITLE};
-unpatched_param::UpdatingReverbParams sidechainShapeMenu{STRING_FOR_SHAPE, STRING_FOR_SIDECH_SHAPE_MENU_TITLE,
-                                                         params::UNPATCHED_SIDECHAIN_SHAPE};
-
-submenu::Sidechain sidechainMenu{
-    STRING_FOR_SIDECHAIN,
-    STRING_FOR_SIDECHAIN,
-    {
-        &sidechainSendMenu,
-        &sidechainVolumeShortcutMenu,
-        &sidechainSyncMenu,
-        &sidechainAttackMenu,
-        &sidechainReleaseMenu,
-        &sidechainShapeMenu,
-    },
-};
 
 // Reverb lives exclusively in the FX BLOCS modular chain (dsp/fx_bloc); the stock engine's
 // params stay automatable for song compatibility but have no menu surface anymore.
@@ -393,20 +364,7 @@ UnpatchedParam globalStutterRateMenu{
     params::UNPATCHED_STUTTER_RATE,
 };
 
-// Sidechain menu
-unpatched_param::UpdatingReverbParams globalSidechainVolumeMenu{STRING_FOR_VOLUME_DUCKING,
-                                                                params::UNPATCHED_SIDECHAIN_VOLUME};
 
-Submenu globalSidechainMenu{
-    STRING_FOR_SIDECHAIN,
-    {
-        &globalSidechainVolumeMenu,
-        &sidechainSyncMenu,
-        &sidechainAttackMenu,
-        &sidechainReleaseMenu,
-        &sidechainShapeMenu,
-    },
-};
 
 // AudioClip stuff ---------------------------------------------------------------------------
 
@@ -926,7 +884,6 @@ menu_item::Submenu soundEditorRootMenu{
         &audioCompMenu,
         &soundFiltersMenu,
         &soundFXMenu,
-        &sidechainMenu,
         &source0Menu,
         &source1Menu,
         &modulator0Menu,
@@ -968,7 +925,6 @@ menu_item::Submenu soundEditorRootMenuAudioClip{
         &audioClipMasterMenu,
         &audioCompMenu,
         &audioClipFXMenu,
-        &globalSidechainMenu,
         &audioClipSampleMenu,
         &audioClipAttackMenu,
         &priorityMenu,
@@ -1056,7 +1012,6 @@ menu_item::Submenu soundEditorRootMenuKitGlobalFX{
         &kitClipMasterMenu,
         &audioCompMenu,
         &globalFXMenu,
-        &globalSidechainMenu,
     },
 };
 
@@ -1094,7 +1049,7 @@ MenuItem* paramShortcutsForSounds[][8] = {
     {&portaMenu,              &polyphonyMenu,          &priorityMenu,                  &unisonDetuneMenu,              &numUnisonToStereoSpreadMenu,       nullptr,  nullptr,                  &foldMenu                          },
     {&envReleaseMenu,         &envSustainMenu,         &envDecayMenu,                  &envAttackMenu,                 &lpfMorphMenu,        &lpfModeMenu,           &lpfResMenu,              &lpfFreqMenu                       },
     {&envReleaseMenu,         &envSustainMenu,         &envDecayMenu,                  &envAttackMenu,                 &hpfMorphMenu,        &hpfModeMenu,           &hpfResMenu,              &hpfFreqMenu                       },
-    {&sidechainReleaseMenu,   &sidechainSyncMenu,      &sidechainVolumeShortcutMenu,   &sidechainAttackMenu,           &sidechainShapeMenu,  &sidechainSendMenu,     nullptr,                nullptr                      },
+    {nullptr,   nullptr,      nullptr,   nullptr,           nullptr,  nullptr,     nullptr,                nullptr                      },
     {&arpRateMenu,            &arpSyncMenu,            &arpGateMenu,                   &arpOctavesMenu,                &arpPresetModeMenu,   &drumNameMenu,          nullptr,                 nullptr                    },
     {&lfo1RateMenu,           &lfo1SyncMenu,           &lfo1TypeMenu,                  nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {&lfo2RateMenu,           &lfo2SyncMenu,           &lfo2TypeMenu,                  nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
@@ -1112,7 +1067,7 @@ MenuItem* paramShortcutsForAudioClips[][8] = {
     {nullptr,                 nullptr,                 &priorityMenu,                  nullptr,                        nullptr,              nullptr,                nullptr,                  comingSoonMenu                     },
     {nullptr,                 nullptr,                 nullptr,                        &audioClipAttackMenu,           nullptr,  &lpfModeMenu,           nullptr,        nullptr              	  },
     {nullptr,                 nullptr,                 nullptr,                        &audioClipAttackMenu,           nullptr,  &hpfModeMenu,           nullptr,        nullptr                 },
-    {&sidechainReleaseMenu,   &sidechainSyncMenu,      &globalSidechainVolumeMenu,     &sidechainAttackMenu,           &sidechainShapeMenu,  nullptr,                nullptr,                nullptr                      },
+    {nullptr,  nullptr,      nullptr,                        nullptr,           nullptr,  nullptr,                nullptr,                nullptr                      },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                 nullptr                    },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
@@ -1148,7 +1103,7 @@ MenuItem* paramShortcutsForKitGlobalFX[][8] = {
     {nullptr,              	  nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,  &lpfModeMenu,           nullptr,        nullptr                 },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,  &hpfModeMenu,           nullptr,        nullptr                 },
-    {&sidechainReleaseMenu,   &sidechainSyncMenu,      &globalSidechainVolumeMenu,     &sidechainAttackMenu,           &sidechainShapeMenu,  nullptr,                nullptr,                nullptr                      },
+    {nullptr,  nullptr,      nullptr,                        nullptr,           nullptr,  nullptr,                nullptr,                nullptr                      },
     {nullptr,                 nullptr,            	   nullptr,                        nullptr,                		   nullptr,         	 nullptr,                nullptr,                 nullptr                    },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },

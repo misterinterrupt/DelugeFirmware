@@ -118,8 +118,8 @@ const uint32_t mutePadActionUIModes[] = {UI_MODE_NOTES_PRESSED, UI_MODE_AUDITION
 
 const uint32_t verticalScrollUIModes[] = {UI_MODE_NOTES_PRESSED, UI_MODE_AUDITIONING, UI_MODE_RECORD_COUNT_IN, 0};
 
-constexpr int32_t kNumNonGlobalParamsForAutomation = 47;
-constexpr int32_t kNumGlobalParamsForAutomation = 7;
+constexpr int32_t kNumNonGlobalParamsForAutomation = 46;
+constexpr int32_t kNumGlobalParamsForAutomation = 5;
 constexpr int32_t kParamNodeWidth = 3;
 
 // synth and kit rows FX - sorted in the order that Parameters are scrolled through on the display
@@ -139,7 +139,6 @@ const std::array<std::pair<params::Kind, ParamType>, kNumNonGlobalParamsForAutom
     // Bass, Bass Freq
     // Treble, Treble Freq
     // Sidechain Shape
-    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_SIDECHAIN_SHAPE},
     // Decimation, Bitcrush, Wavefolder
     {params::Kind::PATCHED, params::LOCAL_FOLD},
     // OSC 1 Volume, Pitch, Pulse Width, Carrier Feedback, Wave Index
@@ -206,8 +205,6 @@ const std::array<std::pair<params::Kind, ParamType>, kNumGlobalParamsForAutomati
     // Bass, Bass Freq
     // Treble, Treble Freq
     // Sidechain Send, Shape
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SIDECHAIN_VOLUME},
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SIDECHAIN_SHAPE},
     // Decimation, Bitcrush
     // Stutter Rate
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_STUTTER_RATE},
@@ -767,8 +764,7 @@ void AutomationView::renderAutomationOverview(ModelStackWithTimelineCounter* mod
 				int32_t paramID = unpatchedGlobalParamShortcuts[xDisplay][yDisplay];
 				if (onArrangerView) {
 					// don't make pitch adjust or sidechain available for automation in arranger
-					if ((paramID == params::UNPATCHED_PITCH_ADJUST) || (paramID == params::UNPATCHED_SIDECHAIN_SHAPE)
-					    || (paramID == params::UNPATCHED_SIDECHAIN_VOLUME)) {
+					if (paramID == params::UNPATCHED_PITCH_ADJUST) {
 						pixel = colours::black; // erase pad
 						continue;
 					}
@@ -2572,10 +2568,8 @@ void AutomationView::handleParameterSelection(Clip* clip, Output* output, Output
 		params::Kind paramKind = params::Kind::UNPATCHED_GLOBAL;
 		int32_t paramID = unpatchedGlobalParamShortcuts[xDisplay][yDisplay];
 
-		// don't allow automation of pitch adjust, or sidechain in arranger
-		if (onArrangerView
-		    && ((paramID == params::UNPATCHED_PITCH_ADJUST) || (paramID == params::UNPATCHED_SIDECHAIN_SHAPE)
-		        || (paramID == params::UNPATCHED_SIDECHAIN_VOLUME))) {
+		// don't allow automation of pitch adjust in arranger
+		if (onArrangerView && paramID == params::UNPATCHED_PITCH_ADJUST) {
 			return; // no parameter selected, don't re-render grid;
 		}
 
@@ -4552,8 +4546,7 @@ void AutomationView::selectGlobalParam(int32_t offset, Clip* clip) {
 		                                             kNumGlobalParamsForAutomation);
 		auto [kind, id] = globalParamsForAutomation[idx];
 		{
-			while ((id == params::UNPATCHED_PITCH_ADJUST || id == params::UNPATCHED_SIDECHAIN_SHAPE
-			        || id == params::UNPATCHED_SIDECHAIN_VOLUME || id == params::UNPATCHED_COMPRESSOR_THRESHOLD)) {
+			while ((id == params::UNPATCHED_PITCH_ADJUST || id == params::UNPATCHED_COMPRESSOR_THRESHOLD)) {
 
 				if (offset < 0) {
 					offset -= 1;

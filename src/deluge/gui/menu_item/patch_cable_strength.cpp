@@ -218,8 +218,7 @@ MenuPermission PatchCableStrength::checkPermissionToBeginSession(ModControllable
 }
 
 uint8_t PatchCableStrength::getIndexOfPatchedParamToBlink() {
-	if (soundEditor.patchingParamSelected == deluge::modulation::params::GLOBAL_VOLUME_POST_REVERB_SEND
-	    || soundEditor.patchingParamSelected == deluge::modulation::params::LOCAL_VOLUME) {
+	if (soundEditor.patchingParamSelected == deluge::modulation::params::LOCAL_VOLUME) {
 		return deluge::modulation::params::GLOBAL_VOLUME_POST_FX;
 	}
 	return soundEditor.patchingParamSelected;

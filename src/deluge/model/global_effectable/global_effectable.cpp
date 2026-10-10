@@ -56,7 +56,6 @@ void GlobalEffectable::initParams(ParamManager* paramManager) {
 	unpatchedParams->params[params::UNPATCHED_PAN].setCurrentValueBasicForSetup(0);
 
 	unpatchedParams->params[params::UNPATCHED_VOLUME].setCurrentValueBasicForSetup(889516852); // 3/4 of the way up
-	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_VOLUME].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
 	unpatchedParams->params[params::UNPATCHED_PITCH_ADJUST].setCurrentValueBasicForSetup(0);
 
 
@@ -517,14 +516,6 @@ void GlobalEffectable::writeParamAttributesToFile(Serializer& writer, ParamManag
 		                                       false, valuesForOverride);
 	}
 
-	if (unpatchedParams->params[params::UNPATCHED_SIDECHAIN_VOLUME].containsSomething(-2147483648)) {
-		unpatchedParams->writeParamAsAttribute(writer, "sidechainCompressorVolume", params::UNPATCHED_SIDECHAIN_VOLUME,
-		                                       writeAutomation, false, valuesForOverride);
-	}
-
-	unpatchedParams->writeParamAsAttribute(writer, "sidechainCompressorShape", params::UNPATCHED_SIDECHAIN_SHAPE,
-	                                       writeAutomation, false, valuesForOverride);
-
 	ModControllableAudio::writeParamAttributesToFile(writer, paramManager, writeAutomation, valuesForOverride);
 
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
@@ -561,18 +552,6 @@ bool GlobalEffectable::readParamTagFromFile(Deserializer& reader, char const* ta
 	if (!strcmp(tagName, "volume")) {
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_VOLUME, readAutomationUpToPos);
 		reader.exitTag("volume");
-	}
-
-	else if (!strcmp(tagName, "sidechainCompressorVolume")) {
-		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_SIDECHAIN_VOLUME,
-		                           readAutomationUpToPos);
-		reader.exitTag("sidechainCompressorVolume");
-	}
-
-	else if (!strcmp(tagName, "sidechainCompressorShape")) {
-		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_SIDECHAIN_SHAPE,
-		                           readAutomationUpToPos);
-		reader.exitTag("sidechainCompressorShape");
 	}
 
 	else if (!strcmp(tagName, "pan")) {

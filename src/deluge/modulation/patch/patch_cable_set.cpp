@@ -360,7 +360,7 @@ bool PatchCableSet::isSourcePatchedToDestinationDescriptorVolumeInspecific(Patch
 			return true;
 		}
 
-		destinationParamDescriptor.changeParam(params::GLOBAL_VOLUME_POST_REVERB_SEND);
+		destinationParamDescriptor.changeParam(params::GLOBAL_VOLUME_POST_FX);
 
 		if (getPatchCableIndex(s, destinationParamDescriptor) != 255) {
 			return true;
@@ -383,7 +383,7 @@ bool PatchCableSet::isAnySourcePatchedToParamVolumeInspecific(ParamDescriptor de
 			return true;
 		}
 
-		destinationParamDescriptor.changeParam(params::GLOBAL_VOLUME_POST_REVERB_SEND);
+		destinationParamDescriptor.changeParam(params::GLOBAL_VOLUME_POST_FX);
 
 		if (doesDestinationDescriptorHaveAnyCables(destinationParamDescriptor)) {
 			return true;
