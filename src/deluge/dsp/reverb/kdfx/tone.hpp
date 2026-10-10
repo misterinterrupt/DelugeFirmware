@@ -99,8 +99,8 @@ public:
 			q31_t trebleBand = midBoosted - trebleL_;
 			q31_t eqOut = add_saturation(midBoosted, kdfx::q31_mul(trebleBand, trebleGainQ31_));
 
-			// 4. Output Level scaling
-			q31_t outL = kdfx::q31_mul(eqOut, outLevel_);
+			// 4. Normalize the drive gain away, then the user output level
+			q31_t outL = kdfx::q31_mul(kdfx::q31_mul(eqOut, normGain_), outLevel_);
 			q31_t outR = outL;
 
 			kdfx::mixWet(s.l, outL, getPanLeft());
@@ -118,6 +118,10 @@ public:
 		// 0 dB (4096 in Q12) to +24 dB (~65000 in Q12)
 		float linearGain = std::pow(10.0f, (value * 24.0f) / 20.0f);
 		driveGain_ = static_cast<int32_t>(linearGain * 4096.0f);
+		// Post-normalization: undo the drive's linear gain at the output so the
+		// bloc hands the next bloc a sane level no matter how hot the DRIVE.
+		// (Only ever attenuates; 0 dB drive = unity.)
+		normGain_ = static_cast<q31_t>((1.0f / linearGain) * ONE_Q31f);
 	}
 	[[nodiscard]] float getDrive() const override { return drive_val_; }
 
@@ -206,6 +210,7 @@ private:
 	q31_t trebleGainQ31_ = 0;
 
 	q31_t outLevel_ = static_cast<q31_t>(0.8f * ONE_Q31f);
+	q31_t normGain_ = ONE_Q31f; // 1/drive, applied at the output
 
 	q31_t bassL_ = 0;
 	q31_t midLpL_ = 0, midHpL_ = 0;

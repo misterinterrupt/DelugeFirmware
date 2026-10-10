@@ -437,9 +437,12 @@ public:
 		// its getters is safe. LEVEL is the chain's own wet/blend control, not an
 		// engine param — it resets to unity on every model change.
 		if (replacement != nullptr) {
-			// mixWet() scales by panLevel << 5; Base's pan defaults to 0, which mutes
-			// every send-style engine — blocs were silently passthrough until this.
-			replacement->setPanLevels(reverb::kdfx::unityWetPan(), reverb::kdfx::unityWetPan());
+			// Seed the wet path from the LEVEL default (0%: silent for send
+			// engines, dry-through for insert engines) — a freshly picked bloc
+			// does nothing until its LEVEL is brought up.
+			if (!replacement->isInsert()) {
+				replacement->setPanLevels(0, 0);
+			}
 			for (const auto& def : paramDefs(m)) {
 				if (def.param == Param::None || def.param == Param::Level || def.param == Param::InGain) {
 					continue;
@@ -447,7 +450,7 @@ public:
 				cache_[util::to_underlying(def.param)] = readEngineParam(replacement, def.param);
 			}
 		}
-		cache_[util::to_underlying(Param::Level)] = 1.0f;
+		cache_[util::to_underlying(Param::Level)] = 0.0f; // pick a bloc -> silent/dry until LEVEL is raised
 		cache_[util::to_underlying(Param::InGain)] = tFromReal(INGAIN_DEF(), 0.0f);
 		if (m == Model::GLOBAL_SEND) {
 			cache_[util::to_underlying(Param::SendBus)] = 0.0f;
