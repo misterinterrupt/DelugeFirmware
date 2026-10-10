@@ -380,6 +380,18 @@ constexpr OscType kLastRingmoddableOscType = OscType::PHYSICAL_MODEL;
 constexpr int32_t kNumOscTypesRingModdable = util::to_underlying(kLastRingmoddableOscType) + 1;
 constexpr int32_t kNumOscTypes = util::to_underlying(OscType::INPUT_STEREO) + 1;
 
+/// How oscillator sync (osc A resetting osc B) behaves at the master's phase wrap.
+enum class OscSyncMode : uint8_t {
+	OFF = 0,
+	HARD = 1,    // reset slave phase to the reset target, with crossfade
+	SOFT = 2,    // reset only if the slave phase is already near the reset target
+	REVERSE = 3, // flip slave phase direction; phase itself is continuous
+};
+
+/// SOFT sync only performs the reset when the slave phase is within this distance (a quarter
+/// cycle) ahead of the reset target.
+constexpr uint32_t kOscSyncSoftResetThreshold = 0x40000000;
+
 /** Integer index into Sound::lfoConfig[].
  *
  * LFO1 is global to the clip (Sound): it is running continuously, and shared by all voices

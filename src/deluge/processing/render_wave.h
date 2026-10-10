@@ -27,6 +27,7 @@
                         startRenderingASyncLabel)                                                                      \
                                                                                                                        \
 	bool renderedASyncFromItsStartYet = false;                                                                         \
+	bool lastCrossoverDidReset = false;                                                                                \
 	int32_t crossoverSampleBeforeSync;                                                                                 \
 	int32_t fadeBetweenSyncs;                                                                                          \
                                                                                                                        \
@@ -49,7 +50,7 @@ startRenderingASyncLabel:                                                       
 	storageFunctionName(valueFunctionName);                                                                            \
                                                                                                                        \
 	/* Sort out the crossover sample at the *start* of that window we just did, if there was one. */                   \
-	if (renderedASyncFromItsStartYet) {                                                                                \
+	if (lastCrossoverDidReset) {                                                                                \
 		int32_t average = (*bufferStartThisSync >> 1) + (crossoverSampleBeforeSync >> 1);                              \
 		int32_t halfDifference = (*bufferStartThisSync >> 1) - (crossoverSampleBeforeSync >> 1);                       \
 		int32_t sineValue = getSine(fadeBetweenSyncs >> 1);                                                            \
@@ -70,15 +71,37 @@ startRenderingASyncLabel:                                                       
 		                                                        point (why again?). */                                 \
 		/* The first time we get here, it won't yet be, so make it so. */                                              \
                                                                                                                        \
-		fadeBetweenSyncs =                                                                                             \
-		    multiply_32x32_rshift32((int32_t)resetterPhase,                                                            \
-		                            resetterDivideByPhaseIncrement) /* The result of that comes out as between "-0.5   \
-		                                                               and 0.5", represented as +-(1<<14) */           \
-		    << 17; /* And this makes it "full-scale", so "1" is 1<<32. */                                              \
-		phase = multiply_32x32_rshift32(fadeBetweenSyncs, phaseIncrement) + retriggerPhase;                            \
+		bool doReset = true;                                                                                           \
+		if (oscSyncMode == OscSyncMode::REVERSE) {                                                                     \
+			/* Reverse sync: no discontinuity - flip the slave's direction and keep running. Wind phase back to the   \
+			 * crossover sample so its re-render is identical, then flip. */                                         \
+			phase += phaseIncrement * (numSamplesThisSyncRender - 1);                                                 \
+			phaseIncrement = 0u - phaseIncrement;                                                                      \
+			if (oscSyncDirection) {                                                                                    \
+				*oscSyncDirection = -*oscSyncDirection;                                                                \
+			}                                                                                                          \
+			doReset = false;                                                                                           \
+		}                                                                                                              \
+		else if (oscSyncMode == OscSyncMode::SOFT                                                                      \
+		         && (uint32_t)(phase - retriggerPhase) >= kOscSyncSoftResetThreshold) {                                \
+			/* Slave phase isn't near the reset target - skip this reset. Wind phase to the crossover sample so its    \
+			 * re-render is identical. */                                                                             \
+			phase += phaseIncrement * (numSamplesThisSyncRender - 1);                                                 \
+			doReset = false;                                                                                           \
+		}                                                                                                              \
                                                                                                                        \
-		phase -= phaseIncrement; /* Because we're going back and redoing the last sample. */                           \
+		if (doReset) {                                                                                                 \
+			fadeBetweenSyncs =                                                                                         \
+			    multiply_32x32_rshift32((int32_t)resetterPhase,                                                        \
+			                            resetterDivideByPhaseIncrement) /* The result of that comes out as between    \
+			                                                               "-0.5 and 0.5", represented as +-(1<<14) */     \
+			    << 17; /* And this makes it "full-scale", so "1" is 1<<32. */                                          \
+			phase = multiply_32x32_rshift32(fadeBetweenSyncs, phaseIncrement) + retriggerPhase;                         \
+                                                                                                                       \
+			phase -= phaseIncrement; /* Because we're going back and redoing the last sample. */                       \
+		}                                                                                                              \
 		renderedASyncFromItsStartYet = true;                                                                           \
+		lastCrossoverDidReset = doReset;                                                                               \
 		samplesIncludingNextCrossoverSample = 2; /* Make this 1 higher now, because resetterPhase's value is 1 sample  \
 		                                            later than what it "is in reality". */                             \
 		goto startRenderingASyncLabel;                                                                                 \

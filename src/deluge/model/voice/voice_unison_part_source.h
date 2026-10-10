@@ -42,6 +42,7 @@ public:
 	                 // wavetable.
 	uint32_t phaseIncrementStoredValue;
 	int32_t carrierFeedback;
+	int8_t oscSyncDirection; // +1/-1. Persists the REVERSE osc-sync direction between render blocks.
 	bool active;
 	VoiceSample* voiceSample;
 	LivePitchShifter* livePitchShifter;

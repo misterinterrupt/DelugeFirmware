@@ -31,6 +31,16 @@ sync = Menu(
     available_when="Voice is in subtractive or ring-mod mode and oscillator 1 is in a synthesis mode.",
 )
 
+sync_phase = Menu(
+    "osc::SyncPhase",
+    "oscSyncPhaseMenu",
+    ["{name}", "{title}", "params::LOCAL_SYNC_PHASE"],
+    "oscillator/sync_phase.md",
+    name="STRING_FOR_SYNC_PHASE",
+    title="STRING_FOR_OSC_SYNC_PHASE_MENU_TITLE",
+    available_when="Oscillator sync is set to a mode other than off, and the oscillator is osc 2.",
+)
+
 retrigger_phase = Menu(
     "osc::RetriggerPhase",
     "oscPhaseMenu",
@@ -67,6 +77,7 @@ menus = [
             sample.interpolation,
             pulse_width,
             sync,
+            sync_phase,
             retrigger_phase,
         ],
         name=f"STRING_FOR_OSCILLATOR_{i+1}",

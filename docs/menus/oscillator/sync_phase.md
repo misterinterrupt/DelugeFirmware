@@ -1,0 +1,1 @@
+Offsets the phase the oscillator resets to when oscillator sync resets it. A full swing covers one whole cycle of the oscillator's wave, so an LFO patched here scrolls through the waveform — the "sync window" effect on wavetables.

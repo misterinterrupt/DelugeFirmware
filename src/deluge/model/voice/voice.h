@@ -125,7 +125,8 @@ private:
 	void renderOsc(int32_t s, OscType type, int32_t amplitude, int32_t* thisSample, int32_t* bufferEnd,
 	               int32_t numSamples, uint32_t phaseIncrementNow, uint32_t phaseWidth, uint32_t* thisPhase,
 	               bool applyAmplitude, int32_t amplitudeIncrement, bool doOscSync, uint32_t resetterPhase,
-	               uint32_t resetterPhaseIncrement, uint32_t retriggerPhase, int32_t waveIndexIncrement);
+	               uint32_t resetterPhaseIncrement, uint32_t retriggerPhase, int32_t waveIndexIncrement,
+	               int8_t* syncDirection = nullptr);
 	void renderBasicSource(Sound* sound, ParamManagerForTimeline* paramManager, int32_t s, int32_t* oscBuffer,
 	                       int32_t numSamples, bool stereoBuffer, int32_t sourceAmplitude,
 	                       bool* unisonPartBecameInactive, int32_t overallPitchAdjust, bool doOscSync,

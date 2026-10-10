@@ -83,6 +83,7 @@ char const* getPatchedParamShortName(ParamType type) {
 	    [LOCAL_ENV_1_SUSTAIN]            = "Env2 sus",
 	    [LOCAL_LPF_MORPH]                = "LPF Morph",
 	    [LOCAL_HPF_MORPH]                = "HPF Morph",
+	    [LOCAL_SYNC_PHASE]               = "Sync phas",
 	    [LOCAL_OSC_A_PHASE_WIDTH]        = "Osc1 PW",
 	    [LOCAL_OSC_B_PHASE_WIDTH]        = "Osc2 PW",
 	    [LOCAL_OSC_A_WAVE_INDEX]         = "Osc1 wave",
@@ -139,6 +140,7 @@ char const* getPatchedParamDisplayName(int32_t p) {
 	    [LOCAL_ENV_1_SUSTAIN] = STRING_FOR_PARAM_LOCAL_ENV_1_SUSTAIN,
 	    [LOCAL_LPF_MORPH] = STRING_FOR_PARAM_LOCAL_LPF_MORPH,
 	    [LOCAL_HPF_MORPH] = STRING_FOR_PARAM_LOCAL_HPF_MORPH,
+	    [LOCAL_SYNC_PHASE] = STRING_FOR_PARAM_LOCAL_SYNC_PHASE,
 	    [LOCAL_OSC_A_PHASE_WIDTH] = STRING_FOR_PARAM_LOCAL_OSC_A_PHASE_WIDTH,
 	    [LOCAL_OSC_B_PHASE_WIDTH] = STRING_FOR_PARAM_LOCAL_OSC_B_PHASE_WIDTH,
 	    [LOCAL_OSC_A_WAVE_INDEX] = STRING_FOR_PARAM_LOCAL_OSC_A_WAVE_INDEX,
@@ -372,6 +374,9 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 
 		case LOCAL_HPF_MORPH:
 			return "hpfMorph";
+
+		case LOCAL_SYNC_PHASE:
+			return "syncPhase";
 
 		case LOCAL_PITCH_ADJUST:
 			return "pitch";

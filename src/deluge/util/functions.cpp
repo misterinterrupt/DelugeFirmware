@@ -105,6 +105,7 @@ int32_t getParamNeutralValue(int32_t p) {
 	case params::LOCAL_PAN:
 	case params::LOCAL_OSC_A_PHASE_WIDTH:
 	case params::LOCAL_OSC_B_PHASE_WIDTH:
+	case params::LOCAL_SYNC_PHASE:
 		return 0;
 
 	case params::LOCAL_ENV_0_ATTACK:

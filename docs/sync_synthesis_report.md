@@ -80,6 +80,9 @@ the range — the "why does my patch sound different up the octave" fix.
 
 ## What we could add (priority order)
 
+> **Status update (2026-10-10):** items 1 and 2 are implemented (see
+> `docs/sync_expansion_spec.md`). Items 3–5 remain roadmap.
+
 1. **Per-source sync mode (HARD / SOFT / REVERSE).** One new param on the sync
    path in `renderOsc`: reverse sync negates the phase increment at the reset
    event instead of loading `retriggerPhase`; soft sync gates the reset on phase

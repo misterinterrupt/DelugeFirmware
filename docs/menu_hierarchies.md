@@ -925,8 +925,11 @@ The Sound menu contains the following menu hierarchy:
 	- Speed (SPEE) - if Sample type selected
 	- Pulse Width (PULS) - if any type except Sample or Input is selected
 	- Oscillator Sync (SYNC)
-		- Disabled (OFF)
-		- Enabled (ON)
+		- Off (OFF)
+		- Hard (HARD)
+		- Soft (SOFT)
+		- Reverse (REV)
+	- Sync Phase (SYNPH) - if Oscillator Sync is not Off
 	- Retrigger Phase (RETR) - if any type except Sample is selected
 </details>
 <details><summary>Envelope 1 (ENV1) </summary>

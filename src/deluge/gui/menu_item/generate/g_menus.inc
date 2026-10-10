@@ -68,8 +68,9 @@ sample::TimeStretchMode timeStretchModeMenu{STRING_FOR_TIME_STRETCH_MODE, STRING
 sample::Interpolation interpolationMenu{STRING_FOR_INTERPOLATION, STRING_FOR_SAMP_INTERP_MENU_TITLE};
 osc::PulseWidth pulseWidthMenu{STRING_FOR_PULSE_WIDTH, STRING_FOR_OSC_P_WIDTH_MENU_TITLE, params::LOCAL_OSC_A_PHASE_WIDTH};
 osc::Sync oscSyncMenu{STRING_FOR_OSCILLATOR_SYNC};
+osc::SyncPhase oscSyncPhaseMenu{STRING_FOR_SYNC_PHASE, STRING_FOR_OSC_SYNC_PHASE_MENU_TITLE, params::LOCAL_SYNC_PHASE};
 osc::RetriggerPhase oscPhaseMenu{STRING_FOR_RETRIGGER_PHASE, STRING_FOR_OSC_R_PHASE_MENU_TITLE, false};
-std::array<MenuItem*, 20> child5 = {
+std::array<MenuItem*, 21> child5 = {
     &oscTypeMenu,
     &sourceVolumeMenu,
     &sourceWaveIndexMenu,
@@ -89,6 +90,7 @@ std::array<MenuItem*, 20> child5 = {
     &interpolationMenu,
     &pulseWidthMenu,
     &oscSyncMenu,
+    &oscSyncPhaseMenu,
     &oscPhaseMenu,
 };
 submenu::ActualSource source0Menu{STRING_FOR_OSCILLATOR_1, child5, 0};

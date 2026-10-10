@@ -1049,10 +1049,13 @@ const int16_t* getKernel(int32_t phaseIncrement, int32_t bandMaxPhaseIncrement) 
 uint32_t WaveTable::render(int32_t* __restrict__ outputBuffer, int32_t numSamples, uint32_t phaseIncrement,
                            uint32_t phase, bool doOscSync, uint32_t resetterPhaseThisCycle,
                            uint32_t resetterPhaseIncrement, uint32_t resetterDivideByPhaseIncrement,
-                           uint32_t retriggerPhase, int32_t waveIndex, int32_t waveIndexIncrement) {
+                           uint32_t retriggerPhase, int32_t waveIndex, int32_t waveIndexIncrement,
+                           OscSyncMode oscSyncMode, int8_t* oscSyncDirection) {
 
-	// Decide on ideal band
-	int32_t bHere = bands.search(phaseIncrement, GREATER_OR_EQUAL);
+	// Decide on ideal band. REVERSE osc sync may hand us a negative (direction-flipped)
+	// increment - band and kernel selection only care about magnitude.
+	uint32_t phaseIncrementMagnitude = ((int32_t)phaseIncrement >= 0) ? phaseIncrement : (0u - phaseIncrement);
+	int32_t bHere = bands.search(phaseIncrementMagnitude, GREATER_OR_EQUAL);
 	if (bHere >= bands.getNumElements()) {
 		bHere--;
 	}
@@ -1117,7 +1120,7 @@ startRenderingACycle:
 		}
 
 		{
-			const int16_t* kernel = getKernel(phaseIncrement, bandHere->maxPhaseIncrement);
+			const int16_t* kernel = getKernel(phaseIncrementMagnitude, bandHere->maxPhaseIncrement);
 
 			if (doOscSync) {
 				int32_t* bufferStartThisSync = outputBuffer;
@@ -1146,7 +1149,7 @@ doneRenderingACycle:
 
 	// Or, if we're actually a single-cycle waveform, with only one cycle...
 	else {
-		const int16_t* kernel = getKernel(phaseIncrement, bandHere->maxPhaseIncrement);
+		const int16_t* kernel = getKernel(phaseIncrementMagnitude, bandHere->maxPhaseIncrement);
 		if (doOscSync) {
 			int32_t* bufferStartThisSync = outputBuffer;
 			uint32_t resetterPhase = resetterPhaseThisCycle;

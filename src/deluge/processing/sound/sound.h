@@ -140,7 +140,7 @@ public:
 
 	int32_t lastNoteCode;
 
-	bool oscillatorSync;
+	OscSyncMode oscSyncMode;
 
 	VoicePriority voicePriority;
 

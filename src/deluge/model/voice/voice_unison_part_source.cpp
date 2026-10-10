@@ -32,6 +32,7 @@ VoiceUnisonPartSource::VoiceUnisonPartSource() {
 	voiceSample = NULL;
 	livePitchShifter = NULL;
 	dxVoice = NULL;
+	oscSyncDirection = 1;
 }
 
 bool VoiceUnisonPartSource::noteOn(Voice* voice, Source* source, VoiceSamplePlaybackGuide* guide, uint32_t samplesLate,
@@ -88,6 +89,7 @@ bool VoiceUnisonPartSource::noteOn(Voice* voice, Source* source, VoiceSamplePlay
 
 	if (resetEverything) {
 		carrierFeedback = 0;
+		oscSyncDirection = 1;
 	}
 
 	return true;

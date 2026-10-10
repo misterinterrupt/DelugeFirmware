@@ -1333,7 +1333,8 @@ cantBeDoingOscSyncForFirstOsc:
 					renderOsc(s, oscType, 0, spareRenderingBuffer[s + 2], spareRenderingBuffer[s + 2] + numSamples,
 					          numSamples, phaseIncrements[s], pulseWidth, &unisonParts[u].sources[s].oscPos, false, 0,
 					          doingOscSyncThisOscillator, oscSyncPos[u], phaseIncrements[0],
-					          sound->oscRetriggerPhase[s], sourceWaveIndexIncrements[s]);
+					          sound->oscRetriggerPhase[s], sourceWaveIndexIncrements[s],
+					          &unisonParts[u].sources[s].oscSyncDirection);
 
 					// Sine and triangle waves come out bigger in fixed-amplitude rendering (for arbitrary reasons), so
 					// we need to compensate
@@ -2514,7 +2515,7 @@ dontUseCache: {}
 			renderOsc(s, sound->sources[s].oscType, sourceAmplitude, renderBuffer, oscBufferEnd, numSamples,
 			          phaseIncrement, pulseWidth, &unisonParts[u].sources[s].oscPos, true, amplitudeIncrement,
 			          doOscSync, oscSyncPosThisUnison, oscSyncPhaseIncrementsThisUnison, oscRetriggerPhase,
-			          waveIndexIncrement);
+			          waveIndexIncrement, &unisonParts[u].sources[s].oscSyncDirection);
 
 			if (stereoBuffer) {
 				// TODO: if render buffer was typed we could use addPannedMono()
@@ -2815,13 +2816,25 @@ __attribute__((optimize("unroll-loops"))) void
 Voice::renderOsc(int32_t s, OscType type, int32_t amplitude, int32_t* bufferStart, int32_t* bufferEnd,
                  int32_t numSamples, uint32_t phaseIncrement, uint32_t pulseWidth, uint32_t* startPhase,
                  bool applyAmplitude, int32_t amplitudeIncrement, bool doOscSync, uint32_t resetterPhase,
-                 uint32_t resetterPhaseIncrement, uint32_t retriggerPhase, int32_t waveIndexIncrement) {
+                 uint32_t resetterPhaseIncrement, uint32_t retriggerPhase, int32_t waveIndexIncrement,
+                 int8_t* syncDirection) {
 	GeneralMemoryAllocator::get().checkStack("renderOsc");
 
 	// We save a decent bit of processing power by grabbing a local copy of the phase to work with, and just
 	// incrementing the startPhase once
 	uint32_t phase = *startPhase;
 	*startPhase += phaseIncrement * numSamples;
+
+	// If doOscSync is set on entry, this is genuine osc-A-resets-osc-B sync, whose behavior
+	// oscSyncMode selects. If doOscSync only gets switched on further below, that's pulse-width
+	// self-sync, which must keep the exact HARD reset semantics.
+	bool genuineOscSync = doOscSync;
+	OscSyncMode oscSyncMode = genuineOscSync ? assignedToSound->oscSyncMode : OscSyncMode::HARD;
+	int8_t* oscSyncDirection = genuineOscSync ? syncDirection : nullptr;
+	if (genuineOscSync) {
+		// Sync-phase mod target: a full patched swing covers one whole cycle of the slave wave
+		retriggerPhase += ((uint32_t)paramFinalValues[params::LOCAL_SYNC_PHASE]) << 2;
+	}
 
 	bool doPulseWave = false;
 
@@ -2923,6 +2936,14 @@ Voice::renderOsc(int32_t s, OscType type, int32_t amplitude, int32_t* bufferStar
 	if (doOscSync) [[unlikely]] {
 doOscSyncSetup:
 
+		// REVERSE sync re-applies the direction persisted from the previous block. Band and
+		// table selection above used the increment's magnitude, which is all they care about.
+		if (oscSyncMode == OscSyncMode::REVERSE && oscSyncDirection && *oscSyncDirection < 0
+		    && type != OscType::PHYSICAL_MODEL && type != OscType::SAMPLE && type != OscType::DX7
+		    && type != OscType::INPUT_L && type != OscType::INPUT_R && type != OscType::INPUT_STEREO) {
+			phaseIncrement = 0u - phaseIncrement;
+		}
+
 		resetterDivideByPhaseIncrement = // You should >> 47 if multiplying by this.
 		    (uint32_t)2147483648u
 		    / (uint16_t)((resetterPhaseIncrement + 65535)
@@ -2948,7 +2969,7 @@ doSine:
 
 		phase = waveTable->render(wavetableRenderingBuffer, numSamples, phaseIncrement, phase, doOscSync, resetterPhase,
 		                          resetterPhaseIncrement, resetterDivideByPhaseIncrement, retriggerPhase, waveIndex,
-		                          waveIndexIncrement);
+		                          waveIndexIncrement, oscSyncMode, oscSyncDirection);
 
 		amplitude <<= 3;
 		amplitudeIncrement <<= 3;
@@ -2971,7 +2992,7 @@ doSine:
 
 	else if (type == OscType::TRIANGLE) {
 
-		if (phaseIncrement < 69273666 || AudioEngine::cpuDireness >= 7) {
+		if (std::min(phaseIncrement, 0u - phaseIncrement) < 69273666 || AudioEngine::cpuDireness >= 7) {
 			if (doOscSync) {
 
 				int32_t amplitudeNow = amplitude << 1;
@@ -2979,16 +3000,29 @@ doSine:
 				int32_t* thisSample = bufferStart;
 				uint32_t resetterPhaseNow = resetterPhase;
 				amplitudeIncrement <<= 1;
+				int32_t syncDir = oscSyncDirection ? *oscSyncDirection : 1;
+				uint32_t phaseIncrementNow = phaseIncrement; // direction already applied above
 				do {
-					phaseNow += phaseIncrement;
+					phaseNow += phaseIncrementNow;
 					resetterPhaseNow += resetterPhaseIncrement;
 
 					// Do the reset
 					if (resetterPhaseNow < resetterPhaseIncrement) {
-						phaseNow = (multiply_32x32_rshift32(multiply_32x32_rshift32(resetterPhaseNow, phaseIncrement),
-						                                    resetterDivideByPhaseIncrement)
-						            << 17)
-						           + 1 + retriggerPhase;
+						if (oscSyncMode == OscSyncMode::REVERSE) {
+							syncDir = -syncDir;
+							phaseIncrementNow = 0u - phaseIncrementNow;
+						}
+						else if (oscSyncMode == OscSyncMode::SOFT
+						         && (uint32_t)(phaseNow - retriggerPhase) >= kOscSyncSoftResetThreshold) {
+							// Slave phase isn't near the reset target - skip this reset
+						}
+						else {
+							phaseNow =
+							    (multiply_32x32_rshift32(multiply_32x32_rshift32(resetterPhaseNow, phaseIncrementNow),
+							                             resetterDivideByPhaseIncrement)
+							     << 17)
+							    + 1 + retriggerPhase;
+						}
 					}
 
 					int32_t value = getTriangleSmall(phaseNow);
@@ -3001,6 +3035,9 @@ doSine:
 						*thisSample = value << 1;
 					}
 				} while (++thisSample != bufferEnd);
+				if (oscSyncDirection) {
+					*oscSyncDirection = syncDir;
+				}
 
 				phase = phaseNow;
 				goto storePhase;
@@ -3086,17 +3123,29 @@ doSaw:
 					uint32_t resetterPhaseNow = resetterPhase;
 					int32_t* thisSample = bufferStart;
 
+					int32_t syncDir = oscSyncDirection ? *oscSyncDirection : 1;
+					uint32_t phaseIncrementNow = phaseIncrement; // direction already applied above
 					do {
-						phaseNow += phaseIncrement;
+						phaseNow += phaseIncrementNow;
 						resetterPhaseNow += resetterPhaseIncrement;
 
 						// Do the reset
 						if (resetterPhaseNow < resetterPhaseIncrement) {
-							phaseNow =
-							    (multiply_32x32_rshift32(multiply_32x32_rshift32(resetterPhaseNow, phaseIncrement),
-							                             resetterDivideByPhaseIncrement)
-							     << 17)
-							    + 1 + retriggerPhase;
+							if (oscSyncMode == OscSyncMode::REVERSE) {
+								syncDir = -syncDir;
+								phaseIncrementNow = 0u - phaseIncrementNow;
+							}
+							else if (oscSyncMode == OscSyncMode::SOFT
+							         && (uint32_t)(phaseNow - retriggerPhase) >= kOscSyncSoftResetThreshold) {
+								// Slave phase isn't near the reset target - skip this reset
+							}
+							else {
+								phaseNow = (multiply_32x32_rshift32(
+								                multiply_32x32_rshift32(resetterPhaseNow, phaseIncrementNow),
+								                resetterDivideByPhaseIncrement)
+								             << 17)
+								            + 1 + retriggerPhase;
+							}
 						}
 
 						if (applyAmplitude) {
@@ -3109,6 +3158,9 @@ doSaw:
 							*thisSample = (int32_t)phaseNow >> 1;
 						}
 					} while (++thisSample != bufferEnd);
+					if (oscSyncDirection) {
+						*oscSyncDirection = syncDir;
+					}
 
 					phase = phaseNow;
 					goto storePhase;
@@ -3174,19 +3226,31 @@ doSaw:
 				}
 
 				else {
+					int32_t syncDir = oscSyncDirection ? *oscSyncDirection : 1;
+					uint32_t phaseIncrementNow = phaseIncrement; // direction already applied above
 					do {
 
-						phaseNow += phaseIncrement;
+						phaseNow += phaseIncrementNow;
 
 						resetterPhaseNow += resetterPhaseIncrement;
 
 						// Do the reset
 						if (resetterPhaseNow < resetterPhaseIncrement) {
-							phaseNow =
-							    (multiply_32x32_rshift32(multiply_32x32_rshift32(resetterPhaseNow, phaseIncrement),
-							                             resetterDivideByPhaseIncrement)
-							     << 17)
-							    + 1 + retriggerPhase;
+							if (oscSyncMode == OscSyncMode::REVERSE) {
+								syncDir = -syncDir;
+								phaseIncrementNow = 0u - phaseIncrementNow;
+							}
+							else if (oscSyncMode == OscSyncMode::SOFT
+							         && (uint32_t)(phaseNow - retriggerPhase) >= kOscSyncSoftResetThreshold) {
+								// Slave phase isn't near the reset target - skip this reset
+							}
+							else {
+								phaseNow = (multiply_32x32_rshift32(
+								                multiply_32x32_rshift32(resetterPhaseNow, phaseIncrementNow),
+								                resetterDivideByPhaseIncrement)
+								             << 17)
+								            + 1 + retriggerPhase;
+							}
 						}
 
 						if (applyAmplitude) {
@@ -3198,6 +3262,9 @@ doSaw:
 							*thisSample = getSquareSmall(phaseNow, pulseWidth);
 						}
 					} while (++thisSample != bufferEnd);
+					if (oscSyncDirection) {
+						*oscSyncDirection = syncDir;
+					}
 
 					phase = phaseNow;
 					goto storePhase;

@@ -6,6 +6,8 @@ Implementation spec for the fx-blocs firmware. Read together with
 items 3–5 (sync matrix, windowed sample sync, phase-distortion osc type) stay
 spec'd only at report level until this lands and soaks.
 
+**Status: IMPLEMENTED** (pending on-device test pass — see test plan).
+
 ## What exists today (grounding audit)
 
 - Sync is a single bool `Sound::oscillatorSync` (`sound.h:143`), menu item
@@ -143,12 +145,38 @@ Keep the Shape page's four slots meaningful; sync's two controls sit together:
 SYNPH. Osc 1's Shape page drops its dead SYNC slot (sync is B-only — dead-link
 sweep rule) and keeps WIDTH / FDBK / PHASE.
 
+## Implementation notes (discovered during the build)
+
+- **REVERSE direction re-application**: `phaseIncrement` re-enters `renderOsc`
+  positive every block (the caller recomputes it from pitch), so the persisted
+  direction is re-applied in the `doOscSyncSetup` block, after band/table
+  selection (which happened before, on magnitude).
+- **Magnitude normalization**: band and kernel selection must never see the
+  flipped (negative) increment — `getTableNumber` keeps using the pre-flip
+  value, `WaveTable::render` selects band/kernel by
+  `phaseIncrementMagnitude`, and the triangle low-rate gate uses
+  `std::min(phaseIncrement, 0u - phaseIncrement)`. Reversal adds no harmonics,
+  so the band is unchanged — this is correctness, not just cosmetics.
+- **Crude loops** derive their own `phaseIncrementNow` from the (already
+  re-applied) local, flip it at REVERSE wraps, and write the direction flag
+  back after the loop; the hard-reset sub-sample math uses the same local
+  (equal to the positive increment in HARD/SOFT, which never flip).
+- **The sync crossfade** in `RENDER_OSC_SYNC` now keys off a new
+  `lastCrossoverDidReset` flag instead of `renderedASyncFromItsStartYet`
+  (which also serves resetter-phase bookkeeping and must stay stock). Skipped
+  SOFT resets and REVERSE crossovers produce no discontinuity, so they skip
+  both the reset and the crossover-sample blend.
+- **`syncPhase` persistence is explicit**, like every other patched param:
+  `writeParamAsAttribute(writer, "syncPhase", LOCAL_SYNC_PHASE, ...)` +
+  matching read tag in `sound.cpp` (the `paramNameForFileConst` entry keeps
+  the compile-time uniqueness assert and mod-matrix naming happy).
+
 ## Persistence audit checklist
 
-- [ ] `oscillatorSync` attribute: writes int 1–3, old `1` loads as HARD, `0`/absent = OFF.
-- [ ] `syncPhase` patched param round-trips through `paramNameForFile` (assert-validated).
-- [ ] `oscSyncDirection` is runtime-only state (never persisted — like `oscPos`).
-- [ ] Default patch (no sync): renders bit-identical to pre-change firmware.
+- [x] `oscillatorSync` attribute: writes int 1–3, old `1` loads as HARD, `0`/absent = OFF.
+- [x] `syncPhase` patched param round-trips (explicit save/load lines + assert-validated file name).
+- [x] `oscSyncDirection` is runtime-only state (never persisted — like `oscPos`; reset on note-on).
+- [ ] Default patch (no sync): renders bit-identical to pre-change firmware — verify by ear + A/B on device.
 
 ## Test plan
 

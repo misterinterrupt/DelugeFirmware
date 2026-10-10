@@ -15,21 +15,32 @@
  * If not, see <https://www.gnu.org/licenses/>.
  */
 #pragma once
-#include "gui/menu_item/toggle.h"
+#include "definitions_cxx.hpp"
+#include "gui/l10n/l10n.h"
+#include "gui/menu_item/selection.h"
 #include "gui/ui/sound_editor.h"
 #include "processing/sound/sound.h"
 
 namespace deluge::gui::menu_item::osc {
-class Sync final : public Toggle {
+class Sync final : public Selection {
 public:
-	using Toggle::Toggle;
-	void readCurrentValue() override { this->setValue(soundEditor.currentSound->oscillatorSync); }
-	void writeCurrentValue() override { soundEditor.currentSound->oscillatorSync = this->getValue(); }
+	using Selection::Selection;
+	void readCurrentValue() override { this->setValue(soundEditor.currentSound->oscSyncMode); }
+	void writeCurrentValue() override {
+		soundEditor.currentSound->oscSyncMode = this->getValue<OscSyncMode>();
+	}
+	deluge::vector<std::string_view> getOptions() override {
+		return {
+		    l10n::getView(l10n::String::STRING_FOR_OFF),
+		    l10n::getView(l10n::String::STRING_FOR_SYNC_HARD),
+		    l10n::getView(l10n::String::STRING_FOR_SYNC_SOFT),
+		    l10n::getView(l10n::String::STRING_FOR_SYNC_REV),
+		};
+	}
 	bool isRelevant(ModControllableAudio* modControllable, int32_t whichThing) override {
 		Sound* sound = static_cast<Sound*>(modControllable);
 		return (whichThing == 1 && sound->synthMode != SynthMode::FM && sound->sources[0].oscType != OscType::SAMPLE
 		        && sound->sources[1].oscType != OscType::SAMPLE);
 	}
 };
-
 } // namespace deluge::gui::menu_item::osc

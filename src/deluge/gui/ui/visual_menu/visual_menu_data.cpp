@@ -49,6 +49,7 @@ using enum deluge::l10n::String;
 #include "gui/menu_item/arpeggiator/sync.h"
 #include "gui/menu_item/unpatched_param/sound_unpatched_param.h"
 #include "gui/menu_item/osc/sync.h"
+#include "gui/menu_item/osc/sync_phase.h"
 #include "gui/menu_item/osc/type.h"
 #include "gui/menu_item/patched_param/integer.h"
 #include "gui/menu_item/patched_param/integer_non_fm.h"
@@ -130,6 +131,7 @@ extern deluge::gui::menu_item::osc::source::WaveIndex sourceWaveIndexMenu;
 extern deluge::gui::menu_item::osc::PulseWidth pulseWidthMenu;
 extern deluge::gui::menu_item::osc::source::Feedback sourceFeedbackMenu;
 extern deluge::gui::menu_item::osc::Sync oscSyncMenu;
+extern deluge::gui::menu_item::osc::SyncPhase oscSyncPhaseMenu;
 extern deluge::gui::menu_item::osc::RetriggerPhase oscPhaseMenu;
 extern deluge::gui::menu_item::patched_param::IntegerNonFM noiseMenu;
 
@@ -225,7 +227,7 @@ static const VisualPage synthOsc1Pages[] = {
     {"Osc 1 Wave", STRING_FOR_OSCILLATOR_1,
      {{{&oscTypeMenu, "TYPE", 0}, {&sourceVolumeMenu, "LEVEL", 0}, {&sourceTransposeMenu, "PITCH", 0}, {&sourceWaveIndexMenu, "WAVE", 0}}}},
     {"Osc 1 Shape", STRING_FOR_OSCILLATOR_1,
-     {{{&pulseWidthMenu, "WIDTH", 0}, {&sourceFeedbackMenu, "FDBK", 0}, {&oscSyncMenu, "SYNC", 0}, {&oscPhaseMenu, "PHASE", 0}}}},
+     {{{&pulseWidthMenu, "WIDTH", 0}, {&sourceFeedbackMenu, "FDBK", 0}, {&oscPhaseMenu, "PHASE", 0}, {nullptr, ""}}}},
     {"Noise", EMPTY_STRING,
      {{{&noiseMenu, "NOISE"}, {nullptr, ""}, {nullptr, ""}, {nullptr, ""}}}},
 };
@@ -234,7 +236,9 @@ static const VisualPage synthOsc2Pages[] = {
     {"Osc 2 Wave", STRING_FOR_OSCILLATOR_2,
      {{{&oscTypeMenu, "TYPE", 1}, {&sourceVolumeMenu, "LEVEL", 1}, {&sourceTransposeMenu, "PITCH", 1}, {&sourceWaveIndexMenu, "WAVE", 1}}}},
     {"Osc 2 Shape", STRING_FOR_OSCILLATOR_2,
-     {{{&pulseWidthMenu, "WIDTH", 1}, {&sourceFeedbackMenu, "FDBK", 1}, {&oscSyncMenu, "SYNC", 1}, {&oscPhaseMenu, "PHASE", 1}}}},
+     {{{&pulseWidthMenu, "WIDTH", 1}, {&sourceFeedbackMenu, "FDBK", 1}, {&oscSyncMenu, "SYNC", 1}, {&oscSyncPhaseMenu, "SYNPH", 1}}}},
+    {"Osc 2 Phase", STRING_FOR_OSCILLATOR_2,
+     {{{&oscPhaseMenu, "PHASE", 1}, {nullptr, ""}, {nullptr, ""}, {nullptr, ""}}}},
 };
 
 static const VisualPage synthFmPages[] = {

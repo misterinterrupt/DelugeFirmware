@@ -106,7 +106,7 @@ Sound::Sound() : patcher(&patchableInfoForSound) {
 
 	transpose = 0;
 
-	oscillatorSync = false;
+	oscSyncMode = OscSyncMode::OFF;
 
 	numUnison = 1;
 	unisonDetune = 8;
@@ -1820,7 +1820,7 @@ bool Sound::isNoiseActiveEver(ParamManagerForTimeline* paramManager) {
 }
 
 bool Sound::renderingOscillatorSyncCurrently(ParamManagerForTimeline* paramManager) {
-	if (!oscillatorSync) {
+	if (oscSyncMode == OscSyncMode::OFF) {
 		return false;
 	}
 	if (synthMode == SynthMode::FM) {
@@ -1831,7 +1831,7 @@ bool Sound::renderingOscillatorSyncCurrently(ParamManagerForTimeline* paramManag
 }
 
 bool Sound::renderingOscillatorSyncEver(ParamManager* paramManager) {
-	if (!oscillatorSync) {
+	if (oscSyncMode == OscSyncMode::OFF) {
 		return false;
 	}
 	if (synthMode == SynthMode::FM) {
@@ -3030,7 +3030,8 @@ Error Sound::readSourceFromFile(Deserializer& reader, int32_t s, ParamManagerFor
 		}
 		else if (!strcmp(tagName, "oscillatorSync")) {
 			int32_t value = reader.readTagOrAttributeValueInt();
-			oscillatorSync = (value != 0);
+			// Pre-sync-mode files wrote 1 for "on", which is exactly OscSyncMode::HARD
+			oscSyncMode = static_cast<OscSyncMode>(std::clamp(value, 0, 3));
 			reader.exitTag("oscillatorSync");
 		}
 		else if (!strcmp(tagName, "reversed")) {
@@ -3358,8 +3359,8 @@ void Sound::writeSourceToFile(Serializer& writer, int32_t s, char const* tagName
 	else {
 		writer.writeAttribute("transpose", source->transpose);
 		writer.writeAttribute("cents", source->cents);
-		if (s == 1 && oscillatorSync) {
-			writer.writeAttribute("oscillatorSync", oscillatorSync);
+		if (s == 1 && oscSyncMode != OscSyncMode::OFF) {
+			writer.writeAttribute("oscillatorSync", util::to_underlying(oscSyncMode));
 		}
 		writer.writeAttribute("retrigPhase", oscRetriggerPhase[s]);
 
@@ -3523,6 +3524,10 @@ bool Sound::readParamTagFromFile(Deserializer& reader, char const* tagName, Para
 	else if (!strcmp(tagName, "waveFold")) {
 		patchedParams->readParam(reader, patchedParamsSummary, params::LOCAL_FOLD, readAutomationUpToPos);
 		reader.exitTag("waveFold");
+	}
+	else if (!strcmp(tagName, "syncPhase")) {
+		patchedParams->readParam(reader, patchedParamsSummary, params::LOCAL_SYNC_PHASE, readAutomationUpToPos);
+		reader.exitTag("syncPhase");
 	}
 
 	else if (!strcmp(tagName, "envelope1")) {
@@ -3708,6 +3713,7 @@ void Sound::writeParamsToFile(Serializer& writer, ParamManager* paramManager, bo
 	patchedParams->writeParamAsAttribute(writer, "hpfMorph", params::LOCAL_HPF_MORPH, writeAutomation);
 
 	patchedParams->writeParamAsAttribute(writer, "waveFold", params::LOCAL_FOLD, writeAutomation);
+	patchedParams->writeParamAsAttribute(writer, "syncPhase", params::LOCAL_SYNC_PHASE, writeAutomation);
 
 	unpatchedParams->writeParamAsAttribute(writer, "ratchetProbability", params::UNPATCHED_ARP_RATCHET_PROBABILITY,
 	                                       writeAutomation);
