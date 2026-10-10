@@ -85,10 +85,14 @@ using enum deluge::l10n::String;
 #include "gui/menu_item/synth_mode.h"
 #include "gui/menu_item/patch_cable_strength/fixed.h"
 #include "gui/menu_item/master_transpose.h"
+#include "gui/menu_item/fx/within_env.h"
 #include "gui/menu_item/fx_bloc/master_fx_items.h"
 #include "gui/ui/sound_editor.h"
 #include "model/global_effectable/global_effectable_for_clip.h"
 #include "processing/sound/sound.h"
+
+// Defined at global scope in menus.cpp
+extern deluge::gui::menu_item::fx::FxCutoff fxCutoffMenu;
 
 // -------------------------------------------------------------------------------------------------
 // External MenuItem declarations
@@ -382,7 +386,7 @@ MasterSlotParam masterParamMenus[3][dsp::FxBloc::kMaxSlotParams] = {
 // slot, where N follows the selected bloc's real param count (4 per page, the
 // last page may be partial). Rebuilt whenever the song-mode menu is opened and
 // whenever a slot's bloc changes — see rebuildFxBlocPages().
-static VisualPage fxBlocRuntimePages[1 + 3 * (1 + dsp::FxBloc::kMaxSlotParams / 4)];
+static VisualPage fxBlocRuntimePages[2 + 3 * (1 + dsp::FxBloc::kMaxSlotParams / 4)];
 static size_t fxBlocRuntimePageCount = 0;
 static char fxBlocRuntimeTitles[sizeof(fxBlocRuntimePages) / sizeof(VisualPage)][12];
 
@@ -401,6 +405,12 @@ void rebuildFxBlocPages() {
 	ensureCategoriesInit();
 	size_t p = 0;
 	auto nextTitle = [&p]() { return fxBlocRuntimeTitles[p]; };
+
+	fxBlocRuntimePages[p++] = VisualPage{
+	    .title = "FX Gate",
+	    .titleString = EMPTY_STRING,
+	    .slots = {VisualSlot{&::fxCutoffMenu, "CUTOFF", -1, 4}, VisualSlot{nullptr, "", -1, 0},
+	              VisualSlot{nullptr, "", -1, 0}, VisualSlot{nullptr, "", -1, 0}}};
 
 	fxBlocRuntimePages[p++] = VisualPage{
 	    .title = "Chain",
