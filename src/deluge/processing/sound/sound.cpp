@@ -1198,6 +1198,11 @@ Error Sound::readTagFromFile(Deserializer& reader, char const* tagName, ParamMan
 		reader.exitTag("voicePriority");
 	}
 
+	else if (!strcmp(tagName, "fxWithinAmpEnv")) {
+		fxWithinAmpEnv = reader.readTagOrAttributeValueInt();
+		reader.exitTag("fxWithinAmpEnv");
+	}
+
 	else if (!strcmp(tagName, "defaultParams")) {
 		ENSURE_PARAM_MANAGER_EXISTS
 		Sound::readParamsFromFile(reader, paramManager, readAutomationUpToPos);
@@ -1902,11 +1907,22 @@ void Sound::reassessRenderSkippingStatus(ModelStackWithSoundFlags* modelStack) {
 	if (skippingStatusNow != skippingRendering) {
 
 		if (skippingStatusNow) {
-			// The compressor's release tail is the only remaining reason to wait
-			// before skipping.
+			// Reasons to keep rendering after the last voice: the compressor's
+			// release tail, and (when the FX chain is set to outlive the amp
+			// envelope) its wet tails — the delay's longest line plus generous
+			// reverb drain. Infinite-sustain settings get cut at that point;
+			// keeping them alive forever would burn a voice's worth of CPU.
+			bool chainHoldsTail = (!fxWithinAmpEnv && fxChain.isActive());
+			int32_t waitSamples = 0;
 			if (compressor.getThreshold() > 0) {
+				waitSamples = compressor.getReleaseMS() * 44;
+			}
+			if (chainHoldsTail) {
+				constexpr int32_t kFxTailSamples = 44100 * 3; // ~3s of tail drain
+				waitSamples = std::max(waitSamples, kFxTailSamples);
+			}
+			if (waitSamples > 0) {
 				if (!startSkippingRenderingAtTime) {
-					int32_t waitSamples = compressor.getReleaseMS() * 44;
 					startSkippingRenderingAtTime = AudioEngine::audioSampleTimer + waitSamples;
 				}
 				else if ((int32_t)(AudioEngine::audioSampleTimer - startSkippingRenderingAtTime) >= 0) {
@@ -3401,6 +3417,9 @@ void Sound::writeSourceToFile(Serializer& writer, int32_t s, char const* tagName
 		writer.writeAttribute("cents", source->cents);
 		if (s == 1 && oscillatorSync) {
 			writer.writeAttribute("oscillatorSync", oscillatorSync);
+			if (!fxWithinAmpEnv) {
+				writer.writeAttribute("fxWithinAmpEnv", false);
+			}
 		}
 		writer.writeAttribute("retrigPhase", oscRetriggerPhase[s]);
 

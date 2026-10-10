@@ -159,6 +159,11 @@ public:
 	deluge::dsp::FxChain fxChain;
 	deluge::dsp::FxChain* getFxChain() override { return &fxChain; }
 
+	/// When true (default) the track FX chain renders inside the sound's render,
+	/// so wet tails (reverb / delay repeats) end with the amp envelope. When
+	/// false, a sounding chain holds rendering open until its tails drain.
+	bool fxWithinAmpEnv = true;
+
 
 	void patchedParamPresetValueChanged(uint8_t p, ModelStackWithSoundFlags* modelStack, int32_t oldValue,
 	                                    int32_t newValue);

@@ -61,6 +61,7 @@
 #include "gui/menu_item/firmware/version.h"
 #include "gui/menu_item/flash/status.h"
 #include "gui/menu_item/fx/clipping.h"
+#include "gui/menu_item/fx/within_env.h"
 #include "gui/menu_item/gate/mode.h"
 #include "gui/menu_item/gate/off_time.h"
 #include "gui/menu_item/gate/selection.h"
@@ -335,6 +336,7 @@ submenu::Sidechain sidechainMenu{
 // FX ----------------------------------------------------------------------------------------
 
 fx::Clipping clippingMenu{STRING_FOR_SATURATION};
+fx::WithinEnv fxWithinEnvMenu{l10n::String::STRING_FOR_FX_ENVELOPE};
 UnpatchedParam srrMenu{STRING_FOR_DECIMATION, params::UNPATCHED_SAMPLE_RATE_REDUCTION};
 UnpatchedParam bitcrushMenu{STRING_FOR_BITCRUSH, params::UNPATCHED_BITCRUSHING};
 patched_param::Integer foldMenu{STRING_FOR_WAVEFOLD, STRING_FOR_WAVEFOLD, params::LOCAL_FOLD};
@@ -986,6 +988,7 @@ Submenu soundMasterMenu{
 Submenu soundFXMenu{
     STRING_FOR_FX,
     {
+        &fxWithinEnvMenu,
         &eqMenu,
         &soundDistortionMenu,
         &noiseMenu,
