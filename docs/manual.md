@@ -9,6 +9,35 @@ them.*
 
 ---
 
+## Contents
+
+- [1. The Visual Menu](#1-the-visual-menu)
+  - [Layout](#layout)
+  - [Controls](#controls)
+- [2. FX Chains](#2-fx-chains)
+  - [The Chain page](#the-chain-page)
+  - [Rules of the chain](#rules-of-the-chain)
+  - [Send vs insert blocs](#send-vs-insert-blocs)
+- [3. The Blocs](#3-the-blocs)
+  - [Spaces](#spaces)
+  - [Delay](#delay)
+  - [Modulation](#modulation)
+  - [Distortion & tone](#distortion--tone)
+  - [Filters](#filters)
+  - [Spectral manglers](#spectral-manglers)
+  - [MST SEND (track slots only)](#mst-send-track-slots-only)
+  - [Combination blocs](#combination-blocs)
+- [4. FX Modulation](#4-fx-modulation)
+  - [The gesture](#the-gesture)
+  - [What the sources are](#what-the-sources-are)
+- [5. Oscillator Sync (new)](#5-oscillator-sync-new)
+- [6. Time Stretching (new)](#6-time-stretching-new)
+  - [The TimeStretch menu (4 pages)](#the-timestretch-menu-4-pages)
+  - [Stretch algorithms (TIME STRETCH MODE)](#stretch-algorithms-time-stretch-mode)
+- [7. What Was Removed](#7-what-was-removed)
+
+---
+
 ## 1. The Visual Menu
 
 The visual menu is this firmware's primary editing interface. Enable it once under
