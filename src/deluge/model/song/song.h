@@ -396,11 +396,15 @@ public:
 	// and the staged setters. Slot params are indexed by dsp::FxBloc::Param;
 	// masterFxParamSeen marks which were present in the file (the rest take the
 	// engine's own defaults).
-	static constexpr int32_t kMasterFxNumParams = 60; // dsp::FxBloc::Param::kNumParams
+	// Covers dsp::FxBloc::Param::kNumParams; locked by static_assert in
+	// song.cpp (was 60 with the id space at 61 — filter/ringmod params at the
+	// top of the enum never staged). 64 = the uint64 seen-mask capacity.
+	static constexpr int32_t kMasterFxNumParams = 64;
 	int32_t masterFxRouting = 0;                      // dsp::MasterFxChain::Routing
 	int32_t masterFxModels[3] = {0, 0, 0};            // dsp::FxBloc::Model per slot
 	float masterFxParams[3][kMasterFxNumParams] = {};
-	uint32_t masterFxParamSeen[3] = {};
+	uint64_t masterFxParamSeen[3] = {}; // 1ull << Param id — uint64: ids run past 32
+	float masterFxRmsCutoffDb = 6.0f;   // chain TAILS threshold (only <= 0 persisted)
 	// Staged <mod> routings per slot, applied when the chain is staged.
 	// (Int-backed: song.h doesn't pull the FxBloc type in.)
 	static constexpr int32_t kMasterFxMaxMods = 8; // dsp::FxBloc::kMaxModConnections

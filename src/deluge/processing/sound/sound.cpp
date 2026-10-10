@@ -3360,9 +3360,6 @@ void Sound::writeSourceToFile(Serializer& writer, int32_t s, char const* tagName
 		writer.writeAttribute("cents", source->cents);
 		if (s == 1 && oscillatorSync) {
 			writer.writeAttribute("oscillatorSync", oscillatorSync);
-			if (fxChain.fxRmsCutoffDb <= 0.0f) {
-				writer.writeAttribute("fxRmsCutoffDb", (int32_t)std::lround(fxChain.fxRmsCutoffDb));
-			}
 		}
 		writer.writeAttribute("retrigPhase", oscRetriggerPhase[s]);
 

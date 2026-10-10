@@ -1329,16 +1329,21 @@ void getMasterFxParamsFromSong(Song* song) {
 	// boundary, like every other param write.
 	masterFxChain.setRouting(static_cast<dsp::MasterFxChain::Routing>(std::clamp<int32_t>(
 	    song->masterFxRouting, 0, util::to_underlying(dsp::MasterFxChain::Routing::PARALLEL_SERIES))));
+	masterFxChain.fxRmsCutoffDb = song->masterFxRmsCutoffDb;
 	for (size_t s = 0; s < dsp::MasterFxChain::kNumSlots; s++) {
 		auto& bloc = masterFxChain.slot(s);
+		// <model> persists as the Model enum's ordinal; the ceiling is the LAST
+		// valid model (new blocs append after GLOBAL_SEND — clamping there made
+		// every post-MST-SEND save load as MST SEND).
 		auto wanted = static_cast<dsp::FxBloc::Model>(std::clamp<int32_t>(
-		    song->masterFxModels[s], 0, util::to_underlying(dsp::FxBloc::Model::GLOBAL_SEND)));
+		    song->masterFxModels[s], 0, util::to_underlying(dsp::FxBloc::Model::KDFX_PTCHR_FLG_DLY)));
 		if (bloc.setModel(wanted)) {
 			if (wanted != dsp::FxBloc::Model::EMPTY) {
-				// Bit position == param id (song.cpp sets 1u << pid); test explicitly.
-				uint32_t seen = song->masterFxParamSeen[s];
+				// Bit position == param id (song.cpp sets 1ull << pid); test
+				// explicitly — ids run past 32, so the mask is uint64.
+				uint64_t seen = song->masterFxParamSeen[s];
 				for (uint32_t pid = 1; pid < static_cast<uint32_t>(Song::kMasterFxNumParams); pid++) {
-					if (seen & (1u << pid)) {
+					if (seen & (1ull << pid)) {
 						bloc.setParam(static_cast<dsp::FxBloc::Param>(pid), song->masterFxParams[s][pid]);
 					}
 				}

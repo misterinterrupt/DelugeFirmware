@@ -42,3 +42,25 @@ User-reported issues on the FX-blocs branch.
    their own tables and per-combo CFG labels; the pair engine also routes the
    EQ/shaper ids to the primary half, which fixes the same dead columns on
    TONE+REV.
+
+## Save/load audit vs the new bloc world (all fixed)
+
+5. **Track `<fxChain>` load dropped every param past id 24.** The reader was
+   written when the Param enum ended at ~24: its name-matching loops were
+   bounded by the 24-entry *menu pool* constant, the staging array was sized
+   to it, and the `seen` bitmask was `uint32` (ids run to 61). Silently lost
+   on load: the Mod trio (Spectral S2–S4), AirShelf (Pitcher QTR), every
+   filter-bloc param, every ring-mod param, plus any mod routings targeting
+   them. Now bounded by `kNumParams` with a `uint64` mask.
+6. **Master `<masterFx>` had the same width bug** (`uint32` seen → ids ≥ 32
+   lost), and `Song::kMasterFxNumParams` was 60 against an id space of 61
+   (now 64, locked by static_assert).
+7. **Master-chain model clamp ended at GLOBAL_SEND** — any Pitcher-family
+   bloc saved in a master slot loaded as MST SEND. Both readers now clamp to
+   the last valid model.
+8. **TAILS (`fxRmsCutoffDb`) was written but never read** — and the only
+   write was buried inside the `oscillatorSync` branch, so it only saved with
+   sync engaged. Kit/audio-clip chains and the master chain never wrote it at
+   all. Now persisted as an attribute on the `<fxChain>`/`<masterFx>` tag
+   for every chain (written whenever it's off VOICE, even with all slots
+   EMPTY) and read back on both paths.

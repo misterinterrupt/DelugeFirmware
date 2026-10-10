@@ -172,6 +172,7 @@ Song::Song() : backedUpParamManagers(sizeof(BackedUpParamManager)) {
 
 	// Master FX chain defaults to the dormant all-EMPTY state.
 	masterFxRouting = 0;
+	masterFxRmsCutoffDb = 6.0f;
 	for (int32_t s = 0; s < 3; s++) {
 		masterFxModels[s] = 0;
 		masterFxParamSeen[s] = 0;
@@ -1144,9 +1145,15 @@ weAreInArrangementEditorOrInClipInstance:
 				break;
 			}
 		}
-		if (anySlot || AudioEngine::masterFxChain.getRouting() != dsp::MasterFxChain::Routing::SERIES) {
+		if (anySlot || AudioEngine::masterFxChain.getRouting() != dsp::MasterFxChain::Routing::SERIES
+		    || AudioEngine::masterFxChain.fxRmsCutoffDb <= 0.0f) {
 			writer.writeOpeningTagBeginning("masterFx");
 			writer.writeAttribute("routing", util::to_underlying(AudioEngine::masterFxChain.getRouting()));
+			if (AudioEngine::masterFxChain.fxRmsCutoffDb <= 0.0f) {
+				// TAILS shutdown threshold — see FxChain::fxRmsCutoffDb
+				writer.writeAttribute("fxRmsCutoffDb",
+				                      (int32_t)std::lround(AudioEngine::masterFxChain.fxRmsCutoffDb));
+			}
 			writer.writeOpeningTagEnd();
 			for (size_t s = 0; s < dsp::MasterFxChain::kNumSlots; s++) {
 				auto& bloc = AudioEngine::masterFxChain.slot(s);
@@ -1361,6 +1368,9 @@ Error Song::readFromFile(Deserializer& reader) {
 		switch (*(uint32_t*)tagName) {
 
 		// "mast" -> masterFx
+static_assert(Song::kMasterFxNumParams >= util::to_underlying(dsp::FxBloc::Param::kNumParams),
+              "kMasterFxNumParams no longer covers the FxBloc param id space");
+
 		case 0x7473616D:
 			if (!strcmp(tagName, "masterFx")) {
 				while (*(tagName = reader.readNextTagOrAttributeName())) {
@@ -1368,11 +1378,16 @@ Error Song::readFromFile(Deserializer& reader) {
 						masterFxRouting = reader.readTagOrAttributeValueInt();
 						reader.exitTag("routing");
 					}
+					else if (!strcmp(tagName, "fxRmsCutoffDb")) {
+						int32_t raw = reader.readTagOrAttributeValueInt();
+						masterFxRmsCutoffDb = (raw > 0) ? 6.0f : static_cast<float>(raw);
+						reader.exitTag("fxRmsCutoffDb");
+					}
 					else if (!strcmp(tagName, "slot")) {
 						int32_t slotIndex = -1;
 						int32_t modelVal = 0;
 						float params[Song::kMasterFxNumParams] = {};
-						uint32_t seen = 0;
+						uint64_t seen = 0; // 1ull << Param id - ids run past 32
 						Song::MasterFxMod stagedMods[Song::kMasterFxMaxMods];
 						size_t numStagedMods = 0;
 						while (*(tagName = reader.readNextTagOrAttributeName())) {
@@ -1441,7 +1456,7 @@ Error Song::readFromFile(Deserializer& reader) {
 										params[pid] = dsp::FxBloc::paramIsInt(p)
 										                    ? (float)raw
 										                    : (float)raw / 2147483648u;
-										seen |= (1u << pid);
+										seen |= (1ull << pid);
 										matched = true;
 									}
 								}

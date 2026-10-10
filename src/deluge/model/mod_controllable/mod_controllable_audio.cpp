@@ -199,9 +199,17 @@ void ModControllableAudio::writeTagsToFile(Serializer& writer) {
 				break;
 			}
 		}
-		if (anySlot || chain->getRouting() != dsp::FxChain::Routing::SERIES) {
+		// The TAILS cutoff is chain state: write the block when the user has moved
+		// it off VOICE even with every slot EMPTY, or the setting would reset.
+		if (anySlot || chain->getRouting() != dsp::FxChain::Routing::SERIES
+		    || chain->fxRmsCutoffDb <= 0.0f) {
 			writer.writeOpeningTagBeginning("fxChain");
 			writer.writeAttribute("routing", util::to_underlying(chain->getRouting()));
+			if (chain->fxRmsCutoffDb <= 0.0f) {
+				// TAILS shutdown threshold (see FxChain::fxRmsCutoffDb); anything
+				// above 0 behaves the same, so only <= 0 is persisted.
+				writer.writeAttribute("fxRmsCutoffDb", (int32_t)std::lround(chain->fxRmsCutoffDb));
+			}
 			writer.writeOpeningTagEnd();
 			for (size_t s = 0; s < dsp::FxChain::kNumSlots; s++) {
 				auto& bloc = chain->slot(s);
@@ -381,11 +389,26 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 				}
 				reader.exitTag("routing");
 			}
+			else if (!strcmp(tagName, "fxRmsCutoffDb")) {
+				// TAILS shutdown threshold; > 0 (VOICE) is never written, so a raw
+				// value above 0 still means the +6 dB default.
+				int32_t raw = reader.readTagOrAttributeValueInt();
+				if (chain != nullptr) {
+					chain->fxRmsCutoffDb = (raw > 0) ? 6.0f : static_cast<float>(raw);
+				}
+				reader.exitTag("fxRmsCutoffDb");
+			}
 			else if (!strcmp(tagName, "slot")) {
 				int32_t slotIndex = -1;
 				int32_t modelVal = 0;
-				float params[dsp::FxBloc::kMaxSlotParams + 1] = {};
-				uint32_t seen = 0;
+				// Staging is by Param id, across the WHOLE id space — the early
+				// tables ended at id 24 and this was sized/bounded by the menu
+				// pool instead, silently dropping every saved param past
+				// AirShelf (the Mod trio, all Filt*, all Rm*) on load.
+				constexpr uint32_t kNumParamIds = util::to_underlying(dsp::FxBloc::Param::kNumParams);
+				static_assert(kNumParamIds <= 64, "seen bitmask is uint64");
+				float params[kNumParamIds] = {};
+				uint64_t seen = 0;
 				// staged mod routings: {param, source, depth}
 				struct StagedMod {
 					uint8_t param;
@@ -425,7 +448,7 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 							}
 						}
 						if (srcName != nullptr && prmName != nullptr && numStagedMods < dsp::FxBloc::kMaxModConnections) {
-							for (uint32_t pid = 1; pid <= dsp::FxBloc::kMaxSlotParams; pid++) {
+							for (uint32_t pid = 1; pid < kNumParamIds; pid++) {
 								const char* nm = dsp::FxBloc::paramName(static_cast<dsp::FxBloc::Param>(pid));
 								if (nm != nullptr && !strcmp(prmName, nm)) {
 									for (int32_t ps = 0; ps < kNumPatchSources; ps++) {
@@ -444,13 +467,13 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 					}
 					else {
 						bool matched = false;
-						for (uint32_t pid = 1; pid <= dsp::FxBloc::kMaxSlotParams && !matched; pid++) {
+						for (uint32_t pid = 1; pid < kNumParamIds && !matched; pid++) {
 							const char* nm = dsp::FxBloc::paramName(static_cast<dsp::FxBloc::Param>(pid));
 							if (nm != nullptr && !strcmp(tagName, nm)) {
 								int32_t raw = reader.readTagOrAttributeValueInt();
 								auto p = static_cast<dsp::FxBloc::Param>(pid);
 								params[pid] = dsp::FxBloc::paramIsInt(p) ? (float)raw : (float)raw / 2147483648u;
-								seen |= (1u << pid);
+								seen |= (1ull << pid);
 								matched = true;
 							}
 						}
@@ -474,7 +497,7 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 								continue;
 							}
 							uint32_t pid = static_cast<uint32_t>(def.param);
-							if (seen & (1u << pid)) {
+							if (seen & (1ull << pid)) {
 								chain->slot(slotIndex).setParam(def.param, params[pid]);
 							}
 						}
