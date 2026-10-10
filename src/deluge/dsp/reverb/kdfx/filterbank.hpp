@@ -41,8 +41,11 @@
 #pragma once
 
 #include "definitions_cxx.hpp"
+#include "dsp/filter/filter_set.h"
 #include "dsp/reverb/base.hpp"
 #include "dsp/reverb/kdfx/kdfx_util.hpp"
+#include "modulation/params/param.h"
+#include "util/functions.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -64,41 +67,75 @@ public:
 
 	void processInsert(std::span<StereoSample> buffer) override {
 		const float dt = 1.0f / float(kSampleRate);
-		// LFO clock (manual: BPM and beats, FIXED or follow System tempo).
+		const int32_t n = static_cast<int32_t>(buffer.size());
 		float bpm = (lfoClock_ != 0) ? std::max(1.0f, systemTempoBpm()) : lfoBpm_;
 		{
-			float hz = bpm / (60.0f * std::max(1.0f, lfoBeats_)); // cycle = beats x (60/BPM)
+			float hz = bpm / (60.0f * std::max(1.0f, lfoBeats_));
 			lfoInc_ = static_cast<uint32_t>((hz / float(kSampleRate)) * 4294967296.0f);
 		}
+
+		// Pass 1: advance the envelope / LFO from the (unfiltered) input.
 		for (auto& s : buffer) {
-			// Shared mono envelope from the loudest channel (manual: "the level of
-			// the incoming signal").
 			float peak = std::max(std::fabs(s.l / 2147483648.0f), std::fabs(s.r / 2147483648.0f));
 			float targetDb = 20.0f * std::log10(peak + 1e-9f);
 			targetDb = std::clamp(targetDb, -60.0f, 0.0f);
 			float slew = targetDb - envDb_;
 			float limit = (slew >= 0.0f ? atkRateDb_ : relRateDb_) * dt;
 			envDb_ += std::clamp(slew, -limit, limit);
-			float env = std::pow(10.0f, envDb_ / 20.0f);
-
 			lfoPhase_ += lfoInc_;
-
-			s.l = runChannel(s.l, freqL_, chL_, env);
-			s.r = runChannel(s.r, freqR_, chR_, env);
 		}
+		float env = std::pow(10.0f, envDb_ / 20.0f);
+
+		// Per-block config — the same rate the per-voice subtractive filters
+		// reconfigure at. FREQ/RES ride the synth's exact param conversion, so
+		// the bloc IS the subtractive-mode filter.
+		float freqHz = centreHz_;
+		switch (mode_) {
+		case Sweep::ENV_FOLLOW: {
+			float sweep = sweep_val_ * 2.0f - 1.0f;
+			float minHz = freqFromNorm(minHz_val_);
+			float ratio = std::max(minHz / kMinHz, 1.0f);
+			freqHz = minHz * std::pow(ratio, env * sweep);
+			break;
+		}
+		case Sweep::LFO: {
+			float lfoN = 0.5f + 0.5f * kdfx::oscWave(lfoShape_, lfoPhase_, lfoPlsw_, lfoSmooth_);
+			float minHz = freqFromNorm(minHz_val_);
+			float maxHz = freqFromNorm(centre_val_);
+			float lo = std::log(std::min(minHz, maxHz));
+			float hi = std::log(std::max(minHz, maxHz));
+			freqHz = std::exp(lo + lfoN * (hi - lo));
+			break;
+		}
+		case Sweep::FIXED:
+		default:
+			break;
+		}
+		freqHz = std::clamp(freqHz, kMinHz, kMaxHz);
+
+		auto mode = static_cast<FilterMode>(std::clamp<int32_t>(type_, 0, kNumLPFModes - 1));
+		int32_t rawF = static_cast<int32_t>((centreToNorm(freqHz) * 2.0f - 1.0f) * 1073741824.0f);
+		q31_t freqParam = getFinalParameterValueExp(2000000, cableToExpParamShortcut(rawF));
+		int32_t rawR = static_cast<int32_t>((res_val_ * 2.0f - 1.0f) * 1073741824.0f);
+		q31_t resParam = getFinalParameterValueLinear(25 * 10737418, cableToLinearParamShortcut(rawR));
+		int32_t gain = filterSet_.setConfig(freqParam, resParam, mode, 0, 2147483647, 0, FilterMode::OFF, 0,
+		                                     134217728, FilterRoute::LOW_TO_HIGH, false, nullptr);
+		// setConfig returns the resonance-compensated gain (134217728 = unity);
+		// convert 2^27-space to Q31 and pre-scale the block.
+		q31_t gainQ31 = static_cast<q31_t>(std::clamp<int64_t>((int64_t)gain * 16, INT32_MIN, INT32_MAX));
+		for (auto& s : buffer) {
+			s.l = multiply_32x32_rshift32_rounded(s.l, gainQ31) << 1;
+			s.r = multiply_32x32_rshift32_rounded(s.r, gainQ31) << 1;
+		}
+		filterSet_.renderLongStereo(reinterpret_cast<int32_t*>(buffer.data()),
+		                             reinterpret_cast<int32_t*>(buffer.data() + n));
 	}
 
 	// ---- Common params ----
-	void setFiltType(int32_t v) override { type_ = std::clamp<int32_t>(v, 0, 3); }
+	void setFiltType(int32_t v) override { type_ = std::clamp<int32_t>(v, 0, kNumLPFModes - 1); }
 	[[nodiscard]] int32_t getFiltType() const override { return type_; }
 
-	void setFiltRes(float v) override {
-		res_val_ = std::clamp(v, 0.0f, 1.0f);
-		// 0..50 dB -> Q = 1..316; k = 1/Q. Self-oscillation only at the very top.
-		resQ_ = std::pow(10.0f, res_val_ * 50.0f / 20.0f);
-		resK_ = 1.0f / resQ_;
-		makeup_ = 1.0f / std::sqrt(resQ_);
-	}
+	void setFiltRes(float v) override { res_val_ = std::clamp(v, 0.0f, 1.0f); }
 	[[nodiscard]] float getFiltRes() const override { return res_val_; }
 
 	// width -> centre/primary frequency (log 16..8372 HZ)
@@ -151,80 +188,23 @@ public:
 	[[nodiscard]] float getModDepth() const override { return modDepth_val_; }
 
 private:
-	static constexpr float kMinHz = 16.0f;
-	static constexpr float kMaxHz = 8372.0f;
+	static constexpr float kMinHz = 10.0f;
+	static constexpr float kMaxHz = 20000.0f;
 
 	static float freqFromNorm(float t) { return kMinHz * std::pow(kMaxHz / kMinHz, std::clamp(t, 0.0f, 1.0f)); }
-
-	struct SvfState {
-		float ic1 = 0.0f; // band
-		float ic2 = 0.0f; // low
-	};
-
-	float runChannel(q31_t inQ31, float& freqHz, SvfState& st, float env) {
-		// 1. Current frequency per mode.
-		switch (mode_) {
-		case Sweep::ENV_FOLLOW: {
-			// At-rest frequency is MIN Freq; positive sweep rises toward 8372 HZ
-			// with level, negative sinks toward 16 HZ (manual: "at positive levels
-			// it moves up in pitch, and at negative levels it moves down").
-			float sweep = sweep_val_ * 2.0f - 1.0f;
-			float minHz = freqFromNorm(minHz_val_);
-			float ratio = std::max(minHz / kMinHz, 1.0f);
-			freqHz = minHz * std::pow(ratio, env * sweep);
-			break;
-		}
-		case Sweep::LFO: {
-			// Manual: sweep between MIN and MAX limits in the log domain (MIN
-			// above MAX = upside-down sweep). The LFO runs in beats: cycle =
-			// beats x (60/BPM), BPM from the clock setting.
-			float lfoN = 0.5f + 0.5f * kdfx::oscWave(lfoShape_, lfoPhase_, lfoPlsw_, lfoSmooth_);
-			float minHz = freqFromNorm(minHz_val_);
-			float maxHz = freqFromNorm(centre_val_);
-			float lo = std::log(std::min(minHz, maxHz));
-			float hi = std::log(std::max(minHz, maxHz));
-			freqHz = std::exp(lo + lfoN * (hi - lo));
-			break;
-		}
-		case Sweep::FIXED:
-		default:
-			freqHz = centreHz_;
-			break;
-		}
-		freqHz = std::clamp(freqHz, kMinHz, kMaxHz);
-
-		// 2. TPT SVF coefficients (tan via its Maclaurin tail — fc/fs ≤ 0.19 here).
-		float g = 3.14159265f * freqHz / float(kSampleRate);
-		float g2 = g * g;
-		float t = g * (1.0f + g2 * (1.0f / 3.0f + g2 * (2.0f / 15.0f)));
-		float a1 = 1.0f / (1.0f + t * (t + resK_));
-		float a2 = t * a1;
-		float a3 = t * a2;
-
-		// 3. Per-sample TPT step.
-		float in = static_cast<float>(inQ31) / 2147483648.0f;
-		float v3 = in - resK_ * st.ic1 - st.ic2;
-		float v1 = a1 * st.ic1 + a2 * v3;
-		float v2 = st.ic2 + a2 * st.ic1 + a3 * v3;
-		st.ic1 = 2.0f * v1 - st.ic1;
-		st.ic2 = 2.0f * v2 - st.ic2;
-
-		float out;
-		switch (type_) {
-		case 1: out = in - resK_ * st.ic1 - st.ic2; break;      // HP
-		case 2: out = v1; break;                                // BP (peak gain ≈ Q)
-		case 3: out = (v2 + in - resK_ * st.ic1 - st.ic2); break; // Notch
-		case 0:
-		default: out = v2 * makeup_; break;                     // LP
-		}
-		out *= makeup_;
-		return static_cast<q31_t>(std::clamp(out, -1.0f, 1.0f) * 2147483647.0f);
+	// Inverse of freqFromNorm — for mapping the swept Hz back to knob space
+	// before the synth param conversion.
+	static float centreToNorm(float hz) {
+		return std::log(std::clamp(hz, kMinHz, kMaxHz) / kMinHz) / std::log(kMaxHz / kMinHz);
 	}
+
 
 	Sweep mode_;
 	int32_t type_ = 0;
 
-	float res_val_ = 0.2f, resQ_ = 2.0f, resK_ = 0.5f, makeup_ = 0.707f;
+	dsp::filter::FilterSet filterSet_{};
+
+	float res_val_ = 0.2f;
 	float centre_val_ = 0.5f, centreHz_ = freqFromNorm(0.5f);
 
 	float envDb_ = -60.0f;
@@ -236,8 +216,6 @@ private:
 	float modRate_val_ = 0.3f, modDepth_val_ = 0.3f;
 	uint32_t lfoPhase_ = 0, lfoInc_ = 100000;
 
-	SvfState chL_{}, chR_{};
-	float freqL_ = 1000.0f, freqR_ = 1000.0f;
 
 	int32_t lfoClock_ = 1; // 0 FIXED, 1 SYSTEM (manual default: follow tempo)
 	float lfoBpm_ = 120.0f;

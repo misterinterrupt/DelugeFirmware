@@ -283,7 +283,8 @@ public:
 	static constexpr const char* kShaperOptionStrings[] = {"SOFT", "TAPE", "HARD", "FOLD"};
 	static constexpr const char* kPhaseOptionStrings[] = {"OFF", "ON"};
 	static constexpr const char* kCfgOptionStrings[] = {"AMP>MOD", "MOD>AMP"};
-	static constexpr const char* kFiltTypeStrings[] = {"LP", "HP", "BP", "NOTCH"};
+	// The subtractive-mode filter set (the synth's LPF mode menu order).
+	static constexpr const char* kFiltTypeStrings[] = {"12L-L", "24L-L", "12L", "24L", "24L-DR", "SVF-B", "SVF-N"};
 	static constexpr const char* kRmModeStrings[] = {"L*R", "OSC"};
 	static constexpr const char* kRmShapeStrings[] = {"SINE", "SAW+", "SAW-", "PULSE", "TRI"};
 	static constexpr const char* kFiltClkStrings[] = {"FIX", "SYS"};
@@ -1299,14 +1300,14 @@ constexpr FxBloc::ParamDef kDefsKdfxShprRev[11] = {
 // rides the Mod* trio (rate 0.01-10 HZ, depth in octaves).
 constexpr FxBloc::ParamDef kDefsKdfxResFilt[6] = {
     FxBloc::INGAIN_DEF(),
-    {FxBloc::Param::FiltType, "TYPE", true, 0, 3, FxBloc::kFiltTypeOptions()},
+    {FxBloc::Param::FiltType, "TYPE", true, 0, 6, FxBloc::kFiltTypeOptions()},
     FxBloc::logHz(FxBloc::Param::FiltFreq, "FREQ", 16.f, 8372.f, 0),
     FxBloc::db(FxBloc::Param::FiltRes, "RES", 0.f, 50.f),
     FxBloc::LEVEL_DEF(),
 };
 constexpr FxBloc::ParamDef kDefsKdfxEnvFilt[9] = {
     FxBloc::INGAIN_DEF(),
-    {FxBloc::Param::FiltType, "TYPE", true, 0, 3, FxBloc::kFiltTypeOptions()},
+    {FxBloc::Param::FiltType, "TYPE", true, 0, 6, FxBloc::kFiltTypeOptions()},
     FxBloc::logHz(FxBloc::Param::FiltMinFreq, "MINF", 16.f, 8372.f, 0),
     FxBloc::LEVEL_DEF(),
     FxBloc::db(FxBloc::Param::FiltRes, "RES", 0.f, 50.f),
@@ -1316,7 +1317,7 @@ constexpr FxBloc::ParamDef kDefsKdfxEnvFilt[9] = {
 };
 constexpr FxBloc::ParamDef kDefsKdfxLfoFilt[8] = {
     FxBloc::INGAIN_DEF(),
-    {FxBloc::Param::FiltType, "TYPE", true, 0, 3, FxBloc::kFiltTypeOptions()},
+    {FxBloc::Param::FiltType, "TYPE", true, 0, 6, FxBloc::kFiltTypeOptions()},
     FxBloc::logHz(FxBloc::Param::FiltFreq, "FREQ", 16.f, 8372.f, 0),
     FxBloc::LEVEL_DEF(),
     FxBloc::db(FxBloc::Param::FiltRes, "RES", 0.f, 50.f),
