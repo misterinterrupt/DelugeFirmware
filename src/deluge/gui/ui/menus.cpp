@@ -320,7 +320,7 @@ submenu::Sidechain sidechainMenu{
 // FX ----------------------------------------------------------------------------------------
 
 fx::Clipping clippingMenu{STRING_FOR_SATURATION};
-fx::WithinEnv fxWithinEnvMenu{l10n::String::STRING_FOR_FX_ENVELOPE};
+fx::FxCutoff fxCutoffMenu{l10n::String::STRING_FOR_FX_ENVELOPE};
 patched_param::Integer foldMenu{STRING_FOR_WAVEFOLD, STRING_FOR_WAVEFOLD, params::LOCAL_FOLD};
 
 Submenu soundDistortionMenu{
@@ -912,7 +912,7 @@ Submenu soundMasterMenu{
 Submenu soundFXMenu{
     STRING_FOR_FX,
     {
-        &fxWithinEnvMenu,
+        &fxCutoffMenu,
         &soundDistortionMenu,
         &noiseMenu,
     },

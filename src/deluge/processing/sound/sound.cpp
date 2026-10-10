@@ -1198,11 +1198,6 @@ Error Sound::readTagFromFile(Deserializer& reader, char const* tagName, ParamMan
 		reader.exitTag("voicePriority");
 	}
 
-	else if (!strcmp(tagName, "fxWithinAmpEnv")) {
-		fxWithinAmpEnv = reader.readTagOrAttributeValueInt();
-		reader.exitTag("fxWithinAmpEnv");
-	}
-
 	else if (!strcmp(tagName, "defaultParams")) {
 		ENSURE_PARAM_MANAGER_EXISTS
 		Sound::readParamsFromFile(reader, paramManager, readAutomationUpToPos);
@@ -1912,18 +1907,36 @@ void Sound::reassessRenderSkippingStatus(ModelStackWithSoundFlags* modelStack) {
 			// envelope) its wet tails — the delay's longest line plus generous
 			// reverb drain. Infinite-sustain settings get cut at that point;
 			// keeping them alive forever would burn a voice's worth of CPU.
+			// FX shutdown follows the chain's RMS cutoff policy:
+			//   > 0 dB  -> voices rule (this path: skip when voices are gone)
+			//   -96..0 -> hold while the chain's output stays above the
+			//             threshold; skip once it's been below for 200 ms
+			//   <= -96 -> the chain holds the render open indefinitely
+			//             (an INF tail rings until the panic kill)
+			if (fxChain.isActive() && fxChain.fxRmsCutoffDb <= 0.0f) {
+				if (fxChain.fxRmsCutoffDb <= -96.0f) {
+					return; // always-on: never start skipping while engaged
+				}
+				constexpr uint32_t kRmsHoldSamples = 44100 / 5; // 200 ms below-threshold hold
+				if (fxChain.rmsGateOpen(AudioEngine::audioSampleTimer)) {
+					fxChain.belowThresholdSince = 0;
+					startSkippingRenderingAtTime = 0;
+					return; // still sounding — keep rendering
+				}
+				if (!fxChain.belowThresholdSince) {
+					fxChain.belowThresholdSince = AudioEngine::audioSampleTimer;
+					return;
+				}
+				if (AudioEngine::audioSampleTimer - fxChain.belowThresholdSince < kRmsHoldSamples) {
+					return; // settling — keep rendering through the hold
+				}
+				startSkippingRendering(modelStack);
+				return;
+			}
+
 			int32_t waitSamples = 0;
 			if (compressor.getThreshold() > 0) {
 				waitSamples = compressor.getReleaseMS() * 44;
-			}
-			if (!fxWithinAmpEnv) {
-				// The engines report their own remaining tails (delay:
-				// repeats-until-silent; reverb: RT60) — the successor of the
-				// stock delay's repeatsUntilAbandon. Sustaining settings
-				// (INF / unity feedback) hold for a bounded 60s drain.
-				int32_t fxTail = static_cast<int32_t>(std::min<uint32_t>(
-					fxChain.tailSamples(), 60u * 44100u));
-				waitSamples = std::max(waitSamples, fxTail);
 			}
 			if (waitSamples > 0) {
 				if (!startSkippingRenderingAtTime) {
@@ -2269,6 +2282,25 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 
 	if (fxChain.isActive()) {
 		fxChain.process((StereoSample*)soundBuffer, numSamples);
+
+		// Track the chain's output peak for the RMS shutdown gate — abs-max
+		// over the block, a few compares per sample.
+		float peak = 0.0f;
+		StereoSample const* sb = (StereoSample const*)soundBuffer;
+		for (int32_t i = 0; i < numSamples; i++) {
+			float l = std::fabs((float)std::abs(sb[i].l)) / 2147483648.0f;
+			float r = std::fabs((float)std::abs(sb[i].r)) / 2147483648.0f;
+			if (l > peak) peak = l;
+			if (r > peak) peak = r;
+		}
+		fxChain.noteBlockPeak(peak);
+
+		// While the chain holds this render open past the last voice, nothing
+		// else will re-run the skip assessment (no notes, no param events) —
+		// re-check the gate ourselves, every block.
+		if (numVoicesAssigned == 0 && !skippingRendering && fxChain.fxRmsCutoffDb <= 0.0f) {
+			reassessRenderSkippingStatus(modelStackWithSoundFlags);
+		}
 	}
 
 	if (recorder && recorder->status < RecorderStatus::FINISHED_CAPTURING_BUT_STILL_WRITING) {
@@ -3375,8 +3407,8 @@ void Sound::writeSourceToFile(Serializer& writer, int32_t s, char const* tagName
 		writer.writeAttribute("cents", source->cents);
 		if (s == 1 && oscillatorSync) {
 			writer.writeAttribute("oscillatorSync", oscillatorSync);
-			if (!fxWithinAmpEnv) {
-				writer.writeAttribute("fxWithinAmpEnv", false);
+			if (fxChain.fxRmsCutoffDb <= 0.0f) {
+				writer.writeAttribute("fxRmsCutoffDb", (int32_t)std::lround(fxChain.fxRmsCutoffDb));
 			}
 		}
 		writer.writeAttribute("retrigPhase", oscRetriggerPhase[s]);

@@ -119,6 +119,26 @@ public:
 		return t;
 	}
 
+	/// FX shutdown policy, in dBFS, measured on this chain's output:
+	///   > 0 dB   - voices rule: processing ends with the voices (previous default)
+	///   -96..0   - RMS gate: processing holds until the chain's output falls
+	///              below the threshold for a hold time, then stops
+	///   <= -96   - always on: the chain processes every block while engaged
+	/// The peak is tracked per render block by the owning render path.
+	float fxRmsCutoffDb = 6.0f;
+	float lastBlockPeak = 0.0f;        // linear, 1.0 = 0 dBFS
+	uint32_t belowThresholdSince = 0;  // audioSampleTimer when first seen below
+
+	void noteBlockPeak(float peakLinear) { lastBlockPeak = peakLinear; }
+
+	[[nodiscard]] bool rmsGateOpen(uint32_t now) const {
+		if (fxRmsCutoffDb <= -96.0f) {
+			return true; // always-on floor
+		}
+		float threshold = std::pow(10.0f, fxRmsCutoffDb / 20.0f);
+		return lastBlockPeak >= threshold;
+	}
+
 	/// Panic-kill every slot's wet tail (short fade, then silent-dry).
 	/// Safe from the UI thread: only bloc scalars are touched; the audio
 	/// thread performs the fade on its next blocks.
