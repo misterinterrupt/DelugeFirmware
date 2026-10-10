@@ -451,6 +451,7 @@ public:
 			}
 		}
 		cache_[util::to_underlying(Param::Level)] = 0.0f; // pick a bloc -> silent/dry until LEVEL is raised
+		effectiveLevel_ = 0.0f;
 		cache_[util::to_underlying(Param::InGain)] = tFromReal(INGAIN_DEF(), 0.0f);
 		if (m == Model::GLOBAL_SEND) {
 			cache_[util::to_underlying(Param::SendBus)] = 0.0f;
@@ -504,9 +505,22 @@ public:
 					// LEVEL on send engines is a wet-output scale, applied through the
 					// same pan-level input mixWet() already uses (unity = 2^27; the
 					// <<5 in mixWet makes wet x panLevel / 2^27). Insert engines blend
-					// in process() and need nothing here.
+					// in process() from the cache — the folded value below is what
+					// reaches them via the modulated cache read. Wait: insert reads
+					// raw cache, so fold here into the value both paths use.
+					float level = std::clamp(cache_[id], 0.0f, 1.0f);
+					if (sourceValues != nullptr) {
+						for (const auto& c : modConnections) {
+							if (c.inUse && c.param == id) {
+								int32_t s = sourceValues[c.source];
+								int32_t contribution = multiply_32x32_rshift32_rounded(s, c.depth) << 1;
+								level = std::clamp(level + static_cast<float>(contribution) / 2147483648.0f,
+								                  0.0f, 1.0f);
+							}
+						}
+					}
+					effectiveLevel_ = level; // the insert blend reads this in process()
 					if (!engine_->isInsert()) {
-						float level = std::clamp(cache_[id], 0.0f, 1.0f);
 						int32_t pan = static_cast<int32_t>(level * 134217728.0f); // level × 2^27
 						engine_->setPanLevels(pan, pan);
 					}
@@ -682,7 +696,7 @@ public:
 		}
 
 		if (engine_->isInsert()) {
-			float level = std::clamp(cache_[util::to_underlying(Param::Level)], 0.0f, 1.0f);
+			float level = effectiveLevel_; // modulated at the boundary; falls back to the cache when unmodded
 			if (level >= 0.999f) {
 				engine_->processInsert(std::span<StereoSample>{buffer, numSamples});
 				return true;
@@ -1027,6 +1041,7 @@ private:
 	/// floats for continuous params, plain integers stored as floats for int params.
 	float cache_[util::to_underlying(Param::kNumParams)]{};
 	uint64_t dirty_ = 0;
+	float effectiveLevel_ = 0.0f; // LEVEL after modulation folds, for the insert blend
 	uint32_t killFade_ = 0;   // remaining wet-fade samples of a panic kill
 	bool killed_ = false;     // kill latched: silent-dry, tail reported none
 	q31_t insertKillLevel_ = 0; // bit per param id — UI writes, audio reads+clears

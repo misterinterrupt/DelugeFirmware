@@ -228,6 +228,22 @@ void ModControllableAudio::writeTagsToFile(Serializer& writer) {
 						writer.writeAttribute(name, v);
 					}
 				}
+				// Modulation routings: name-keyed both ways, unknown skipped on load
+				for (const auto& c : bloc.modConnections) {
+					if (!c.inUse) {
+						continue;
+					}
+					const char* pname = dsp::FxBloc::paramName(static_cast<dsp::FxBloc::Param>(c.param));
+					if (pname == nullptr) {
+						continue;
+					}
+					writer.writeOpeningTagBeginning("mod");
+					writer.writeAttribute("source", sourceToString(static_cast<PatchSource>(c.source)));
+					writer.writeAttribute("param", pname);
+					uint32_t d = static_cast<uint32_t>(c.depth);
+					writer.writeAttribute("depth", std::min<uint32_t>(d, 2147483647u));
+					writer.closeTag();
+				}
 				writer.closeTag();
 			}
 			writer.writeClosingTag("fxChain");
@@ -370,6 +386,14 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 				int32_t modelVal = 0;
 				float params[dsp::FxBloc::kMaxSlotParams + 1] = {};
 				uint32_t seen = 0;
+				// staged mod routings: {param, source, depth}
+				struct StagedMod {
+					uint8_t param;
+					uint8_t source;
+					q31_t depth;
+				};
+				StagedMod stagedMods[dsp::FxBloc::kMaxModConnections];
+				size_t numStagedMods = 0;
 				while (*(tagName = reader.readNextTagOrAttributeName())) {
 					if (!strcmp(tagName, "index")) {
 						slotIndex = reader.readTagOrAttributeValueInt();
@@ -378,6 +402,45 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 					else if (!strcmp(tagName, "model")) {
 						modelVal = reader.readTagOrAttributeValueInt();
 						reader.exitTag("model");
+					}
+					else if (!strcmp(tagName, "mod")) {
+						const char* srcName = nullptr;
+						const char* prmName = nullptr;
+						q31_t depth = 0;
+						while (*(tagName = reader.readNextTagOrAttributeName())) {
+							if (!strcmp(tagName, "source")) {
+								srcName = reader.readTagOrAttributeValue();
+								reader.exitTag("source");
+							}
+							else if (!strcmp(tagName, "param")) {
+								prmName = reader.readTagOrAttributeValue();
+								reader.exitTag("param");
+							}
+							else if (!strcmp(tagName, "depth")) {
+								depth = reader.readTagOrAttributeValueInt();
+								reader.exitTag("depth");
+							}
+							else {
+								reader.exitTag(tagName);
+							}
+						}
+						if (srcName != nullptr && prmName != nullptr && numStagedMods < dsp::FxBloc::kMaxModConnections) {
+							for (uint32_t pid = 1; pid <= dsp::FxBloc::kMaxSlotParams; pid++) {
+								const char* nm = dsp::FxBloc::paramName(static_cast<dsp::FxBloc::Param>(pid));
+								if (nm != nullptr && !strcmp(prmName, nm)) {
+									for (int32_t ps = 0; ps < kNumPatchSources; ps++) {
+										if (!strcmp(srcName,
+										            sourceToString(static_cast<PatchSource>(ps)))) {
+											stagedMods[numStagedMods++] = {
+											    static_cast<uint8_t>(pid), static_cast<uint8_t>(ps), depth};
+											break;
+										}
+									}
+									break;
+								}
+							}
+						}
+						reader.exitTag("mod");
 					}
 					else {
 						bool matched = false;
@@ -411,6 +474,11 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 							if (seen & (1u << pid)) {
 								chain->slot(slotIndex).setParam(def.param, params[pid]);
 							}
+						}
+						for (size_t m = 0; m < numStagedMods; m++) {
+							chain->slot(slotIndex).setModConnection(
+							    static_cast<dsp::FxBloc::Param>(stagedMods[m].param), stagedMods[m].source,
+							    stagedMods[m].depth);
 						}
 					}
 				}

@@ -1320,6 +1320,10 @@ void getMasterFxParamsFromSong(Song* song) {
 						bloc.setParam(static_cast<dsp::FxBloc::Param>(pid), song->masterFxParams[s][pid]);
 					}
 				}
+				for (size_t m = 0; m < song->masterFxModCount[s]; m++) {
+					const auto& mc = song->masterFxMods[s][m];
+					bloc.setModConnection(static_cast<dsp::FxBloc::Param>(mc.param), mc.source, mc.depth);
+				}
 			}
 		}
 		else {

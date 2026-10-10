@@ -314,6 +314,9 @@ extern bool expressionValueChangesMustBeDoneSmoothly;
 void SoundInstrument::monophonicExpressionEvent(int32_t newValue, int32_t whichExpressionDimension) {
 	whichExpressionSourcesChangedAtSynthLevel |= 1 << whichExpressionDimension;
 	monophonicExpressionValues[whichExpressionDimension] = newValue;
+	if (whichExpressionDimension == 2) {
+		lastAftertouch_ = newValue; // FX-mod source sample
+	}
 }
 
 // Alternative to what's in the NonAudioInstrument:: implementation, which would almost work here, but we cut corner for

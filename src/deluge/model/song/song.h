@@ -401,6 +401,16 @@ public:
 	int32_t masterFxModels[3] = {0, 0, 0};            // dsp::FxBloc::Model per slot
 	float masterFxParams[3][kMasterFxNumParams] = {};
 	uint32_t masterFxParamSeen[3] = {};
+	// Staged <mod> routings per slot, applied when the chain is staged.
+	// (Int-backed: song.h doesn't pull the FxBloc type in.)
+	static constexpr int32_t kMasterFxMaxMods = 8; // dsp::FxBloc::kMaxModConnections
+	struct MasterFxMod {
+		uint8_t param;
+		uint8_t source;
+		q31_t depth;
+	};
+	MasterFxMod masterFxMods[3][kMasterFxMaxMods] = {};
+	size_t masterFxModCount[3] = {};
 
 	// START ~ new Automation Arranger View Variables
 	int32_t lastSelectedParamID; // last selected Parameter to be edited in Automation Arranger View
