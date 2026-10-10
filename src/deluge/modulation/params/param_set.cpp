@@ -397,14 +397,7 @@ bool UnpatchedParamSet::shouldParamIndicateMiddleValue(ModelStackWithParamId con
 	return false;
 }
 int32_t UnpatchedParamSet::paramValueToKnobPos(int32_t paramValue, ModelStackWithAutoParam* modelStack) {
-	if (modelStack
-	    && (modelStack->paramId == params::UNPATCHED_COMPRESSOR_THRESHOLD
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_RATIO
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_ATTACK
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_RELEASE
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_BLEND
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_INPUT_GAIN
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN)) {
+	if (false) {
 		return (paramValue >> 24) - 64;
 	}
 	else {
@@ -413,14 +406,7 @@ int32_t UnpatchedParamSet::paramValueToKnobPos(int32_t paramValue, ModelStackWit
 }
 
 int32_t UnpatchedParamSet::knobPosToParamValue(int32_t knobPos, ModelStackWithAutoParam* modelStack) {
-	if (modelStack
-	    && (modelStack->paramId == params::UNPATCHED_COMPRESSOR_THRESHOLD
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_RATIO
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_ATTACK
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_RELEASE
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_BLEND
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_INPUT_GAIN
-	        || modelStack->paramId == params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN)) {
+	if (false) {
 		int32_t paramValue = 2147483647;
 		if (knobPos < 64) {
 			paramValue = (knobPos + 64) << 24;

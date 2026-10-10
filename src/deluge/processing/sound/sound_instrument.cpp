@@ -99,8 +99,6 @@ void SoundInstrument::renderOutput(ModelStack* modelStack, StereoSample* startPo
 	        ->addOtherTwoThingsButNoNoteRow(this, getParamManager(modelStack->song));
 
 	if (skippingRendering) {
-		compressor.reset();
-		compressor.gainReduction = 0;
 	}
 	else {
 		Sound::render(modelStackWithThreeMainThings, startPos, numSamples, sideChainHitPending, kMaxSampleValue,

@@ -78,17 +78,7 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 
 	int32_t pan = unpatchedParams->getValue(params::UNPATCHED_PAN) >> 1;
 
-	// Render sidechain
 	int32_t postReverbVolume = 134217728;
-	q31_t compThreshold = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
-	q31_t compBlend = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_BLEND);
-	compressor.setThreshold(compThreshold);
-	compressor.setRatio(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RATIO));
-	compressor.setAttack(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_ATTACK));
-	compressor.setRelease(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RELEASE));
-	compressor.setBlend(compBlend);
-	compressor.setInputGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_INPUT_GAIN));
-	compressor.setMakeupGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN));
 	StereoSample globalEffectableBuffer[SSI_TX_BUFFER_NUM_SAMPLES] __attribute__((aligned(CACHE_LINE_SIZE)));
 
 	memset(globalEffectableBuffer, 0, sizeof(StereoSample) * numSamples);
@@ -118,12 +108,6 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 	}
 
 	processOutputVolume(globalEffectableBuffer, numSamples, volumePostFX, postReverbVolume, pan, true);
-	if (compBlend > 0) {
-		compressor.renderVolNeutral(globalEffectableBuffer, numSamples, volumePostFX);
-	}
-	else {
-		compressor.reset();
-	}
 
 	// Same FX shutdown policy as the synth path, on the chain's own output:
 	// VOICE mode processes only while the clip produced audio this block;

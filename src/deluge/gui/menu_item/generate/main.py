@@ -8,7 +8,6 @@ import sys
 top_level_menus = (
     [
         dmenus.filter.sound_filters,
-        dmenus.compressor.menu,
         dmenus.unison.menu,
     ]
     + dmenus.envelopes.menus

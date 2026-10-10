@@ -16,6 +16,7 @@
  */
 #pragma once
 #include "gui/menu_item/decimal.h"
+#include "gui/menu_item/value_scaling.h"
 #include "gui/menu_item/menu_item_with_cc_learning.h"
 #include "gui/ui/sound_editor.h"
 #include "model/clip/audio_clip.h"

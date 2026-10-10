@@ -868,15 +868,6 @@ void renderSongFX(size_t numSamples) { // LPF and stutter for song (must happen 
 		logAction("mastercomp start");
 
 		UnpatchedParamSet* unpatchedParams = currentSong->paramManager.getUnpatchedParamSet();
-		q31_t compThreshold = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
-		q31_t compBlend = unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_BLEND);
-		currentSong->globalEffectable.compressor.setThreshold(compThreshold);
-		currentSong->globalEffectable.compressor.setRatio(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RATIO));
-		currentSong->globalEffectable.compressor.setAttack(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_ATTACK));
-		currentSong->globalEffectable.compressor.setRelease(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_RELEASE));
-		currentSong->globalEffectable.compressor.setBlend(compBlend);
-		currentSong->globalEffectable.compressor.setInputGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_INPUT_GAIN));
-		currentSong->globalEffectable.compressor.setMakeupGain(unpatchedParams->getValue(params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN));
 
 		int32_t songVolume =
 		    getFinalParameterValueVolume(
@@ -888,12 +879,6 @@ void renderSongFX(size_t numSamples) { // LPF and stutter for song (must happen 
 		int64_t adjR = ((int64_t)multiply_32x32_rshift32(masterVolumeAdjustmentR, songVolume)) << 8;
 		masterVolumeAdjustmentR = (int32_t)std::min<int64_t>(adjR, 2147483647LL);
 
-		if (compBlend > 0) {
-			currentSong->globalEffectable.compressor.renderVolNeutral(renderingBuffer.data(), numSamples, 0);
-		}
-		else {
-			currentSong->globalEffectable.compressor.reset();
-		}
 		logAction("mastercomp end");
 	}
 }

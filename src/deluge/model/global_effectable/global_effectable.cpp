@@ -38,8 +38,6 @@ namespace params = deluge::modulation::params;
 GlobalEffectable::GlobalEffectable() {
 	unpatchedParamKind_ = params::Kind::UNPATCHED_GLOBAL;
 	lpfMode = FilterMode::TRANSISTOR_24DB_LEGACY;
-	editingComp = false;
-	currentCompParam = CompParam::RATIO;
 }
 
 void GlobalEffectable::cloneFrom(ModControllableAudio* other) {
@@ -75,29 +73,15 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 		endStutter(paramManager);
 	}
 
-	// Compressor
-	else if (whichModButton == 4) {
-		displayCompressorSettings(on);
-	}
 	// Stutter / Custom 1
 	else if (whichModButton == 6) {
 		if (on) {
 			custom1Shifted = Buttons::isShiftButtonPressed();
 			if (display->haveOLED()) {
-				if (custom1Shifted) {
-					display->popupText("Compressor:\nAttack / Release");
-				}
-				else {
-					display->popupText("Compressor:\nStutter / Blend");
-				}
+				display->popupText("Stutter");
 			}
 			else {
-				if (custom1Shifted) {
-					display->displayPopup("AT.RL");
-				}
-				else {
-					display->displayPopup("ST.BL");
-				}
+				display->displayPopup("ST");
 			}
 		}
 	}
@@ -116,65 +100,12 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 	else if (whichModButton == 7) {
 		if (on) {
 			custom3Shifted = Buttons::isShiftButtonPressed();
-			if (display->haveOLED()) {
-				if (custom3Shifted) {
-					display->popupText("Compressor:\nInput / Makeup");
-				}
-				else {
-					display->popupText("Compressor:\nRatio / Threshold");
-				}
-			}
-			else {
-				if (custom3Shifted) {
-					display->displayPopup("IG.MG");
-				}
-				else {
-					display->displayPopup("RA.TH");
-				}
-			}
 		}
 	}
 	// Other Mod Buttons
 	else {
 		displayOtherModKnobSettings(whichModButton, on);
 	}
-}
-
-void GlobalEffectable::displayCompressorSettings(bool on) {
-	if (display->haveOLED()) {
-		if (on) {
-			DEF_STACK_STRING_BUF(popupMsg, 100);
-			popupMsg.append("Comp Mode: ");
-			popupMsg.append(getCompressorModeDisplayName());
-			popupMsg.append("\n");
-
-			popupMsg.append("Comp Param: ");
-			popupMsg.append(getCompressorParamDisplayName());
-
-			display->popupText(popupMsg.c_str());
-		}
-		else {
-			display->cancelPopup();
-		}
-	}
-	else {
-		if (on) {
-			display->displayPopup(getCompressorModeDisplayName());
-		}
-		else {
-			display->displayPopup(getCompressorParamDisplayName());
-		}
-	}
-}
-
-char const* GlobalEffectable::getCompressorModeDisplayName() {
-	return editingComp ? "FULL" : "ONE";
-}
-
-char const* GlobalEffectable::getCompressorParamDisplayName() {
-	currentCompParam = static_cast<CompParam>(util::to_underlying(currentCompParam) % maxCompParam);
-	const char* params[util::to_underlying(CompParam::LAST)] = {"ratio", "attack", "release", "hpf", "blend"};
-	return params[int(currentCompParam)];
 }
 
 // Returns whether Instrument changed
@@ -194,219 +125,20 @@ bool GlobalEffectable::modEncoderButtonAction(uint8_t whichModEncoder, bool on,
 		return false;
 	}
 
-	// Compressor section
-	else if (modKnobMode == 4) {
-		if (whichModEncoder == 0) { // Comp param select
-			if (on) {
-				currentCompParam =
-				    static_cast<CompParam>((util::to_underlying(currentCompParam) + 1) % maxCompParam);
-
-				// if mod button is pressed, update mod button pop up
-				if (Buttons::isButtonPressed(
-				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displayCompressorSettings(on);
-				}
-				else {
-					display->displayPopup(getCompressorParamDisplayName());
-				}
-			}
-		}
-		else {
-			if (on) {
-				editingComp = !editingComp;
-
-				// if mod button is pressed, update mod button pop up
-				if (Buttons::isButtonPressed(
-				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displayCompressorSettings(on);
-				}
-				else {
-					display->displayPopup(getCompressorModeDisplayName());
-				}
-			}
-		}
-
-		return false;
-	}
-
 	return false; // Some cases could lead here
 }
 
+// Always check this doesn't return NULL!
+
 int32_t GlobalEffectable::getKnobPosForNonExistentParam(int32_t whichModEncoder, ModelStackWithAutoParam* modelStack) {
-	int current = 0;
-	if (*getModKnobMode() == 4) {
-
-		// this is only reachable in comp editing mode, otherwise it's an existent param
-		if (whichModEncoder == 1) { // sidechain (threshold)
-			current = (compressor.getThreshold() >> 24);
-		}
-		else if (whichModEncoder == 0) {
-			switch (currentCompParam) {
-
-			case CompParam::RATIO:
-				current = (compressor.getRatio() >> 24);
-
-				break;
-
-			case CompParam::ATTACK:
-				current = compressor.getAttack() >> 24;
-
-				break;
-
-			case CompParam::RELEASE:
-				current = compressor.getRelease() >> 24;
-
-				break;
-
-			case CompParam::SIDECHAIN:
-				current = compressor.getSidechain() >> 24;
-				break;
-
-			case CompParam::BLEND:
-				current = compressor.getBlend() >> 24;
-				break;
-			}
-		}
-	}
-	return current - 64;
+	return 0;
 }
 
 ActionResult GlobalEffectable::modEncoderActionForNonExistentParam(int32_t offset, int32_t whichModEncoder,
-                                                                   ModelStackWithAutoParam* modelStack) {
-	if (*getModKnobMode() == 4) {
-		DEF_STACK_STRING_BUF(popupMsg, 40);
-		int current;
-		int displayLevel;
-		int ledLevel;
-		const char* unit;
-		// this is only reachable in comp editing mode, otherwise it's an existent param
-		if (whichModEncoder == 1) { // sidechain (threshold)
-			if (display->haveOLED()) {
-				popupMsg.append(deluge::l10n::get(deluge::l10n::String::STRING_FOR_THRESHOLD));
-			}
-			current = (compressor.getThreshold() >> 24) - 64;
-			current += offset;
-			current = std::clamp(current, -64, 64);
-			ledLevel = (64 + current);
-			q31_t level = current == 64 ? ONE_Q31 : lshiftAndSaturate<24>(current + 64);
-			compressor.setThreshold(level);
-			displayLevel = compressor.getThresholdForDisplay();
-			indicator_leds::setKnobIndicatorLevel(1, ledLevel);
-			unit = " dB";
-		}
-		else if (whichModEncoder == 0) {
-			switch (currentCompParam) {
-
-			case CompParam::RATIO:
-				if (display->haveOLED()) {
-					popupMsg.append(deluge::l10n::get(deluge::l10n::String::STRING_FOR_RATIO));
-				}
-				current = (compressor.getRatio() >> 24) - 64;
-				current += offset;
-				current = std::clamp(current, -64, 64);
-				ledLevel = (64 + current);
-				{
-					q31_t ratLevel = current == 64 ? ONE_Q31 : lshiftAndSaturate<24>(current + 64);
-					compressor.setRatio(ratLevel);
-				}
-				displayLevel = compressor.getRatioForDisplay();
-				unit = "";
-				break;
-
-			case CompParam::ATTACK:
-				if (display->haveOLED()) {
-					popupMsg.append(deluge::l10n::get(deluge::l10n::String::STRING_FOR_ATTACK));
-				}
-				current = (compressor.getAttack() >> 24) - 64;
-				current += offset;
-				current = std::clamp(current, -64, 64);
-				ledLevel = (64 + current);
-
-				displayLevel = compressor.setAttack(lshiftAndSaturate<24>(current + 64));
-				unit = " MS";
-				break;
-
-			case CompParam::RELEASE:
-				if (display->haveOLED()) {
-					popupMsg.append(deluge::l10n::get(deluge::l10n::String::STRING_FOR_RELEASE));
-				}
-				current = (compressor.getRelease() >> 24) - 64;
-				current += offset;
-				current = std::clamp(current, -64, 64);
-				ledLevel = (64 + current);
-
-				displayLevel = compressor.setRelease(lshiftAndSaturate<24>(current + 64));
-				unit = " MS";
-				break;
-
-			case CompParam::SIDECHAIN:
-				if (display->haveOLED()) {
-					popupMsg.append(deluge::l10n::get(deluge::l10n::String::STRING_FOR_HPF));
-				}
-				current = (compressor.getSidechain() >> 24) - 64;
-				current += offset;
-				current = std::clamp(current, -64, 64);
-				ledLevel = (64 + current);
-
-				displayLevel = compressor.setSidechain(lshiftAndSaturate<24>(current + 64));
-				unit = " HZ";
-				break;
-
-			case CompParam::BLEND:
-				if (display->haveOLED()) {
-					popupMsg.append(deluge::l10n::get(deluge::l10n::String::STRING_FOR_BLEND));
-				}
-				current = (compressor.getBlend() >> 24) - 64;
-				current += offset;
-				current = std::clamp(current, -64, 64);
-				ledLevel = (64 + current);
-				q31_t level = current == 64 ? ONE_Q31 : lshiftAndSaturate<24>(current + 64);
-				displayLevel = compressor.setBlend(level);
-				unit = " %";
-				break;
-			}
-			indicator_leds::setKnobIndicatorLevel(0, ledLevel);
-		}
-
-		if (display->haveOLED()) {
-			popupMsg.append(": ");
-			if (whichModEncoder == 0 && currentCompParam == CompParam::RATIO) {
-				char ratioBuffer[16];
-				compressor.getRatioString(ratioBuffer, sizeof(ratioBuffer));
-				popupMsg.append(ratioBuffer);
-			}
-			else {
-				popupMsg.appendInt(displayLevel);
-				popupMsg.append(unit);
-			}
-		}
-		else {
-			if (whichModEncoder == 0 && currentCompParam == CompParam::RATIO) {
-				char ratioBuffer[16];
-				compressor.getRatioString(ratioBuffer, sizeof(ratioBuffer));
-				popupMsg.append(ratioBuffer);
-			}
-			else {
-				popupMsg.appendInt(displayLevel);
-			}
-		}
-		display->displayPopup(popupMsg.c_str());
-
-		return ActionResult::DEALT_WITH;
-	}
-	else if (*getModKnobMode() == 2) {
-		if (display->haveOLED()) {
-			display->popupText("Attack / Release:\n(Sound only)");
-		}
-		else {
-			display->displayPopup("AT.RL");
-		}
-		return ActionResult::DEALT_WITH;
-	}
+                                                                  ModelStackWithAutoParam* modelStack) {
 	return ActionResult::NOT_DEALT_WITH;
 }
 
-// Always check this doesn't return NULL!
 int32_t GlobalEffectable::getParameterFromKnob(int32_t whichModEncoder) {
 
 	int32_t modKnobMode = *getModKnobMode();
@@ -424,39 +156,8 @@ int32_t GlobalEffectable::getParameterFromKnob(int32_t whichModEncoder) {
 		// not editing the compressor.
 	}
 	else if (modKnobMode == 6) { // Stutter / Custom 1
-		if (custom1Shifted) {
-			if (whichModEncoder == 1) {
-				return params::UNPATCHED_COMPRESSOR_ATTACK;
-			}
-			else {
-				return params::UNPATCHED_COMPRESSOR_RELEASE;
-			}
-		}
-		else {
-			if (whichModEncoder == 1) {
-				return params::UNPATCHED_STUTTER_RATE;
-			}
-			else {
-				return params::UNPATCHED_COMPRESSOR_BLEND;
-			}
-		}
-	}
-	else if (modKnobMode == 7) { // Custom 2 / Custom 3
-		if (custom3Shifted) {
-			if (whichModEncoder == 1) {
-				return params::UNPATCHED_COMPRESSOR_INPUT_GAIN;
-			}
-			else {
-				return params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN;
-			}
-		}
-		else {
-			if (whichModEncoder == 1) {
-				return params::UNPATCHED_COMPRESSOR_RATIO;
-			}
-			else {
-				return params::UNPATCHED_COMPRESSOR_THRESHOLD;
-			}
+		if (!custom1Shifted && whichModEncoder == 1) {
+			return params::UNPATCHED_STUTTER_RATE;
 		}
 	}
 	return 255;

@@ -26,8 +26,6 @@ using namespace deluge;
 using namespace deluge::gui::ui::visual_menu;
 using enum deluge::l10n::String;
 
-#include "gui/menu_item/audio_compressor/compressor_params.h"
-#include "gui/menu_item/audio_compressor/compressor_values.h"
 #include "gui/menu_item/envelope/segment.h"
 #include "gui/menu_item/filter/hpf_freq.h"
 #include "gui/menu_item/filter/hpf_mode.h"
@@ -66,6 +64,7 @@ using enum deluge::l10n::String;
 #include "gui/menu_item/voice/polyphony.h"
 #include "gui/menu_item/voice/priority.h"
 #include "gui/menu_item/fx/clipping.h"
+#include "gui/menu_item/value_scaling.h"
 #include "gui/menu_item/midi/bank.h"
 #include "gui/menu_item/midi/pgm.h"
 #include "gui/menu_item/midi/sub.h"
@@ -153,14 +152,6 @@ extern deluge::gui::menu_item::lfo::Type lfo2TypeMenu;
 extern deluge::gui::menu_item::fx::Clipping clippingMenu;
 extern deluge::gui::menu_item::patched_param::Integer foldMenu;
 
-extern deluge::gui::menu_item::audio_compressor::Threshold compThreshold;
-extern deluge::gui::menu_item::audio_compressor::Ratio compRatio;
-extern deluge::gui::menu_item::audio_compressor::Attack compAttack;
-extern deluge::gui::menu_item::audio_compressor::Release compRelease;
-extern deluge::gui::menu_item::audio_compressor::InputGain compInputGain;
-extern deluge::gui::menu_item::audio_compressor::MakeupGain compMakeupGain;
-extern deluge::gui::menu_item::audio_compressor::SideHPF compHPF;
-extern deluge::gui::menu_item::audio_compressor::Blend compBlend;
 
 
 // Arpeggiator
@@ -263,10 +254,6 @@ static const VisualPage synthLfoPages[] = {
 static const VisualPage synthFxPages[] = {
     {"Distortion", STRING_FOR_DISTORTION,
      {{{&clippingMenu, "CLIP"}, {nullptr, ""}, {nullptr, ""}, {&foldMenu, "FOLD"}}}},
-    {"Compressor 1", STRING_FOR_COMMUNITY_FEATURE_MASTER_COMPRESSOR,
-     {{{&compThreshold, "THRESH"}, {&compRatio, "RATIO"}, {&compAttack, "ATK"}, {&compRelease, "REL"}}}},
-    {"Compressor 2", STRING_FOR_COMMUNITY_FEATURE_MASTER_COMPRESSOR,
-     {{{&compInputGain, "IN-GN"}, {&compMakeupGain, "MAKEUP"}, {&compHPF, "HPF"}, {&compBlend, "BLEND"}}}},
 };
 
 static const VisualPage synthArpPages[] = {

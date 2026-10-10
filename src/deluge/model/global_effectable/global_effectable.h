@@ -46,19 +46,12 @@ public:
 	                               int32_t readAutomationUpToPos);
 	static bool readParamTagFromFile(Deserializer& reader, char const* tagName, ParamManagerForTimeline* paramManager,
 	                                 int32_t readAutomationUpToPos);
-	bool isEditingComp() override { return editingComp; }
 	int32_t getKnobPosForNonExistentParam(int32_t whichModEncoder, ModelStackWithAutoParam* modelStack) override;
 	ActionResult modEncoderActionForNonExistentParam(int32_t offset, int32_t whichModEncoder,
 	                                                 ModelStackWithAutoParam* modelStack) override;
-	bool editingComp;
-	CompParam currentCompParam;
 
 protected:
-	int maxCompParam = 0;
 	virtual int32_t getParameterFromKnob(int32_t whichModEncoder);
 
 private:
-	void displayCompressorSettings(bool on);
-	char const* getCompressorModeDisplayName();
-	char const* getCompressorParamDisplayName();
 };

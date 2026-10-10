@@ -134,10 +134,6 @@ Sound::Sound() : patcher(&patchableInfoForSound) {
 	modKnobs[5][0].paramDescriptor.setToHaveParamAndSource(params::LOCAL_PITCH_ADJUST, PatchSource::LFO_GLOBAL);
 
 	modKnobs[6][1].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_STUTTER_RATE);
-	modKnobs[6][0].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_COMPRESSOR_BLEND);
-
-	modKnobs[7][1].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_COMPRESSOR_RATIO);
-	modKnobs[7][0].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_COMPRESSOR_THRESHOLD);
 	voicePriority = VoicePriority::MEDIUM;
 	whichExpressionSourcesChangedAtSynthLevel = 0;
 
@@ -2227,22 +2223,6 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 
 	processOutputVolume((StereoSample*)soundBuffer, numSamples, postFXVolume, postReverbVolume, 0, true);
 
-	q31_t compThreshold = paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_THRESHOLD);
-	q31_t compBlend = paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_BLEND);
-	compressor.setThreshold(compThreshold);
-	compressor.setRatio(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_RATIO));
-	compressor.setAttack(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_ATTACK));
-	compressor.setRelease(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_RELEASE));
-	compressor.setBlend(compBlend);
-	compressor.setInputGain(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_INPUT_GAIN));
-	compressor.setMakeupGain(paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN));
-	if (compBlend > 0) {
-		compressor.renderVolNeutral((StereoSample*)soundBuffer, numSamples, postFXVolume);
-	}
-	else {
-		compressor.reset();
-	}
-
 	if (fxChain.isActive()) {
 		fxChain.process((StereoSample*)soundBuffer, numSamples);
 
@@ -4031,18 +4011,14 @@ ModelStackWithAutoParam* Sound::getParamFromModEncoderDeeper(int32_t whichModEnc
 	int32_t modKnobMode = *getModKnobMode();
 
 	if (modKnobMode == 6) {
-		paramId = custom1Shifted
-		              ? (whichModEncoder == 1 ? params::UNPATCHED_COMPRESSOR_ATTACK : params::UNPATCHED_COMPRESSOR_RELEASE)
-		              : (whichModEncoder == 1 ? (int32_t)params::UNPATCHED_STUTTER_RATE : params::UNPATCHED_COMPRESSOR_BLEND);
+		paramId = (whichModEncoder == 1) ? (int32_t)params::UNPATCHED_STUTTER_RATE : 255;
 		summary = paramManager->getUnpatchedParamSetSummary();
 		ModelStackWithParamId* newModelStack1 =
 		    modelStack->addParamCollectionAndId(summary->paramCollection, summary, paramId);
 		return newModelStack1->paramCollection->getAutoParamFromId(newModelStack1, allowCreation);
 	}
 	if (modKnobMode == 7) {
-		paramId = custom3Shifted
-		              ? (whichModEncoder == 1 ? (int32_t)params::UNPATCHED_COMPRESSOR_INPUT_GAIN : (int32_t)params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN)
-		              : (whichModEncoder == 1 ? (int32_t)params::UNPATCHED_COMPRESSOR_RATIO : (int32_t)params::UNPATCHED_COMPRESSOR_THRESHOLD);
+		paramId = 255; // custom knobs are unassigned with the compressor gone
 		summary = paramManager->getUnpatchedParamSetSummary();
 		ModelStackWithParamId* newModelStack1 =
 		    modelStack->addParamCollectionAndId(summary->paramCollection, summary, paramId);

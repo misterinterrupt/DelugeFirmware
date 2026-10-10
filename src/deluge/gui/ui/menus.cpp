@@ -21,8 +21,6 @@
 #include "gui/menu_item/audio_clip/sample_marker_editor.h"
 #include "gui/menu_item/audio_clip/set_clip_length_equal_to_sample_length.h"
 #include "gui/menu_item/audio_clip/transpose.h"
-#include "gui/menu_item/audio_compressor/compressor_params.h"
-#include "gui/menu_item/audio_compressor/compressor_values.h"
 #include "gui/menu_item/audio_interpolation.h"
 #include "gui/menu_item/bend_range/main.h"
 #include "gui/menu_item/bend_range/per_finger.h"
@@ -138,6 +136,7 @@
 #include "gui/menu_item/submenu/envelope.h"
 #include "gui/menu_item/submenu/modulator.h"
 #include "gui/menu_item/submenu_referring_to_one_thing.h"
+#include "gui/menu_item/value_scaling.h"
 #include "gui/menu_item/swing/interval.h"
 #include "gui/menu_item/synth_mode.h"
 #include "gui/menu_item/trigger/in/ppqn.h"
@@ -881,7 +880,6 @@ menu_item::Submenu soundEditorRootMenu{
     {
         &soundMasterMenu,
         &arpMenu,
-        &audioCompMenu,
         &soundFiltersMenu,
         &soundFXMenu,
         &source0Menu,
@@ -923,7 +921,6 @@ menu_item::Submenu soundEditorRootMenuAudioClip{
         &audioSourceSelectorMenu,
         &specificOutputSelectorMenu,
         &audioClipMasterMenu,
-        &audioCompMenu,
         &audioClipFXMenu,
         &audioClipSampleMenu,
         &audioClipAttackMenu,
@@ -1010,7 +1007,6 @@ menu_item::Submenu soundEditorRootMenuKitGlobalFX{
     STRING_FOR_KIT_GLOBAL_FX,
     {
         &kitClipMasterMenu,
-        &audioCompMenu,
         &globalFXMenu,
     },
 };

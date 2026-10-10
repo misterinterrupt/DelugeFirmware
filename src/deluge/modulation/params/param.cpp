@@ -182,13 +182,7 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 	if ((kind == Kind::UNPATCHED_SOUND || kind == Kind::UNPATCHED_GLOBAL) && p < (UNPATCHED_NUM_SHARED)) {
 		static l10n::String const NAMES[UNPATCHED_NUM_SHARED] = {
 		    [UNPATCHED_STUTTER_RATE] = STRING_FOR_STUTTER_RATE,
-		    [UNPATCHED_COMPRESSOR_THRESHOLD] = STRING_FOR_THRESHOLD,
-		    [UNPATCHED_COMPRESSOR_RATIO] = STRING_FOR_RATIO,
-		    [UNPATCHED_COMPRESSOR_ATTACK] = STRING_FOR_ATTACK,
-		    [UNPATCHED_COMPRESSOR_RELEASE] = STRING_FOR_RELEASE,
-		    [UNPATCHED_COMPRESSOR_BLEND] = STRING_FOR_BLEND,
-		    [UNPATCHED_COMPRESSOR_INPUT_GAIN] = STRING_FOR_INPUT_GAIN,
-		    [UNPATCHED_COMPRESSOR_MAKEUP_GAIN] = STRING_FOR_MAKEUP_GAIN};
+		};
 		return l10n::get(NAMES[p]);
 	}
 
@@ -303,27 +297,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 		case UNPATCHED_STUTTER_RATE:
 			return "stutterRate";
 
-
-		case UNPATCHED_COMPRESSOR_THRESHOLD:
-			return "compressorThreshold";
-
-		case UNPATCHED_COMPRESSOR_RATIO:
-			return "compressorRatio";
-
-		case UNPATCHED_COMPRESSOR_ATTACK:
-			return "compressorAttack";
-
-		case UNPATCHED_COMPRESSOR_RELEASE:
-			return "compressorRelease";
-
-		case UNPATCHED_COMPRESSOR_BLEND:
-			return "compressorBlend";
-
-		case UNPATCHED_COMPRESSOR_INPUT_GAIN:
-			return "compressorInputGain";
-
-		case UNPATCHED_COMPRESSOR_MAKEUP_GAIN:
-			return "compressorMakeupGain";
 
 		case UNPATCHED_NUM_SHARED:
 		    // Intentionally not handled

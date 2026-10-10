@@ -88,13 +88,6 @@ void ModControllableAudio::initParams(ParamManager* paramManager) {
 
 	Stutterer::initParams(paramManager);
 
-	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_THRESHOLD].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RATIO].setCurrentValueBasicForSetup(1073741824);
-	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_ATTACK].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RELEASE].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_BLEND].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_INPUT_GAIN].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN].setCurrentValueBasicForSetup(1073741824);
 }
 
 void ModControllableAudio::processOutputVolume(StereoSample* buffer, int32_t numSamples, int32_t postFXVolume,
@@ -149,11 +142,14 @@ void ModControllableAudio::processOutputVolume(StereoSample* buffer, int32_t num
 void ModControllableAudio::writeAttributesToFile(Serializer& writer) {
 	writer.writeAttribute("lpfMode", (char*)lpfTypeToString(lpfMode));
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
-	writer.writeAttribute("hpfMode", (char*)lpfTypeToString(hpfMode));
-	writer.writeAttribute("filterRoute", (char*)filterRouteToString(filterRoute));
-	if (clippingAmount) {
-		writer.writeAttribute("clippingAmount", clippingAmount);
-	}
+}
+
+void ModControllableAudio::writeParamAttributesToFile(Serializer& writer, ParamManager* paramManager,
+                                                      bool writeAutomation, int32_t* valuesForOverride) {
+	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
+
+	unpatchedParams->writeParamAsAttribute(writer, "stutterRate", params::UNPATCHED_STUTTER_RATE, writeAutomation,
+	                                       false, valuesForOverride);
 }
 
 void ModControllableAudio::writeTagsToFile(Serializer& writer) {
@@ -175,7 +171,7 @@ void ModControllableAudio::writeTagsToFile(Serializer& writer) {
 
 				if (knob->paramDescriptor.hasSecondSource()) {
 					writer.writeAttribute("patchAmountFromSecondSource",
-					                      sourceToString(knob->paramDescriptor.getSecondSourceFromTop()));
+				                      sourceToString(knob->paramDescriptor.getSecondSourceFromTop()));
 				}
 			}
 
@@ -192,16 +188,6 @@ void ModControllableAudio::writeTagsToFile(Serializer& writer) {
 		}
 		writer.writeClosingTag("midiKnobs");
 	}
-
-	// Audio compressor (this section is all new so we write it at the end)
-	writer.writeOpeningTagBeginning("audioCompressor");
-	writer.writeAttribute("attack", compressor.getAttack());
-	writer.writeAttribute("release", compressor.getRelease());
-	writer.writeAttribute("thresh", compressor.getThreshold());
-	writer.writeAttribute("ratio", compressor.getRatio());
-	writer.writeAttribute("compHPF", compressor.getSidechain());
-	writer.writeAttribute("compBlend", compressor.getBlend());
-	writer.closeTag();
 
 	// Modular track FX chain (Milestone 2b)
 	auto* chain = getFxChain();
@@ -247,29 +233,6 @@ void ModControllableAudio::writeTagsToFile(Serializer& writer) {
 			writer.writeClosingTag("fxChain");
 		}
 	}
-}
-
-void ModControllableAudio::writeParamAttributesToFile(Serializer& writer, ParamManager* paramManager,
-                                                      bool writeAutomation, int32_t* valuesForOverride) {
-	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
-
-	unpatchedParams->writeParamAsAttribute(writer, "stutterRate", params::UNPATCHED_STUTTER_RATE, writeAutomation,
-	                                       false, valuesForOverride);
-	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
-	unpatchedParams->writeParamAsAttribute(writer, "compressorThreshold", params::UNPATCHED_COMPRESSOR_THRESHOLD,
-	                                       writeAutomation, false, valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "compressorRatio", params::UNPATCHED_COMPRESSOR_RATIO,
-	                                       writeAutomation, false, valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "compressorAttack", params::UNPATCHED_COMPRESSOR_ATTACK,
-	                                       writeAutomation, false, valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "compressorRelease", params::UNPATCHED_COMPRESSOR_RELEASE,
-	                                       writeAutomation, false, valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "compressorBlend", params::UNPATCHED_COMPRESSOR_BLEND,
-	                                       writeAutomation, false, valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "compressorInputGain", params::UNPATCHED_COMPRESSOR_INPUT_GAIN,
-	                                       writeAutomation, false, valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "compressorMakeupGain", params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN,
-	                                       writeAutomation, false, valuesForOverride);
 }
 
 void ModControllableAudio::writeParamTagsToFile(Serializer& writer, ParamManager* paramManager, bool writeAutomation,
@@ -322,66 +285,6 @@ Error ModControllableAudio::readTagFromFile(Deserializer& reader, char const* ta
 		reader.exitTag("clippingAmount");
 	}
 
-	else if (!strcmp(tagName, "audioCompressor")) {
-		UnpatchedParamSet* unpatchedParams =
-		    paramManager ? (UnpatchedParamSet*)paramManager->getUnpatchedParamSetSummary()->paramCollection : nullptr;
-		while (*(tagName = reader.readNextTagOrAttributeName())) {
-			if (!strcmp(tagName, "attack")) {
-				q31_t masterCompressorAttack = reader.readTagOrAttributeValueInt();
-				compressor.setAttack(masterCompressorAttack);
-				if (unpatchedParams) {
-					unpatchedParams->params[params::UNPATCHED_COMPRESSOR_ATTACK].setCurrentValueBasicForSetup(
-					    masterCompressorAttack);
-				}
-				reader.exitTag("attack");
-			}
-			else if (!strcmp(tagName, "release")) {
-				q31_t masterCompressorRelease = reader.readTagOrAttributeValueInt();
-				compressor.setRelease(masterCompressorRelease);
-				if (unpatchedParams) {
-					unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RELEASE].setCurrentValueBasicForSetup(
-					    masterCompressorRelease);
-				}
-				reader.exitTag("release");
-			}
-			else if (!strcmp(tagName, "thresh")) {
-				q31_t masterCompressorThresh = reader.readTagOrAttributeValueInt();
-				compressor.setThreshold(masterCompressorThresh);
-				if (unpatchedParams) {
-					unpatchedParams->params[params::UNPATCHED_COMPRESSOR_THRESHOLD].setCurrentValueBasicForSetup(
-					    masterCompressorThresh);
-				}
-				reader.exitTag("thresh");
-			}
-			else if (!strcmp(tagName, "ratio")) {
-				q31_t masterCompressorRatio = reader.readTagOrAttributeValueInt();
-				compressor.setRatio(masterCompressorRatio);
-				if (unpatchedParams) {
-					unpatchedParams->params[params::UNPATCHED_COMPRESSOR_RATIO].setCurrentValueBasicForSetup(
-					    masterCompressorRatio);
-				}
-				reader.exitTag("ratio");
-			}
-			else if (!strcmp(tagName, "compHPF")) {
-				q31_t masterCompressorSidechain = reader.readTagOrAttributeValueInt();
-				compressor.setSidechain(masterCompressorSidechain);
-				reader.exitTag("compHPF");
-			}
-			else if (!strcmp(tagName, "compBlend")) {
-				q31_t masterCompressorBlend = reader.readTagOrAttributeValueInt();
-				compressor.setBlend(masterCompressorBlend);
-				if (unpatchedParams) {
-					unpatchedParams->params[params::UNPATCHED_COMPRESSOR_BLEND].setCurrentValueBasicForSetup(
-					    masterCompressorBlend);
-				}
-				reader.exitTag("compBlend");
-			}
-			else {
-				reader.exitTag(tagName);
-			}
-		}
-		reader.exitTag("AudioCompressor");
-	}
 	// this is actually the sidechain but pre c1.1 songs save it as compressor
 	else if (!strcmp(tagName, "midiKnobs")) {
 
