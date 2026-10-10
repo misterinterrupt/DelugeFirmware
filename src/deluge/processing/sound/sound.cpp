@@ -3031,7 +3031,7 @@ Error Sound::readSourceFromFile(Deserializer& reader, int32_t s, ParamManagerFor
 		else if (!strcmp(tagName, "oscillatorSync")) {
 			int32_t value = reader.readTagOrAttributeValueInt();
 			// Pre-sync-mode files wrote 1 for "on", which is exactly OscSyncMode::HARD
-			oscSyncMode = static_cast<OscSyncMode>(std::clamp(value, 0, 3));
+			oscSyncMode = static_cast<OscSyncMode>(std::clamp<int32_t>(value, 0, 3));
 			reader.exitTag("oscillatorSync");
 		}
 		else if (!strcmp(tagName, "reversed")) {
