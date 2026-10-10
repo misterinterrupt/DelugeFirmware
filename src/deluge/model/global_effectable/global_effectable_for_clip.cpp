@@ -141,8 +141,46 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 		compressor.reset();
 	}
 
+	// Same FX shutdown policy as the synth path, on the chain's own output:
+	// VOICE mode processes only while the clip produced audio this block;
+	// the RMS gate holds while the output stays above the threshold (200 ms
+	// settle); ALWAYS runs every block. Unlike the synth, these clips render
+	// their chain unconditionally by construction — the gate is what stops
+	// that from costing CPU forever after content ends.
 	if (fxChain.isActive()) {
-		fxChain.process(globalEffectableBuffer, numSamples);
+		bool chainOn;
+		if (fxChain.fxRmsCutoffDb <= -96.0f) {
+			chainOn = true;
+		}
+		else if (fxChain.fxRmsCutoffDb > 0.0f) {
+			chainOn = renderedLastTime;
+		}
+		else {
+			constexpr uint32_t kRmsHoldSamples = 44100 / 5;
+			if (fxChain.rmsGateOpen(0)) {
+				fxChain.belowThresholdSince = 0;
+				chainOn = true;
+			}
+			else if (!fxChain.belowThresholdSince) {
+				fxChain.belowThresholdSince = AudioEngine::audioSampleTimer;
+				chainOn = true;
+			}
+			else {
+				chainOn = (AudioEngine::audioSampleTimer - fxChain.belowThresholdSince) < kRmsHoldSamples;
+			}
+		}
+		if (chainOn) {
+			fxChain.process(globalEffectableBuffer, numSamples);
+
+			float peak = 0.0f;
+			for (int32_t i = 0; i < numSamples; i++) {
+				float l = std::fabs((float)std::abs(globalEffectableBuffer[i].l)) / 2147483648.0f;
+				float r = std::fabs((float)std::abs(globalEffectableBuffer[i].r)) / 2147483648.0f;
+				if (l > peak) peak = l;
+				if (r > peak) peak = r;
+			}
+			fxChain.noteBlockPeak(peak);
+		}
 	}
 
 	addAudio(globalEffectableBuffer, outputBuffer, numSamples);
