@@ -15,22 +15,22 @@ namespace deluge::gui::menu_item::fx {
 class FxCutoff final : public Integer {
 public:
 	using Integer::Integer;
+	// Item value 0 means VOICE (stored as +6 dB — anything above 0 behaves the
+	// same, and storing 0.0f would accidentally arm the 0 dB gate); -1..-96 map
+	// straight through. One detent down from VOICE is visibly -1DB.
 	void readCurrentValue() override {
 		auto* chain = fx_bloc::getCurrentFxChain();
-		if (chain == nullptr) {
-			this->setValue(6);
-			return;
-		}
-		this->setValue(static_cast<int32_t>(std::lround(chain->fxRmsCutoffDb)));
+		float db = (chain != nullptr) ? chain->fxRmsCutoffDb : 6.0f;
+		this->setValue(db > 0.0f ? 0 : static_cast<int32_t>(std::lround(db)));
 	}
 	void writeCurrentValue() override {
 		auto* chain = fx_bloc::getCurrentFxChain();
 		if (chain != nullptr) {
-			chain->fxRmsCutoffDb = static_cast<float>(this->getValue());
+			chain->fxRmsCutoffDb = (this->getValue() > 0) ? 6.0f : static_cast<float>(this->getValue());
 		}
 	}
 	[[nodiscard]] int32_t getMinValue() const override { return -96; }
-	[[nodiscard]] int32_t getMaxValue() const override { return 6; }
+	[[nodiscard]] int32_t getMaxValue() const override { return 0; }
 	void formatValueForVisualMenu(char* outBuffer, size_t bufferSize) override {
 		int32_t v = this->getValue();
 		if (v >= 0) {
