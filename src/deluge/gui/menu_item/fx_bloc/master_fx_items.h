@@ -353,6 +353,13 @@ public:
 		snprintf(outBuffer, bufferSize, "%s", num);
 	}
 
+	// For the modulation UI (shift+grid): which slot and param this item edits.
+	[[nodiscard]] int32_t slotIndex() const { return slot_; }
+	[[nodiscard]] int32_t currentParamId() const { return def().param != dsp::FxBloc::Param::None
+		                                                   ? util::to_underlying(def().param)
+		                                                   : -1; }
+	[[nodiscard]] bool paramIsInt() const { return def().isInt; }
+
 private:
 	[[nodiscard]] dsp::FxBloc::ParamDef def() const {
 		auto* chain = getCurrentFxChain();

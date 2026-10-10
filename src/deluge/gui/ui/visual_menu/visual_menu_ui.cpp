@@ -16,6 +16,8 @@
  */
 
 #include "visual_menu_ui.h"
+#include "printf.h"
+#include "gui/menu_item/fx_bloc/master_fx_items.h"
 #include "gui/ui/sound_editor.h"
 #include "gui/ui/visual_menu/visual_menu_renderer.h"
 #include "hid/buttons.h"
@@ -150,6 +152,67 @@ ActionResult VisualMenuUI::padAction(int32_t x, int32_t y, int32_t velocity) {
 	// button won't edit" freeze.
 	if (velocity == 0) {
 		return getRootUI()->padAction(x, y, velocity);
+	}
+
+	// Shift + grid pad while a slot param is selected in the FX BLOCS pages:
+	// connect that pad's modulator source to the selected param (the approved
+	// modulation gesture). Repeats cycle depth 25% -> 50% -> 100% -> remove.
+	if (Buttons::isShiftButtonPressed() && selectedSlot_ >= 0
+	    && currentCategoryIndex_ < static_cast<int32_t>(categories_.size())) {
+		const auto& page = categories_[currentCategoryIndex_].pages[currentPageIndex_];
+		if (selectedSlot_ < static_cast<int32_t>(page.slots.size())) {
+			const auto& slot = page.slots[selectedSlot_];
+			auto* paramItem = static_cast<deluge::gui::menu_item::fx_bloc::MasterSlotParam*>(slot.item);
+			if (paramItem != nullptr) {
+				int32_t paramId = paramItem->currentParamId();
+				if (paramId > 0 && !paramItem->paramIsInt()) {
+					// Grid pad maps to a patch source the same way the patching
+					// shortcuts do (soundEditor's modSourceShortcuts grid).
+					if (x >= 14 && x < 16 && y >= 0 && y < kDisplayHeight) {
+						PatchSource source = modSourceShortcuts[x - 14][y];
+						if (source < kLastPatchSource) {
+						auto* chain = deluge::gui::menu_item::fx_bloc::getCurrentFxChain();
+						if (chain != nullptr) {
+							auto& bloc = chain->slot(paramItem->slotIndex());
+							constexpr q31_t kDepths[] = {536870912, 1073741824, 2147483647}; // 25/50/100%
+							bool wasConnected = false;
+							q31_t currentDepth = 0;
+							for (const auto& c : bloc.modConnections) {
+								if (c.inUse && c.param == paramId && c.source == util::to_underlying(source)) {
+									wasConnected = true;
+									currentDepth = c.depth;
+									break;
+								}
+							}
+							char readout[24];
+							if (!wasConnected) {
+								bloc.setModConnection(static_cast<dsp::FxBloc::Param>(paramId),
+								                      util::to_underlying(source), kDepths[0]);
+								snprintf_(readout, sizeof(readout), "MOD %d%%", 25);
+							}
+							else if (currentDepth < kDepths[1]) {
+								bloc.setModConnection(static_cast<dsp::FxBloc::Param>(paramId),
+								                      util::to_underlying(source), kDepths[1]);
+								snprintf_(readout, sizeof(readout), "MOD %d%%", 50);
+							}
+							else if (currentDepth < kDepths[2]) {
+								bloc.setModConnection(static_cast<dsp::FxBloc::Param>(paramId),
+								                      util::to_underlying(source), kDepths[2]);
+								snprintf_(readout, sizeof(readout), "MOD %d%%", 100);
+							}
+							else {
+								bloc.clearModConnection(static_cast<dsp::FxBloc::Param>(paramId),
+								                        util::to_underlying(source));
+								snprintf_(readout, sizeof(readout), "MOD OFF");
+							}
+							display->displayPopup(readout);
+							return ActionResult::DEALT_WITH;
+						}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	if (currentUIMode == UI_MODE_NONE || currentUIMode == UI_MODE_AUDITIONING) {

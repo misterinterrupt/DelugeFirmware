@@ -18,6 +18,10 @@
 #pragma once
 
 #include "definitions_cxx.hpp"
+
+extern PatchSource modSourceShortcuts[2][8];
+
+#include "definitions_cxx.hpp"
 #include "gui/menu_item/menu_item.h"
 #include "gui/ui/ui.h"
 #include "hid/button.h"

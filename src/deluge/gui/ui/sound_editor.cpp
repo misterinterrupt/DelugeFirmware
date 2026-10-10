@@ -67,6 +67,7 @@ using namespace deluge::gui::menu_item;
 #define comingSoonMenu (MenuItem*)0xFFFFFFFF
 
 // 255 means none. 254 means soon
+extern PatchSource modSourceShortcuts[2][8];
 PatchSource modSourceShortcuts[2][8] = {
     {
         PatchSource::NOT_AVAILABLE,
