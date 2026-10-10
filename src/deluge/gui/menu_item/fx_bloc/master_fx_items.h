@@ -51,14 +51,18 @@ public:
 	    dsp::FxBloc::Model::KDFX_SHPR_REV, dsp::FxBloc::Model::KDFX_RESFILT,
 	    dsp::FxBloc::Model::KDFX_ENVFILT, dsp::FxBloc::Model::KDFX_LFOFILT,
 	    dsp::FxBloc::Model::KDFX_RINGMOD, dsp::FxBloc::Model::KDFX_QUANT,
-	    dsp::FxBloc::Model::KDFX_QNT_FLG, dsp::FxBloc::Model::COMPRESSOR,
+	    dsp::FxBloc::Model::KDFX_QNT_FLG, dsp::FxBloc::Model::KDFX_SPEC4,
+	    dsp::FxBloc::Model::KDFX_CHO_4TAP, dsp::FxBloc::Model::KDFX_CHO_X_4TAP,
+	    dsp::FxBloc::Model::KDFX_FLG_4TAP, dsp::FxBloc::Model::KDFX_FLG_X_4TAP,
+	    dsp::FxBloc::Model::COMPRESSOR,
 	    dsp::FxBloc::Model::GLOBAL_SEND,
 	};
 	static constexpr const char* kNames[] = {
 	    "EMPTY",  "FREEVERB", "MUTABLE",     "KDFX REV",   "KDFX DLY",  "KDFX CHO", "KDFX TONE",
 	    "KDFX FLANGER", "KDFX PHASER", "KDFX TREMOLO", "KDFX PAN", "KDFX DIST", "KDFX TUBEAMP",
 	    "KDFX LASER", "CHO+DLY", "CHO+REV", "FLG+DLY", "FLG+REV", "FLG+LASER", "TONE+REV",
-	    "RESFILT", "ENVFILT", "LFOFILT", "RINGMOD", "QUANT", "QNT+FLG", "COMPRESSOR", "MST SEND",
+	    "RESFILT", "ENVFILT", "LFOFILT", "RINGMOD", "QUANT", "QNT+FLG", "SPEC 4-TAP",
+	    "CHO+4TAP", "CHO<>4TAP", "FLG+4TAP", "FLG<>4TAP", "COMPRESSOR", "MST SEND",
 	};
 
 	// The names and models are a hand-maintained parallel pair — when they last

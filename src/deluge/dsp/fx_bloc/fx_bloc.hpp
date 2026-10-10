@@ -34,6 +34,7 @@
 #include "dsp/reverb/kdfx/phaser.hpp"
 #include "dsp/reverb/kdfx/ringmod.hpp"
 #include "dsp/reverb/kdfx/quantize.hpp"
+#include "dsp/reverb/kdfx/spectral4.hpp"
 #include "dsp/reverb/kdfx/reverb.hpp"
 #include "dsp/reverb/kdfx/tone.hpp"
 #include "dsp/reverb/kdfx/tremolo.hpp"
@@ -83,6 +84,11 @@ public:
 		KDFX_RINGMOD,
 		KDFX_QUANT,
 		KDFX_QNT_FLG,
+		KDFX_SPEC4,
+		KDFX_CHO_4TAP,
+		KDFX_CHO_X_4TAP,
+		KDFX_FLG_4TAP,
+		KDFX_FLG_X_4TAP,
 		GLOBAL_SEND,
 	};
 
@@ -947,6 +953,21 @@ private:
 		case Model::KDFX_QNT_FLG:
 			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::QUANT, reverb::PairEngine::Kind::FLANGER, false>);
 			break;
+		case Model::KDFX_SPEC4:
+			size = sizeof(reverb::KdfxSpectral4Tap);
+			break;
+		case Model::KDFX_CHO_4TAP:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::CHORUS, reverb::PairEngine::Kind::DELAY, true>);
+			break;
+		case Model::KDFX_CHO_X_4TAP:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::CHORUS, reverb::PairEngine::Kind::DELAY, true>);
+			break;
+		case Model::KDFX_FLG_4TAP:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::DELAY, false>);
+			break;
+		case Model::KDFX_FLG_X_4TAP:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::DELAY, false>);
+			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
 			break;
@@ -1008,6 +1029,16 @@ private:
 			return new (memory) reverb::KdfxQuantize();
 		case Model::KDFX_QNT_FLG:
 			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::QUANT, reverb::PairEngine::Kind::FLANGER, false>();
+		case Model::KDFX_SPEC4:
+			return new (memory) reverb::KdfxSpectral4Tap();
+		case Model::KDFX_CHO_4TAP:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::CHORUS, reverb::PairEngine::Kind::DELAY, true>();
+		case Model::KDFX_CHO_X_4TAP:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::CHORUS, reverb::PairEngine::Kind::DELAY, true>();
+		case Model::KDFX_FLG_4TAP:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::DELAY, false>();
+		case Model::KDFX_FLG_X_4TAP:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::DELAY, false>();
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:
@@ -1347,6 +1378,30 @@ constexpr FxBloc::ParamDef kDefsCompressor[9] = {
 };
 /// Track-side send into the master chain: BUS picks which master slot's bus the
 /// signal feeds; PAN/IN-GN/LEVEL shape it on the way out of the track.
+/// Spectral 4-Tap (135): LOOP time, FDBK, IMAGE, feedback HPF/TONE, then the
+/// per-tap controls: comb pitch (C-1..C8 as note numbers), PtAmt, Shapr, and
+/// the tap time fractions. IN-GN leads per house style.
+constexpr FxBloc::ParamDef kDefsKdfxSpectral4[18] = {
+    FxBloc::INGAIN_DEF(),
+    {FxBloc::Param::RoomSize, "LOOP", false, 0, 1, nullptr, "MS", 1.f, 1480.f, 0, false},
+    {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+    FxBloc::bipolarPct(FxBloc::Param::Diffusion, "IMAGE", 100.f),
+    FxBloc::LEVEL_DEF(),
+    {FxBloc::Param::HPF, "HPF", false, 0, 1, nullptr, "HZ", 20.f, 1000.f, 0, false},
+    {FxBloc::Param::Damping, "TONE", false, 0, 1, nullptr, "HZ", 351.f, 7019.f, 0, false},
+    {FxBloc::Param::BassGain, "P1", false, 0, 1, nullptr, "NOTE", 0.f, 108.f, 0, false},
+    {FxBloc::Param::BassFreq, "P2", false, 0, 1, nullptr, "NOTE", 0.f, 108.f, 0, false},
+    {FxBloc::Param::MidGain, "P3", false, 0, 1, nullptr, "NOTE", 0.f, 108.f, 0, false},
+    {FxBloc::Param::MidFreq, "P4", false, 0, 1, nullptr, "NOTE", 0.f, 108.f, 0, false},
+    {FxBloc::Param::TrebleGain, "A1", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+    {FxBloc::Param::TrebleFreq, "A2", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+    {FxBloc::Param::AirShelf, "A3", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+    {FxBloc::Param::DelayTimeR, "A4", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
+    {FxBloc::Param::DelayDrive, "S1", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
+    {FxBloc::Param::PreDelay, "T2", false, 0, 1, nullptr, "%", 2.f, 100.f, 0, false},
+    {FxBloc::Param::ERLevel, "T3", false, 0, 1, nullptr, "%", 2.f, 100.f, 0, false},
+};
+
 constexpr FxBloc::ParamDef kDefsGlobalSend[5] = {
     FxBloc::INGAIN_DEF(),
     {FxBloc::Param::SendBus, "BUS", true, 0, 2, FxBloc::kBusOptions()},
@@ -1416,6 +1471,11 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_RINGMOD: return kDefsKdfxRingMod;
 	case Model::KDFX_QUANT: return kDefsKdfxQuant;
 	case Model::KDFX_QNT_FLG: return kDefsKdfxQntFlg;
+	case Model::KDFX_SPEC4: return kDefsKdfxSpectral4;
+	case Model::KDFX_CHO_4TAP:
+	case Model::KDFX_CHO_X_4TAP:
+	case Model::KDFX_FLG_4TAP:
+	case Model::KDFX_FLG_X_4TAP: return kDefsKdfxChoDly;
 	case Model::GLOBAL_SEND: return kDefsGlobalSend;
 	case Model::EMPTY:
 	default: return kDefsEmpty;
