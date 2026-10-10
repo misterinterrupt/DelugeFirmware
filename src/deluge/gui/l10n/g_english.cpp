@@ -544,6 +544,7 @@ PLACE_SDRAM_DATA Language english{
         {STRING_FOR_REVERB, "REVERB"},
         {STRING_FOR_VOLUME_DUCKING, "Volume ducking"},
         {STRING_FOR_SIDECHAIN, "Sidechain"},
+        {STRING_FOR_FX_ENVELOPE, "FX within envelope"},
         {STRING_FOR_THRESHOLD, "Threshold"},
         {STRING_FOR_INPUT_GAIN, "Input Gain"},
         {STRING_FOR_MAKEUP_GAIN, "Makeup Gain"},
