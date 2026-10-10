@@ -89,6 +89,8 @@ public:
 		KDFX_CHO_X_4TAP,
 		KDFX_FLG_4TAP,
 		KDFX_FLG_X_4TAP,
+		KDFX_REV_COMP,
+		KDFX_TUB_FLANG,
 		GLOBAL_SEND,
 	};
 
@@ -968,6 +970,12 @@ private:
 		case Model::KDFX_FLG_X_4TAP:
 			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::DELAY, false>);
 			break;
+		case Model::KDFX_REV_COMP:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::REVERB, reverb::PairEngine::Kind::COMPRESSOR, true>);
+			break;
+		case Model::KDFX_TUB_FLANG:
+			size = sizeof(reverb::KdfxPair<reverb::PairEngine::Kind::TUBEAMP, reverb::PairEngine::Kind::FLANGER, false>);
+			break;
 		case Model::MUTABLE:
 			size = sizeof(reverb::Mutable);
 			break;
@@ -1039,6 +1047,10 @@ private:
 			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::DELAY, false>();
 		case Model::KDFX_FLG_X_4TAP:
 			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::FLANGER, reverb::PairEngine::Kind::DELAY, false>();
+		case Model::KDFX_REV_COMP:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::REVERB, reverb::PairEngine::Kind::COMPRESSOR, true>();
+		case Model::KDFX_TUB_FLANG:
+			return new (memory) reverb::KdfxPair<reverb::PairEngine::Kind::TUBEAMP, reverb::PairEngine::Kind::FLANGER, false>();
 		case Model::MUTABLE:
 			return new (memory) reverb::Mutable();
 		case Model::FREEVERB:
@@ -1480,6 +1492,8 @@ constexpr std::span<const FxBloc::ParamDef> FxBloc::paramDefs(FxBloc::Model m) {
 	case Model::KDFX_CHO_X_4TAP:
 	case Model::KDFX_FLG_4TAP:
 	case Model::KDFX_FLG_X_4TAP: return kDefsKdfxChoDly;
+	case Model::KDFX_REV_COMP:
+	case Model::KDFX_TUB_FLANG: return kDefsKdfxShprRev;
 	case Model::GLOBAL_SEND: return kDefsGlobalSend;
 	case Model::EMPTY:
 	default: return kDefsEmpty;
