@@ -96,17 +96,18 @@ inline bool init() {
 		}
 		uintptr_t start = free_[i].start;
 		size_t blockSize = free_[i].size;
+		size_t* header = (size_t*)start;
 		if (blockSize - need < kHeaderSize + kAlignment) {
 			// Too small to split — hand out the whole block
 			free_[i] = free_[numFree_ - 1];
 			numFree_--;
+			*header = blockSize;
 		}
 		else {
 			free_[i].start += need;
 			free_[i].size -= need;
+			*header = need;
 		}
-		size_t* header = (size_t*)start;
-		*header = blockSize;
 		return (void*)(start + kHeaderSize);
 	}
 	return nullptr;

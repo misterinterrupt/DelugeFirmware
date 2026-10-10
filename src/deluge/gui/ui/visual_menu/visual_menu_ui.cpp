@@ -225,27 +225,46 @@ bool VisualMenuUI::setupEditContext(Clip* clip, const MenuItem* item) {
 	currentClip_ = clip;
 	contextIsClipMinder_ = rootUIIsClipMinderScreen();
 
+	InstrumentClip* asInstClip = nullptr;
+	if (contextIsClipMinder_ && clip && clip->type == ClipType::INSTRUMENT) {
+		asInstClip = static_cast<InstrumentClip*>(clip);
+	}
+
+	// Kits must bind like the classic menu does: affect-entire ON edits the KIT
+	// (not the last-selected drum row) — the user pressed select-all precisely to
+	// reach the whole kit's chain. Without this, the FX pages silently edited one
+	// drum while the user believed they were editing the kit.
+	bool kitAffectEntire = asInstClip != nullptr && asInstClip->output != nullptr
+	                       && asInstClip->output->type == OutputType::KIT && asInstClip->affectEntire;
+
 	// A kit clip with no (sound) drum row selected cannot resolve a per-drum editing context; fall back to
 	// the kit's affect-entire (global FX) context instead of silently failing.
 	bool kitGlobalFX = false;
+	if (kitAffectEntire) {
+		soundEditor.setupKitGlobalFXMenu = true;
+	}
 	if (!soundEditor.setup(clip, item)) {
-		InstrumentClip* kitClip = nullptr;
-		if (rootUIIsClipMinderScreen() && clip && clip->type == ClipType::INSTRUMENT) {
-			kitClip = static_cast<InstrumentClip*>(clip);
-		}
-		if (kitClip && kitClip->output && kitClip->output->type == OutputType::KIT) {
+		if (asInstClip != nullptr && asInstClip->output != nullptr
+		    && asInstClip->output->type == OutputType::KIT) {
 			soundEditor.setupKitGlobalFXMenu = true;
 			if (!soundEditor.setup(clip, item)) {
 				soundEditor.setupKitGlobalFXMenu = false;
+				// Don't let this stay silent — the kit visual menu silently failing to
+				// open was reported as "the kit fx don't work".
+				display->displayPopup("KIT MENU FAIL");
 				return false;
 			}
 			kitGlobalFX = true;
-			soundEditor.setupKitGlobalFXMenu = false; // don't let the flag poison later setups
 		}
 		else {
+			soundEditor.setupKitGlobalFXMenu = false;
 			return false;
 		}
 	}
+	else if (kitAffectEntire) {
+		kitGlobalFX = true; // bound to the kit via the flag
+	}
+	soundEditor.setupKitGlobalFXMenu = false; // don't let the flag poison later setups
 
 	if (!rootUIIsClipMinderScreen() || clip == nullptr) {
 		categories_ = getGlobalFxCategories();
