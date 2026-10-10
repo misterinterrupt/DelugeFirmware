@@ -86,8 +86,11 @@ void Freeverb::mute() {
 void Freeverb::update() {
 	// Recalculate internal values after parameter change
 
-	wet1 = wet * (width / 2 + 0.5f);
-	wet2 = (((float)1 - width) / 2) / (width / 2 + 0.5f) * std::numeric_limits<int32_t>::max();
+	// Stock freeverb: wet1 (direct) wanes and wet2 (crossfeed) waxes as width
+	// narrows, both scaled by the wet level — their sum stays constant-power,
+	// so the width knob changes image, never gain.
+	wet1 = static_cast<int32_t>(wet * (width / 2 + 0.5f) * std::numeric_limits<int32_t>::max());
+	wet2 = static_cast<int32_t>(wet * ((1.0f - width) / 2) * std::numeric_limits<int32_t>::max());
 
 	gain = fixedgain * std::numeric_limits<int32_t>::max();
 

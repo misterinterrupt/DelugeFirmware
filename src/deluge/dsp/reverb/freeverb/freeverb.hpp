@@ -86,9 +86,16 @@ public:
 			out_r = allpassR[i].process(out_r);
 		}
 
-		// Calculate output
-		out_l = (out_l + multiply_32x32_rshift32_rounded(out_r, wet2)) << 1;
-		out_r = (out_r + multiply_32x32_rshift32_rounded(out_l, wet2)) << 1;
+		// Stock freeverb constant-power width: crossfeed from the ORIGINAL
+		// values (the previous sequential cascade re-used the already-updated
+		// out_l inside out_r, doubling the crossfeed and swinging the effective
+		// gain with the width knob — "width turned up = runaway" symptom).
+		int32_t const src_l = out_l;
+		int32_t const src_r = out_r;
+		out_l = multiply_32x32_rshift32_rounded(src_l, wet1)
+		        + multiply_32x32_rshift32_rounded(src_r, wet2);
+		out_r = multiply_32x32_rshift32_rounded(src_r, wet1)
+		        + multiply_32x32_rshift32_rounded(src_l, wet2);
 
 		// Mix output
 		output_sample.l += multiply_32x32_rshift32_rounded(out_l, this->getPanLeft());
@@ -115,7 +122,7 @@ private:
 	float roomsize;
 	float damp;
 	float wet;
-	float wet1;
+	int32_t wet1;
 	int32_t wet2;
 	float dry;
 	float width;

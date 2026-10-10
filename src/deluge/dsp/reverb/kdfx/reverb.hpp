@@ -95,8 +95,16 @@ public:
 
 			// 7. Stereo output taps
 			auto safeTapOffset = [&](uint32_t l, uint32_t spread) -> size_t {
+				// spread 5..8 is a Q6 fraction of the line (0.078..0.125 len);
+				// tapSpread_ (Q6, 1.0x..4.0x) widens it. The old form folded the
+				// multiplier into the pre-shift product, overshooting 32-256x
+				// so every tap clamped to len-1 — width did nothing.
 				size_t len = lineLen_[l];
-				size_t off = (len >> 1) + ((len * spread * tapSpread_) >> 6);
+				size_t base = (len * spread) >> 6;
+				if (base >= (len >> 1)) {
+					base = (len >> 1) - 1; // keep the widened spread inside the line
+				}
+				size_t off = (len >> 1) + (base * (tapSpread_ >> 6));
 				if (off >= len) {
 					off = len - 1;
 				}
