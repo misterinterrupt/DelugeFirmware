@@ -261,8 +261,9 @@ public:
 		return std::clamp(t, 0.0f, 1.0f);
 	}
 
-	/// Per-model menu/persistence table, variable length. Index 3 is always LEVEL;
-	/// the menu lays params out 4 per page, as many pages as the table needs.
+	/// Per-model menu/persistence table, variable length. IN-GN leads every
+	/// table (user directive); the menu lays params out 4 per page, as many
+	/// pages as the table needs.
 	static constexpr size_t kMaxSlotParams = 16; // menu item pool per slot
 
 	// Display option strings for the int params, and the LEVEL / INGAIN column definitions.
@@ -319,8 +320,9 @@ public:
 		return {p, label, false, 0, 1, nullptr, "S", minS, maxS, 1, false, 5, 1.5f};
 	}
 
-	/// Per-model menu/persistence table, variable length. Index 3 is always LEVEL;
-	/// the menu lays params out 4 per page, as many pages as the table needs.
+	/// Per-model menu/persistence table, variable length. IN-GN leads every
+	/// table (user directive); the menu lays params out 4 per page, as many
+	/// pages as the table needs.
 	/// Defined at file scope below (in-class static arrays can't invoke the
 	/// ParamDef constructor's default arguments inside the class body).
 	static constexpr std::span<const ParamDef> paramDefs(Model m);
@@ -970,40 +972,40 @@ private:
 
 // ---- Per-model param tables, file scope (see the in-class declaration for why) ----
 
-constexpr FxBloc::ParamDef kDefsFreeverb[5] = {
+constexpr FxBloc::ParamDef kDefsFreeverb[6] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::pct(FxBloc::Param::RoomSize, "SIZE"),
     FxBloc::pct(FxBloc::Param::Damping, "DAMP"),
     FxBloc::pct(FxBloc::Param::Width, "WIDTH"),
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
 };
-constexpr FxBloc::ParamDef kDefsMutable[6] = {
+constexpr FxBloc::ParamDef kDefsMutable[7] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::pct(FxBloc::Param::RoomSize, "SIZE"),
     FxBloc::pct(FxBloc::Param::Damping, "DAMP"),
     FxBloc::pct(FxBloc::Param::Width, "WIDTH"),
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     FxBloc::hz(FxBloc::Param::HPF, "HPF", 20.f, 1000.f, 0),
 };
-constexpr FxBloc::ParamDef kDefsKdfxReverb[10] = {
+constexpr FxBloc::ParamDef kDefsKdfxReverb[12] = {
+    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::RoomSize, "SIZE", false, 0, 1, nullptr, "M", 3.f, 48.f, 0, false}, // tank scale 1x-3.7x
     FxBloc::rt60(FxBloc::Param::Decay, "DCAY", 0.6f, 999.f),
     FxBloc::hz(FxBloc::Param::Damping, "DAMP", 351.f, 7019.f, 0), // one-pole cutoff, coeff 0.05-1.0
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     FxBloc::pct(FxBloc::Param::Width, "WIDTH"),
     FxBloc::ms(FxBloc::Param::PreDelay, "PREDL", 0.f, 300.f, 0),
     FxBloc::pct(FxBloc::Param::ERLevel, "ER"),
     {FxBloc::Param::BassDecay, "BASS", false, 0, 1, nullptr, "X", 0.2f, 2.5f, 2, false},
     FxBloc::pct(FxBloc::Param::AirShelf, "AIR"),
 };
-constexpr FxBloc::ParamDef kDefsKdfxDelay[11] = {
+constexpr FxBloc::ParamDef kDefsKdfxDelay[12] = {
+    FxBloc::INGAIN_DEF(),
     // Both delay lines and the feedback lead — they are the primary controls.
     FxBloc::ms(FxBloc::Param::RoomSize, "TIM L", 1.f, 1480.f, 0),
     FxBloc::ms(FxBloc::Param::DelayTimeR, "TIM R", 1.f, 1480.f, 0),
     {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     FxBloc::hz(FxBloc::Param::Damping, "TONE", 351.f, 7019.f, 0),
     FxBloc::pct(FxBloc::Param::Diffusion, "XFEED"),
     FxBloc::db(FxBloc::Param::DelayDrive, "DRV", 0.f, 18.f),
@@ -1011,24 +1013,24 @@ constexpr FxBloc::ParamDef kDefsKdfxDelay[11] = {
     FxBloc::pct(FxBloc::Param::Width, "WIDTH"),
     {FxBloc::Param::DelayPhase, "PHASE", true, 0, 1, FxBloc::kPhaseOptions()},
 };
-constexpr FxBloc::ParamDef kDefsKdfxChorus[10] = {
+constexpr FxBloc::ParamDef kDefsKdfxChorus[11] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::hz(FxBloc::Param::RoomSize, "RATE", 0.05f, 15.f),
     FxBloc::ms(FxBloc::Param::Decay, "DEPTH", 0.f, 10.f),
     FxBloc::bipolarPct(FxBloc::Param::Damping, "FDBK", 95.f),
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     FxBloc::ms(FxBloc::Param::BaseDelay, "BASE", 0.1f, 40.f),
     {FxBloc::Param::ChorusVoices, "VOICE", true, 2, 6},
     {FxBloc::Param::ChorusWaveform, "WAVE", true, 0, 2, FxBloc::kWaveformOptions()},
     {FxBloc::Param::Diffusion, "SPRD", false, 0, 1, nullptr, "DEG", 0.f, 180.f, 0, false},
     FxBloc::hz(FxBloc::Param::HPF, "HPF", 20.f, 1000.f, 0),
 };
-constexpr FxBloc::ParamDef kDefsKdfxTone[11] = {
+constexpr FxBloc::ParamDef kDefsKdfxTone[12] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     FxBloc::db(FxBloc::Param::BassGain, "BASS", -15.f, 15.f, true),
     FxBloc::db(FxBloc::Param::MidGain, "MID", -15.f, 15.f, true),
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::ShaperMode, "SHPR", true, 0, 3, FxBloc::kShaperOptions()},
     FxBloc::hz(FxBloc::Param::BassFreq, "BFREQ", 30.f, 400.f, 0),
     FxBloc::db(FxBloc::Param::TrebleGain, "TRBL", -15.f, 15.f, true),
@@ -1036,43 +1038,43 @@ constexpr FxBloc::ParamDef kDefsKdfxTone[11] = {
     FxBloc::hz(FxBloc::Param::MidFreq, "MFREQ", 200.f, 8000.f, 0),
     FxBloc::hz(FxBloc::Param::TrebleFreq, "TFREQ", 1000.f, 16000.f, 0),
 };
-constexpr FxBloc::ParamDef kDefsKdfxFlanger[8] = {
+constexpr FxBloc::ParamDef kDefsKdfxFlanger[9] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::hz(FxBloc::Param::RoomSize, "RATE", 0.05f, 8.f),
     FxBloc::ms(FxBloc::Param::Decay, "DEPTH", 0.f, 3.f, 2),
     FxBloc::bipolarPct(FxBloc::Param::Damping, "FDBK", 95.f),
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     FxBloc::ms(FxBloc::Param::BaseDelay, "BASE", 0.1f, 7.f),
     {FxBloc::Param::Diffusion, "SPRD", false, 0, 1, nullptr, "DEG", 0.f, 180.f, 0, false},
     FxBloc::hz(FxBloc::Param::HPF, "HPF", 20.f, 1000.f, 0),
 };
-constexpr FxBloc::ParamDef kDefsKdfxPhaser[7] = {
+constexpr FxBloc::ParamDef kDefsKdfxPhaser[8] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::hz(FxBloc::Param::RoomSize, "RATE", 0.05f, 8.f),
     FxBloc::pct(FxBloc::Param::Decay, "DEPTH"),
     {FxBloc::Param::Damping, "FDBK", false, 0, 1, nullptr, "%", 0.f, 70.f, 0, false},
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::Diffusion, "SPRD", false, 0, 1, nullptr, "DEG", 0.f, 180.f, 0, false},
     FxBloc::hz(FxBloc::Param::HPF, "HPF", 20.f, 1000.f, 0),
 };
-constexpr FxBloc::ParamDef kDefsKdfxTremolo[4] = {
+constexpr FxBloc::ParamDef kDefsKdfxTremolo[5] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::hz(FxBloc::Param::RoomSize, "RATE", 0.10f, 16.f),
     FxBloc::pct(FxBloc::Param::Decay, "DEPTH"),
-    FxBloc::INGAIN_DEF(),
     FxBloc::LEVEL_DEF(),
 };
-constexpr FxBloc::ParamDef kDefsKdfxAutoPan[4] = {
+constexpr FxBloc::ParamDef kDefsKdfxAutoPan[5] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::hz(FxBloc::Param::RoomSize, "RATE", 0.05f, 10.f),
     FxBloc::pct(FxBloc::Param::Decay, "WIDTH"),
-    FxBloc::INGAIN_DEF(),
     FxBloc::LEVEL_DEF(),
 };
 constexpr FxBloc::ParamDef kDefsKdfxTubeAmp[12] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
     FxBloc::hz(FxBloc::Param::LoCut, "LOCUT", 20.f, 300.f, 0),
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     FxBloc::pct(FxBloc::Param::CabSim, "CAB"),
     FxBloc::hz(FxBloc::Param::HiCut, "HCUT", 1000.f, 16000.f, 0),
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 5.f),
@@ -1080,7 +1082,8 @@ constexpr FxBloc::ParamDef kDefsKdfxTubeAmp[12] = {
     FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 10.f),
     {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
 };
-constexpr FxBloc::ParamDef kDefsKdfxLaser[8] = {
+constexpr FxBloc::ParamDef kDefsKdfxLaser[9] = {
+    FxBloc::INGAIN_DEF(),
     // TIME leads (overall delay length = duration); SPAC sets the buzz start pitch
     // / descent, CONT the shape (0=delay, 34%=reverse), FDBK extends (100% sustains).
     FxBloc::ms(FxBloc::Param::RoomSize, "TIME", 0.f, 2000.f, 0),
@@ -1092,10 +1095,10 @@ constexpr FxBloc::ParamDef kDefsKdfxLaser[8] = {
 // Pair combinations (manual 706-724): primary half's natural ids + the Mod*
 // trio for the modulated half; CFG only where the manual's "<>" allows order
 // swaps ("+" variants are fixed-order).
-constexpr FxBloc::ParamDef kDefsKdfxChoDly[9] = {
+constexpr FxBloc::ParamDef kDefsKdfxChoDly[10] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::pct(FxBloc::Param::Diffusion, "XFEED"),
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     FxBloc::ms(FxBloc::Param::RoomSize, "TIME", 1.f, 1480.f, 0),
     {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 15.f),
@@ -1103,7 +1106,8 @@ constexpr FxBloc::ParamDef kDefsKdfxChoDly[9] = {
     FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
     {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
 };
-constexpr FxBloc::ParamDef kDefsKdfxChoRev[8] = {
+constexpr FxBloc::ParamDef kDefsKdfxChoRev[10] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::ms(FxBloc::Param::RoomSize, "SIZE", 3.f, 48.f, 0),
     FxBloc::rt60(FxBloc::Param::Decay, "DCAY", 0.6f, 999.f),
     FxBloc::hz(FxBloc::Param::Damping, "DAMP", 351.f, 7019.f, 0),
@@ -1114,16 +1118,17 @@ constexpr FxBloc::ParamDef kDefsKdfxChoRev[8] = {
     {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
 };
 constexpr FxBloc::ParamDef kDefsKdfxFlgDly[9] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::pct(FxBloc::Param::Diffusion, "XFEED"),
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     FxBloc::ms(FxBloc::Param::RoomSize, "TIME", 1.f, 1480.f, 0),
     {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
     FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
     FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
 };
-constexpr FxBloc::ParamDef kDefsKdfxFlgRev[8] = {
+constexpr FxBloc::ParamDef kDefsKdfxFlgRev[10] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::ms(FxBloc::Param::RoomSize, "SIZE", 3.f, 48.f, 0),
     FxBloc::rt60(FxBloc::Param::Decay, "DCAY", 0.6f, 999.f),
     FxBloc::hz(FxBloc::Param::Damping, "DAMP", 351.f, 7019.f, 0),
@@ -1133,7 +1138,8 @@ constexpr FxBloc::ParamDef kDefsKdfxFlgRev[8] = {
     FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
     {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
 };
-constexpr FxBloc::ParamDef kDefsKdfxFlgLaser[8] = {
+constexpr FxBloc::ParamDef kDefsKdfxFlgLaser[10] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::ms(FxBloc::Param::RoomSize, "TIME", 0.f, 2000.f, 0),
     {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
     {FxBloc::Param::Width, "SPAC", false, 0, 1, nullptr, "SMP", 0.f, 40.f, 1, false},
@@ -1143,7 +1149,8 @@ constexpr FxBloc::ParamDef kDefsKdfxFlgLaser[8] = {
     FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
     {FxBloc::Param::ComboCfg, "CFG", true, 0, 1, FxBloc::kCfgOptions()},
 };
-constexpr FxBloc::ParamDef kDefsKdfxShprRev[9] = {
+constexpr FxBloc::ParamDef kDefsKdfxShprRev[11] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     {FxBloc::Param::ShaperMode, "SHPR", true, 0, 3, FxBloc::kShaperOptions()},
     FxBloc::db(FxBloc::Param::BassGain, "BASS", -15.f, 15.f, true),
@@ -1157,13 +1164,15 @@ constexpr FxBloc::ParamDef kDefsKdfxShprRev[9] = {
 // Resonant filter bank (manual 900/902/903): common TYPE/FREQ/RES; the env
 // variant adds at-rest MIN Freq + bipolar SWEEP + dB/sec rates, the LFO variant
 // rides the Mod* trio (rate 0.01-10 HZ, depth in octaves).
-constexpr FxBloc::ParamDef kDefsKdfxResFilt[5] = {
+constexpr FxBloc::ParamDef kDefsKdfxResFilt[6] = {
+    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::FiltType, "TYPE", true, 0, 3, FxBloc::kFiltTypeOptions()},
     FxBloc::logHz(FxBloc::Param::FiltFreq, "FREQ", 16.f, 8372.f, 0),
     FxBloc::db(FxBloc::Param::FiltRes, "RES", 0.f, 50.f),
     FxBloc::LEVEL_DEF(),
 };
-constexpr FxBloc::ParamDef kDefsKdfxEnvFilt[8] = {
+constexpr FxBloc::ParamDef kDefsKdfxEnvFilt[9] = {
+    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::FiltType, "TYPE", true, 0, 3, FxBloc::kFiltTypeOptions()},
     FxBloc::logHz(FxBloc::Param::FiltMinFreq, "MINF", 16.f, 8372.f, 0),
     FxBloc::LEVEL_DEF(),
@@ -1172,7 +1181,8 @@ constexpr FxBloc::ParamDef kDefsKdfxEnvFilt[8] = {
     {FxBloc::Param::FiltAtk, "ATK", false, 0, 1, nullptr, "DB/S", 0.f, 300.f, 0, false},
     {FxBloc::Param::FiltRel, "REL", false, 0, 1, nullptr, "DB/S", 0.f, 300.f, 0, false},
 };
-constexpr FxBloc::ParamDef kDefsKdfxLfoFilt[7] = {
+constexpr FxBloc::ParamDef kDefsKdfxLfoFilt[8] = {
+    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::FiltType, "TYPE", true, 0, 3, FxBloc::kFiltTypeOptions()},
     FxBloc::logHz(FxBloc::Param::FiltFreq, "FREQ", 16.f, 8372.f, 0),
     FxBloc::LEVEL_DEF(),
@@ -1186,7 +1196,8 @@ constexpr FxBloc::ParamDef kDefsKdfxLfoFilt[7] = {
 // Quantizer (the 714 Quantize+Flange partner): DYN 0-144 DB (0 = two levels,
 // square wave; every 6 DB doubles the levels), HEAD 0-144 DB of headroom above
 // the signal, DC Off/-79..0 DB.
-constexpr FxBloc::ParamDef kDefsKdfxQuant[4] = {
+constexpr FxBloc::ParamDef kDefsKdfxQuant[6] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::db(FxBloc::Param::RoomSize, "DYN", 0.f, 144.f),
     FxBloc::LEVEL_DEF(),
     FxBloc::db(FxBloc::Param::Decay, "HEAD", 0.f, 144.f),
@@ -1194,17 +1205,18 @@ constexpr FxBloc::ParamDef kDefsKdfxQuant[4] = {
 };
 // Quantize+Flange (manual 714, "+" = fixed order: quantize then flange).
 constexpr FxBloc::ParamDef kDefsKdfxQntFlg[10] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::db(FxBloc::Param::RoomSize, "DYN", 0.f, 144.f),
     FxBloc::db(FxBloc::Param::Decay, "HEAD", 0.f, 144.f),
     FxBloc::db(FxBloc::Param::Diffusion, "DC", -79.f, 0.f, true),
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
     FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
     FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
     FxBloc::ms(FxBloc::Param::BaseDelay, "BASE", 0.1f, 7.f),
 };
-constexpr FxBloc::ParamDef kDefsKdfxRingMod[16] = {
+constexpr FxBloc::ParamDef kDefsKdfxRingMod[17] = {
+    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::RmMode, "MODE", true, 0, 1, FxBloc::kRmModeOptions()},
     FxBloc::LEVEL_DEF(),
     FxBloc::pct(FxBloc::Param::RmO1Lvl, "O1LVL"),
@@ -1221,34 +1233,34 @@ constexpr FxBloc::ParamDef kDefsKdfxRingMod[16] = {
     FxBloc::pct(FxBloc::Param::RmO5Lvl, "S5LVL"),
     FxBloc::logHz(FxBloc::Param::RmO5Freq, "S5FRQ", 16.f, 25088.f, 0),
 };
-constexpr FxBloc::ParamDef kDefsKdfxDist[7] = {
+constexpr FxBloc::ParamDef kDefsKdfxDist[8] = {
+    FxBloc::INGAIN_DEF(),
     FxBloc::db(FxBloc::Param::RoomSize, "DRIVE", 0.f, 24.f),
     {FxBloc::Param::ShaperMode, "MODE", true, 0, 3, FxBloc::kShaperOptions()},
     FxBloc::hz(FxBloc::Param::LoCut, "LOCUT", 20.f, 300.f, 0),
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     FxBloc::pct(FxBloc::Param::CabSim, "CAB"),
     FxBloc::hz(FxBloc::Param::HiCut, "HCUT", 1000.f, 16000.f, 0),
 };
 /// Stock compressor wrapped as a bloc (manual comp/gate family 950-957 stand-in).
 /// Param aliases: roomSize=threshold, decay=ratio, damping=attack, diffusion=release,
 /// hpf=sidechain HPF, width=wet/dry blend — curves match the engine's setters.
-constexpr FxBloc::ParamDef kDefsCompressor[8] = {
+constexpr FxBloc::ParamDef kDefsCompressor[9] = {
+    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::RoomSize, "THRSH", false, 0, 1, nullptr, "DB", 0.f, -48.f, 1, false},
     {FxBloc::Param::Decay, "RATIO", false, 0, 1, nullptr, "", 0.1f, 128.f, 1, false, 3, 1.5f},
     {FxBloc::Param::Damping, "ATK", false, 0, 1, nullptr, "MS", 0.5f, 100.f, 1, false, 2, 1.5f},
     FxBloc::LEVEL_DEF(),
-    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::Diffusion, "REL", false, 0, 1, nullptr, "MS", 10.f, 1000.f, 0, false, 2, 1.5f},
     {FxBloc::Param::HPF, "SIDE", false, 0, 1, nullptr, "HZ", 0.f, 100.f, 0, false, 4, 1.5f},
     {FxBloc::Param::Width, "BLEND", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
 };
 /// Track-side send into the master chain: BUS picks which master slot's bus the
 /// signal feeds; PAN/IN-GN/LEVEL shape it on the way out of the track.
-constexpr FxBloc::ParamDef kDefsGlobalSend[4] = {
+constexpr FxBloc::ParamDef kDefsGlobalSend[5] = {
+    FxBloc::INGAIN_DEF(),
     {FxBloc::Param::SendBus, "BUS", true, 0, 2, FxBloc::kBusOptions()},
     FxBloc::bipolarPct(FxBloc::Param::Width, "PAN", 100.f),
-    FxBloc::INGAIN_DEF(),
     FxBloc::LEVEL_DEF(),
 };
 
