@@ -1,47 +1,51 @@
-# Deluge Community Firmware
+# Deluge AntiFirmware
 
-## Dear Deluge owners
-If you want to start using the community firmware please visit https://synthstromaudible.github.io/DelugeFirmware/ for all relevant details.
+Firmware for the [Synthstrom Deluge](https://synthstrom.com/product/deluge/) —
+the same hardware and sequencer you know, with the effect engine gutted and
+rebuilt around a modular KDFX bloc system, a visual-menu UI, and a set of new
+synthesis capabilities. This is a hard fork of the upstream firmware:
+**no legacy effect support** — old songs load, but their stock-effect settings
+are ignored (the full removed/kept list is in the manual).
 
-## About
-The [Deluge](https://synthstrom.com/product/deluge/) from [Synthstrom Audible](https://synthstrom.com/) is a portable sequencer, synthesizer and sampler. Synthstrom Audible decided to [open source](https://synthstrom.com/open/) the firmware application that runs on the Deluge to allow the community to customize and extend the capabilities of the device. 
+**Read the manual: [docs/manual.md](docs/manual.md).** It covers everything —
+the bloc reference, chain architecture, FX modulation, sync, time stretching,
+the visual menu, and what was deleted. Summary below.
 
-The hardware is built around a Renesas RZ/A1L processor with an Arm® Cortex®-A9 core running at 400MHz and 3MB of on-chip SRAM. Connected to that is a 64MB SDRAM chip, a PIC for button handling and either a 7-Segment array or an OLED screen. The application is written in C and C++ and some occasional assembly in bare metal style without an operating system.
+## What's different
 
-## Important links
-* For acquiring and using the firmware visit the [community firmware website](https://synthstromaudible.github.io/DelugeFirmware)
-* Once you have the firmware, consult our detailed [update guide](https://github.com/SynthstromAudible/DelugeFirmware/wiki/Update-guide) for instructions on how to install it
-* To contribute to the project with code, bug reports, suggestions, and feedback see: [How to contribute to Deluge Firmware](docs/CONTRIBUTING.md)
-* To learn about the toolchain, application, and to start working on the code continue with: [Getting Started with Deluge Development](docs/dev/getting_started.md)
-* Please also visit the [Synthstrom Forum](https://forums.synthstrom.com/) and the community [Discord](https://discord.gg/BnRcyFSgaT) to interact with other users and the developers
-* You can donate to the project using the [Synthstrom Patreon](https://www.patreon.com/Synthstrom)
+- **FX blocs** — every stock effect engine (reverb, delay, chorus, flanger,
+  phaser, grain, EQ, filters, crush, sidechain, compressor) is deleted and
+  replaced by a modular system of KDFX-modeled blocs: reverbs (FREEVERB,
+  MUTABLE, KDFX REV), delays (KDFX DLY, Spectral 4-Tap with its comb bank),
+  modulation (chorus, flanger, phaser, tremolo, auto-pan), distortion
+  (TONE, DIST, TUBEAMP), the synth's own filter cores as FX (RESFILT, ENVFILT,
+  LFOFILT), LaserVerb, the Pitcher resonator bank, ring mod, quantizer,
+  compressor, and ~20 combination blocs. Three slots each on the master chain,
+  every synth, every kit drum row, and every audio clip; four routing
+  topologies; MST SEND taps any track into any master slot bus.
+- **FX modulation** — with a bloc param selected in the menu, shift + a grid
+  pad connects an LFO, envelope, velocity, note, aftertouch, MPE or random
+  source to it; repeated presses cycle depth 25/50/100/OFF. Eight connections
+  per bloc, saved with the song.
+- **TAILS + panic kill** — each chain gates its own render tail (voice /
+  RMS dB threshold / always-on), and holding play/stop for a third of a second
+  fades every wet tail in the song to silence at once.
+- **Oscillator sync expansion** — sync is now OFF / HARD / SOFT / REV, plus
+  SYNPH, a patch-cable-ready reset-position offset: sync windows on wavetables,
+  soft phase-locking, direction-flip timbres. Full technique notes in the
+  manual.
+- **BPM time stretching** — per-sample Original BPM + Stretch % relative to
+  song tempo, a one-press auto-BPM detector, and an Akai-style granular stretch
+  mode alongside the stock WSOLA.
+- **The visual menu** — the primary editing UI: category/page/4-slot layouts
+  on the OLED, slot buttons under your fingers, live grid underneath. Enable
+  under SETTINGS → Visual Menu Style → "Visual 4-Param".
+- Kept on purpose: the per-voice synth filters (now with MORPH), the
+  wavefolder, clipping, the stutterer — synthesis-side, not FX.
 
-## J-Link RAM Flashing & Debugging (Linux)
+## Working on it
 
-### 1. Direct Command Line Flashing (Non-persistent RAM load)
-To load and execute `deluge.elf` directly on the target (Renesas RZ/A1L) using `JLinkExe` over SWD:
-
-Create a command script (e.g. `scripts/.flash_cmd.jlink`):
-```text
-loadfile build/Release/deluge.elf
-r
-g
-exit
-```
-
-Then run `JLinkExe`:
-```bash
-JLinkExe -device R7S721020 -if SWD -speed 4000 -autoconnect 1 \
-  -exitonerror 1 -CommandFile scripts/.flash_cmd.jlink < /dev/null
-```
-> **Important:** Redirecting standard input (`< /dev/null`) is essential on Linux host systems. Without redirecting stdin, interactive terminal prompts disrupt the `-autoconnect 1` sequence.
-
-### 2. GDB Debugging & Binary Naming Note (`dbt debug -j`)
-When using `dbt debug -j` on Linux with standard SEGGER installs, `dbt` expects `JLinkGDBServerCL` (or `JLinkGDBServerCLExe`). On some Linux systems (such as SEGGER's standard Linux package install), the command is installed as `JLinkGDBServerCLExe`. 
-
-Ensure `JLinkGDBServerCLExe` (or a symlink to it) is in your `PATH`, or pass the executable explicitly using the `-c` flag:
-```bash
-./dbt debug -j -c JLinkGDBServerCLExe
-```
-Then connect GDB via `./dbt gdb` or standard `arm-none-eabi-gdb`.
-
+We build with **`./dbt`** (`./dbt build release` → `build/Release/deluge.bin`)
+and flash over **J-Link** with **`scripts/flash-jlink.sh`** (flashes the
+Release ELF to RAM via JLinkExe; `debug` or an explicit ELF path also accepted,
+see the script header).

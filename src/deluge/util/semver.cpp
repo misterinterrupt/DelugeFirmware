@@ -80,8 +80,8 @@ std::string_view SemVer::Parser::parseBuild() {
 }
 */
 
-std::expected<uint8_t, SemVer::Parser::Error> SemVer::Parser::parseNumericIdentifier() {
-	uint8_t number;
+std::expected<uint16_t, SemVer::Parser::Error> SemVer::Parser::parseNumericIdentifier() {
+	uint16_t number;
 	auto [ptr, ec] = std::from_chars(input_.data() + index_, input_.data() + input_.size(), number);
 	if (ec != std::errc{}) {
 		return std::unexpected(Error::INVALID_NUMBER);

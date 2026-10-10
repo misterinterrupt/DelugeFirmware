@@ -789,8 +789,9 @@ void MidiEngine::midiSysexReceived(MIDIDevice* device, uint8_t* data, int32_t le
 			    SysEx::DELUGE_SYSEX_ID_BYTE3, 0,
 			    // 14bit device family member LSB, MSB
 			    0, 0,
-			    // Four byte firmware version in human readable order
-			    FIRMWARE_VERSION_MAJOR, FIRMWARE_VERSION_MINOR, FIRMWARE_VERSION_PATCH, 0, SysEx::SYSEX_END};
+			    // Four byte firmware version in human readable order (major truncates to a byte)
+			    (uint8_t)FIRMWARE_VERSION_MAJOR, (uint8_t)FIRMWARE_VERSION_MINOR, (uint8_t)FIRMWARE_VERSION_PATCH, 0,
+			    SysEx::SYSEX_END};
 			device->sendSysex(reply, sizeof(reply));
 		}
 		return;

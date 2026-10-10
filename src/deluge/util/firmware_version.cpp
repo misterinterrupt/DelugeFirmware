@@ -6,7 +6,8 @@
 FirmwareVersion FirmwareVersion::parse(std::string_view version_string) {
 	Type type;
 
-	if (version_string[0] == 'c') {
+	if (version_string[0] == 'a' || version_string[0] == 'c') {
+		// 'a' = AntiFirmware; 'c' still recognized from old community-firmware files
 		type = Type::COMMUNITY;
 		version_string = version_string.substr(1);
 	}

@@ -8,13 +8,13 @@
  */
 struct SemVer {
 	/// Major version
-	uint8_t major;
+	uint16_t major;
 
 	/// Minor version
-	uint8_t minor;
+	uint16_t minor;
 
 	/// Patch version
-	uint8_t patch;
+	uint16_t patch;
 
 	/// Pre-release string
 	std::string_view pre_release{};
@@ -88,7 +88,7 @@ struct SemVer {
 		 * @return std::expected<uint8_t, Error> The parsed number or Error
 		 * @retval Error::INVALID_NUMBER If the number cannot be parsed
 		 */
-		std::expected<uint8_t, Error> parseNumericIdentifier();
+		std::expected<uint16_t, Error> parseNumericIdentifier();
 
 		/**
 		 * @brief Consumes all characters up to the build-tag identifier '+' and returns them
