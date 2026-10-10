@@ -33,9 +33,6 @@ public:
 	bool modEncoderButtonAction(uint8_t whichModEncoder, bool on, ModelStackWithThreeMainThings* modelStack);
 	ModelStackWithAutoParam* getParamFromModEncoder(int32_t whichModEncoder, ModelStackWithThreeMainThings* modelStack,
 	                                                bool allowCreation = true);
-	void setupFilterSetConfig(int32_t* postFXVolume, ParamManager* paramManager);
-	void processFilters(StereoSample* buffer, int32_t numSamples);
-	void compensateVolumeForResonance(ParamManagerForTimeline* paramManager);
 
 	void writeAttributesToFile(Serializer& writer, bool writeToFile);
 	void writeTagsToFile(Serializer& writer, ParamManager* paramManager, bool writeToFile);
@@ -53,8 +50,6 @@ public:
 	int32_t getKnobPosForNonExistentParam(int32_t whichModEncoder, ModelStackWithAutoParam* modelStack) override;
 	ActionResult modEncoderActionForNonExistentParam(int32_t offset, int32_t whichModEncoder,
 	                                                 ModelStackWithAutoParam* modelStack) override;
-	dsp::filter::FilterSet filterSet;
-	FilterType currentFilterType;
 	bool editingComp;
 	CompParam currentCompParam;
 

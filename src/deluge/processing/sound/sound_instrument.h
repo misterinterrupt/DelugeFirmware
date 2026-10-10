@@ -68,7 +68,6 @@ public:
 	bool readTagFromFile(Deserializer& reader, char const* tagName);
 
 	void prepareForHibernationOrDeletion();
-	void compensateInstrumentVolumeForResonance(ModelStackWithThreeMainThings* modelStack);
 	bool isSkippingRendering() { return skippingRendering; }
 	void loadCrucialAudioFilesOnly();
 	void beenEdited(bool shouldMoveToEmptySlot = true);

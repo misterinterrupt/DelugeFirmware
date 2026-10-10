@@ -45,11 +45,6 @@ extern int32_t spareRenderingBuffer[][SSI_TX_BUFFER_NUM_SAMPLES];
 
 ModControllableAudio::ModControllableAudio() {
 	// EQ
-	withoutTrebleL = 0;
-	bassOnlyL = 0;
-	withoutTrebleR = 0;
-	bassOnlyR = 0;
-
 	// Filters
 	lpfMode = FilterMode::TRANSISTOR_24DB_LEGACY;
 	hpfMode = FilterMode::HPLADDER_LEGACY;
@@ -81,8 +76,6 @@ void ModControllableAudio::cloneFrom(ModControllableAudio* other) {
 	lpfMode = other->lpfMode;
 	hpfMode = other->hpfMode;
 	clippingAmount = other->clippingAmount;
-	bassFreq = other->bassFreq; // Eventually, these shouldn't be variables like this
-	trebleFreq = other->trebleFreq;
 	filterRoute = other->filterRoute;
 	sidechain.cloneFrom(&other->sidechain);
 	midiKnobArray.cloneFrom(&other->midiKnobArray); // Could fail if no RAM... not too big a concern
@@ -94,11 +87,6 @@ void ModControllableAudio::cloneFrom(ModControllableAudio* other) {
 void ModControllableAudio::initParams(ParamManager* paramManager) {
 
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
-
-	unpatchedParams->params[params::UNPATCHED_BASS].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_TREBLE].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_BASS_FREQ].setCurrentValueBasicForSetup(0);
-	unpatchedParams->params[params::UNPATCHED_TREBLE_FREQ].setCurrentValueBasicForSetup(0);
 
 	Stutterer::initParams(paramManager);
 
@@ -114,16 +102,6 @@ void ModControllableAudio::initParams(ParamManager* paramManager) {
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_BLEND].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_INPUT_GAIN].setCurrentValueBasicForSetup(0);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_MAKEUP_GAIN].setCurrentValueBasicForSetup(1073741824);
-}
-
-bool ModControllableAudio::hasBassAdjusted(ParamManager* paramManager) {
-	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
-	return (unpatchedParams->getValue(params::UNPATCHED_BASS) != 0);
-}
-
-bool ModControllableAudio::hasTrebleAdjusted(ParamManager* paramManager) {
-	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
-	return (unpatchedParams->getValue(params::UNPATCHED_TREBLE) != 0);
 }
 
 void ModControllableAudio::processOutputVolume(StereoSample* buffer, int32_t numSamples, int32_t postFXVolume,
@@ -285,39 +263,6 @@ void ModControllableAudio::processSRRAndBitcrushing(StereoSample* buffer, int32_
 	}
 }
 
-inline void ModControllableAudio::doEQ(bool doBass, bool doTreble, int32_t* inputL, int32_t* inputR, int32_t bassAmount,
-                                       int32_t trebleAmount) {
-	int32_t trebleOnlyL;
-	int32_t trebleOnlyR;
-
-	if (doTreble) {
-		int32_t distanceToGoL = *inputL - withoutTrebleL;
-		int32_t distanceToGoR = *inputR - withoutTrebleR;
-		withoutTrebleL += multiply_32x32_rshift32(distanceToGoL, trebleFreq) << 1;
-		withoutTrebleR += multiply_32x32_rshift32(distanceToGoR, trebleFreq) << 1;
-		trebleOnlyL = *inputL - withoutTrebleL;
-		trebleOnlyR = *inputR - withoutTrebleR;
-		*inputL = withoutTrebleL; // Input now has had the treble removed. Or is this bad?
-		*inputR = withoutTrebleR; // Input now has had the treble removed. Or is this bad?
-	}
-
-	if (doBass) {
-		int32_t distanceToGoL = *inputL - bassOnlyL;
-		int32_t distanceToGoR = *inputR - bassOnlyR;
-		bassOnlyL += multiply_32x32_rshift32(distanceToGoL, bassFreq); // 33554432
-		bassOnlyR += multiply_32x32_rshift32(distanceToGoR, bassFreq); // 33554432
-	}
-
-	if (doTreble) {
-		*inputL += (multiply_32x32_rshift32(trebleOnlyL, trebleAmount) << 3);
-		*inputR += (multiply_32x32_rshift32(trebleOnlyR, trebleAmount) << 3);
-	}
-	if (doBass) {
-		*inputL += (multiply_32x32_rshift32(bassOnlyL, bassAmount) << 3);
-		*inputR += (multiply_32x32_rshift32(bassOnlyR, bassAmount) << 3);
-	}
-}
-
 void ModControllableAudio::writeAttributesToFile(Serializer& writer) {
 	writer.writeAttribute("lpfMode", (char*)lpfTypeToString(lpfMode));
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
@@ -461,16 +406,7 @@ void ModControllableAudio::writeParamTagsToFile(Serializer& writer, ParamManager
                                                 int32_t* valuesForOverride) {
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
 
-	writer.writeOpeningTagBeginning("equalizer");
-	unpatchedParams->writeParamAsAttribute(writer, "bass", params::UNPATCHED_BASS, writeAutomation, false,
-	                                       valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "treble", params::UNPATCHED_TREBLE, writeAutomation, false,
-	                                       valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "bassFrequency", params::UNPATCHED_BASS_FREQ, writeAutomation, false,
-	                                       valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "trebleFrequency", params::UNPATCHED_TREBLE_FREQ, writeAutomation,
-	                                       false, valuesForOverride);
-	writer.closeTag();
+	(void)unpatchedParams;
 }
 
 bool ModControllableAudio::readParamTagFromFile(Deserializer& reader, char const* tagName,
@@ -478,33 +414,7 @@ bool ModControllableAudio::readParamTagFromFile(Deserializer& reader, char const
 	ParamCollectionSummary* unpatchedParamsSummary = paramManager->getUnpatchedParamSetSummary();
 	UnpatchedParamSet* unpatchedParams = (UnpatchedParamSet*)unpatchedParamsSummary->paramCollection;
 
-	if (!strcmp(tagName, "equalizer")) {
-		while (*(tagName = reader.readNextTagOrAttributeName())) {
-			if (!strcmp(tagName, "bass")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_BASS,
-				                           readAutomationUpToPos);
-				reader.exitTag("bass");
-			}
-			else if (!strcmp(tagName, "treble")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_TREBLE,
-				                           readAutomationUpToPos);
-				reader.exitTag("treble");
-			}
-			else if (!strcmp(tagName, "bassFrequency")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_BASS_FREQ,
-				                           readAutomationUpToPos);
-				reader.exitTag("bassFrequency");
-			}
-			else if (!strcmp(tagName, "trebleFrequency")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_TREBLE_FREQ,
-				                           readAutomationUpToPos);
-				reader.exitTag("trebleFrequency");
-			}
-		}
-		reader.exitTag("equalizer");
-	}
-
-	else if (!strcmp(tagName, "stutterRate")) {
+	if (!strcmp(tagName, "stutterRate")) {
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_STUTTER_RATE,
 		                           readAutomationUpToPos);
 		reader.exitTag("stutterRate");

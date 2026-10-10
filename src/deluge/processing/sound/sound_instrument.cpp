@@ -417,10 +417,6 @@ bool SoundInstrument::readTagFromFile(Deserializer& reader, char const* tagName)
 	return MelodicInstrument::readTagFromFile(reader, tagName);
 }
 
-void SoundInstrument::compensateInstrumentVolumeForResonance(ModelStackWithThreeMainThings* modelStack) {
-	Sound::compensateVolumeForResonance(modelStack);
-}
-
 void SoundInstrument::loadCrucialAudioFilesOnly() {
 	loadAllAudioFiles(true);
 }

@@ -251,7 +251,6 @@ public:
 	void recalculatePatchingToParam(uint8_t p, ParamManagerForTimeline* paramManager);
 	void doneReadingFromFile();
 	virtual void setupPatchingForAllParamManagers(Song* song) {}
-	void compensateVolumeForResonance(ModelStackWithThreeMainThings* modelStack);
 	// void channelAftertouchReceivedFromInputMIDIChannel(int32_t newValue);
 	ModelStackWithAutoParam* getParamFromModEncoder(int32_t whichModEncoder, ModelStackWithThreeMainThings* modelStack,
 	                                                bool allowCreation = true) final;

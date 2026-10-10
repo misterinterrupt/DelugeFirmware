@@ -70,33 +70,17 @@ using namespace gui;
 using namespace deluge::modulation::params;
 
 // Performance View constants
-constexpr int32_t kNumParamsForPerformance = 13;
+constexpr int32_t kNumParamsForPerformance = 3;
 
 // list of parameters available for assignment to FX columns in performance view
 constexpr std::array<ParamsForPerformance, kNumParamsForPerformance> songParamsForPerformance = {{
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_LPF_FREQ, 8, 7, colours::red, colours::red.forTail()},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_LPF_RES, 8, 6, colours::red, colours::red.forTail()},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_LPF_MORPH, 8, 4, colours::red, colours::red.forTail()},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_HPF_FREQ, 9, 7, colours::pastel::orange, colours::pastel::orangeTail},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_HPF_RES, 9, 6, colours::pastel::orange, colours::pastel::orangeTail},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_HPF_MORPH, 9, 4, colours::pastel::orange, colours::pastel::orangeTail},
 
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_BASS, 10, 6, colours::pastel::yellow, colours::pastel::yellow.forTail()},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_TREBLE, 11, 6, colours::pastel::yellow, colours::pastel::yellow.forTail()},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_BASS_FREQ, 10, 7, colours::pastel::yellow, colours::pastel::yellow.forTail()},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_TREBLE_FREQ, 11, 7, colours::pastel::yellow, colours::pastel::yellow.forTail()},
     {Kind::UNPATCHED_GLOBAL, UNPATCHED_SAMPLE_RATE_REDUCTION, 6, 5, colours::magenta, colours::magenta.forTail()},
     {Kind::UNPATCHED_GLOBAL, UNPATCHED_BITCRUSHING, 6, 6, colours::magenta, colours::magenta.forTail()},
     {Kind::UNPATCHED_GLOBAL, UNPATCHED_STUTTER_RATE, 5, 7, colours::blue, colours::blue.forTail()},
 }};
 
 constexpr std::array<ParamsForPerformance, kDisplayWidth> defaultLayoutForPerformance = {{
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_LPF_FREQ, 8, 7, colours::red, colours::red.forTail()},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_LPF_RES, 8, 6, colours::red, colours::red.forTail()},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_HPF_FREQ, 9, 7, colours::pastel::orange, colours::pastel::orangeTail},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_HPF_RES, 9, 6, colours::pastel::orange, colours::pastel::orangeTail},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_BASS, 10, 6, colours::pastel::yellow, colours::pastel::yellow.forTail()},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_TREBLE, 11, 6, colours::pastel::yellow, colours::pastel::yellow.forTail()},
     {Kind::UNPATCHED_GLOBAL, UNPATCHED_SAMPLE_RATE_REDUCTION, 6, 5, colours::magenta, colours::magenta.forTail()},
     {Kind::UNPATCHED_GLOBAL, UNPATCHED_BITCRUSHING, 6, 6, colours::magenta, colours::magenta.forTail()},
     {Kind::UNPATCHED_GLOBAL, UNPATCHED_STUTTER_RATE, 5, 7, colours::blue, colours::blue.forTail()},
@@ -140,12 +124,10 @@ constexpr uint32_t paramIDShortcutsForPerformanceView[kDisplayWidth][kDisplayHei
     {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, UNPATCHED_SAMPLE_RATE_REDUCTION, UNPATCHED_BITCRUSHING,
      kNoParamID},
     {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID},
-    {kNoParamID, kNoParamID, kNoParamID, kNoParamID, UNPATCHED_LPF_MORPH, kNoParamID, UNPATCHED_LPF_RES,
-     UNPATCHED_LPF_FREQ},
-    {kNoParamID, kNoParamID, kNoParamID, kNoParamID, UNPATCHED_HPF_MORPH, kNoParamID, UNPATCHED_HPF_RES,
-     UNPATCHED_HPF_FREQ},
-    {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, UNPATCHED_BASS, UNPATCHED_BASS_FREQ},
-    {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, UNPATCHED_TREBLE, UNPATCHED_TREBLE_FREQ},
+    {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID},
+    {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID},
+    {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID},
+    {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID},
     {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID},
 };
 

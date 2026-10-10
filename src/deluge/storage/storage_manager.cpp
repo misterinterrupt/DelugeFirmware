@@ -376,9 +376,7 @@ deleteInstrumentAndGetOut:
 				goto deleteInstrumentAndGetOut;
 			}
 
-			GlobalEffectableForClip::initParams(&paramManager);
-			((Kit*)newInstrument)->compensateInstrumentVolumeForResonance(&paramManager, song); // Necessary?
-			song->backUpParamManager(((Kit*)newInstrument), clip, &paramManager, true);
+			GlobalEffectableForClip::initParams(&paramManager);			song->backUpParamManager(((Kit*)newInstrument), clip, &paramManager, true);
 		}
 		else if (outputType == OutputType::MIDI_OUT) {
 			// midi instruments make the param manager later

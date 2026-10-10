@@ -2757,10 +2757,8 @@ void Sound::setSynthMode(SynthMode value, Song* song) {
 				int32_t p0 = modKnobs[f][0].paramDescriptor.getJustTheParam();
 				int32_t p1 = modKnobs[f][1].paramDescriptor.getJustTheParam();
 
-				if ((p0 == params::LOCAL_LPF_RESONANCE || p0 == params::LOCAL_HPF_RESONANCE
-				     || p0 == params::UNPATCHED_START + params::UNPATCHED_BASS)
-				    && (p1 == params::LOCAL_LPF_FREQ || p1 == params::LOCAL_HPF_FREQ
-				        || p1 == params::UNPATCHED_START + params::UNPATCHED_TREBLE)) {
+				if ((p0 == params::LOCAL_LPF_RESONANCE || p0 == params::LOCAL_HPF_RESONANCE)
+				    && (p1 == params::LOCAL_LPF_FREQ || p1 == params::LOCAL_HPF_FREQ)) {
 					modKnobs[f][0].paramDescriptor.setToHaveParamOnly(params::LOCAL_MODULATOR_1_VOLUME);
 					modKnobs[f][1].paramDescriptor.setToHaveParamOnly(params::LOCAL_MODULATOR_0_VOLUME);
 				}
@@ -2969,7 +2967,6 @@ Error Sound::readFromFile(Deserializer& reader, ModelStackWithModControllable* m
 	// If we actually got a paramManager, we can do resonance compensation on it
 	if (paramManager.containsAnyMainParamCollections()) {
 		if (smDeserializer.firmware_version < FirmwareVersion::official({1, 2, 0})) {
-			compensateVolumeForResonance(modelStack->addParamManager(&paramManager));
 		}
 
 		possiblySetupDefaultExpressionPatching(&paramManager);
@@ -3002,48 +2999,6 @@ Error Sound::createParamManagerForLoading(ParamManagerForTimeline* paramManager)
 	paramManager->getUnpatchedParamSet()->params[params::UNPATCHED_SIDECHAIN_SHAPE].setCurrentValueBasicForSetup(
 	    2147483647); // Hmm, why this here? Obviously I had some reason...
 	return Error::NONE;
-}
-
-void Sound::compensateVolumeForResonance(ModelStackWithThreeMainThings* modelStack) {
-
-	// If it was an old-firmware file, we need to compensate for resonance
-	if (smDeserializer.firmware_version < FirmwareVersion::official({1, 2, 0}) && synthMode != SynthMode::FM) {
-		if (modelStack->paramManager->resonanceBackwardsCompatibilityProcessed) {
-			return;
-		}
-
-		modelStack->paramManager->resonanceBackwardsCompatibilityProcessed = true;
-
-		PatchedParamSet* patchedParams = modelStack->paramManager->getPatchedParamSet();
-
-		int32_t compensation = interpolateTableSigned(patchedParams->getValue(params::LOCAL_LPF_RESONANCE) + 2147483648,
-		                                              32, oldResonanceCompensation, 3);
-		float compensationDB = (float)compensation / (1024 << 16);
-
-		if (compensationDB > 0.1) {
-			// Uart::print("compensating dB: ");
-			// Uart::println((int32_t)(compensationDB * 100));
-			patchedParams->shiftParamVolumeByDB(params::GLOBAL_VOLUME_POST_FX, compensationDB);
-		}
-
-		ModelStackWithParamCollection* modelStackWithParamCollection =
-		    modelStack->paramManager->getPatchCableSet(modelStack);
-
-		PatchCableSet* patchCableSet = (PatchCableSet*)modelStackWithParamCollection->paramCollection;
-
-		patchCableSet->setupPatching(
-		    modelStackWithParamCollection); // So that we may then call doesParamHaveSomethingPatchedToIt(), below
-
-		// If no LPF on, and resonance is at 50%, set it to 0%
-		if (!patchCableSet->doesParamHaveSomethingPatchedToIt(params::LOCAL_LPF_FREQ)
-		    && !patchedParams->params[params::LOCAL_LPF_FREQ].isAutomated()
-		    && patchedParams->params[params::LOCAL_LPF_FREQ].getCurrentValue() >= 2147483602
-		    && !patchedParams->params[params::LOCAL_LPF_RESONANCE].isAutomated()
-		    && patchedParams->params[params::LOCAL_LPF_RESONANCE].getCurrentValue() <= 0
-		    && patchedParams->params[params::LOCAL_LPF_RESONANCE].getCurrentValue() >= -23) {
-			patchedParams->params[params::LOCAL_LPF_RESONANCE].currentValue = -2147483648;
-		}
-	}
 }
 
 // paramManager only required for old old song files
@@ -4034,11 +3989,6 @@ void Sound::modButtonAction(uint8_t whichModButton, bool on, ParamManagerForTime
 	         && ourModKnobBottom->paramDescriptor.isSetToParamWithNoSource(params::LOCAL_HPF_RESONANCE)) {
 		displayFilterSettings(on, FilterType::HPF);
 	}
-	else if (ourModKnobTop->paramDescriptor.isSetToParamWithNoSource(params::UNPATCHED_START + params::UNPATCHED_TREBLE)
-	         && ourModKnobBottom->paramDescriptor.isSetToParamWithNoSource(params::UNPATCHED_START
-	                                                                       + params::UNPATCHED_BASS)) {
-		displayFilterSettings(on, FilterType::EQ);
-	}
 	else if (whichModButton == 6) {
 		if (on) {
 			custom1Shifted = Buttons::isShiftButtonPressed();
@@ -4274,33 +4224,10 @@ bool Sound::modEncoderButtonAction(uint8_t whichModEncoder, bool on, ModelStackW
 
 	else if (ourModKnob->paramDescriptor.isSetToParamWithNoSource(params::LOCAL_HPF_FREQ)) {
 		if (on && synthMode != SynthMode::FM) {
-			ourModKnob->paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START + params::UNPATCHED_TREBLE);
-			// Switch resonance too
-			if (modKnobs[modKnobMode][1 - whichModEncoder].paramDescriptor.isSetToParamWithNoSource(
-			        params::LOCAL_HPF_RESONANCE)) {
-				modKnobs[modKnobMode][1 - whichModEncoder].paramDescriptor.setToHaveParamOnly(params::UNPATCHED_START
-				                                                                              + params::UNPATCHED_BASS);
-			}
-			FilterType currentFilterType = FilterType::EQ;
-
-			// if mod button is pressed, update mod button pop up
-			if (Buttons::isButtonPressed(
-			        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-				displayFilterSettings(on, currentFilterType);
-			}
-			else {
-				display->displayPopup(getFilterTypeDisplayName(currentFilterType));
-			}
-		}
-		return false;
-	}
-
-	else if (ourModKnob->paramDescriptor.isSetToParamWithNoSource(params::UNPATCHED_START + params::UNPATCHED_TREBLE)) {
-		if (on && synthMode != SynthMode::FM) {
 			ourModKnob->paramDescriptor.setToHaveParamOnly(params::LOCAL_LPF_FREQ);
 			// Switch resonance too
 			if (modKnobs[modKnobMode][1 - whichModEncoder].paramDescriptor.isSetToParamWithNoSource(
-			        params::UNPATCHED_START + params::UNPATCHED_BASS)) {
+			        params::LOCAL_HPF_RESONANCE)) {
 				modKnobs[modKnobMode][1 - whichModEncoder].paramDescriptor.setToHaveParamOnly(
 				    params::LOCAL_LPF_RESONANCE);
 			}

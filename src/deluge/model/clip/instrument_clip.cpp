@@ -3668,26 +3668,6 @@ void InstrumentClip::backupPresetSlot() {
 	}
 }
 
-void InstrumentClip::compensateVolumeForResonance(ModelStackWithTimelineCounter* modelStack) {
-	((Instrument*)output)
-	    ->compensateInstrumentVolumeForResonance(
-	        modelStack->addOtherTwoThingsButNoNoteRow(output->toModControllable(), &paramManager));
-
-	if (output->type == OutputType::KIT) {
-
-		for (int32_t i = 0; i < noteRows.getNumElements(); i++) {
-			NoteRow* thisNoteRow = noteRows.getElement(i);
-			if (thisNoteRow->drum && thisNoteRow->paramManager.containsAnyMainParamCollections()
-			    && thisNoteRow->drum->type == DrumType::SOUND) {
-				SoundDrum* thisDrum = (SoundDrum*)thisNoteRow->drum;
-				ModelStackWithThreeMainThings* modelStackWithThreeMainThings =
-				    modelStack->addNoteRow(i, thisNoteRow)->addOtherTwoThings(thisDrum, &thisNoteRow->paramManager);
-				thisDrum->compensateVolumeForResonance(modelStackWithThreeMainThings);
-			}
-		}
-	}
-}
-
 void InstrumentClip::deleteOldDrumNames() {
 	for (int32_t i = 0; i < noteRows.getNumElements(); i++) {
 		NoteRow* thisNoteRow = noteRows.getElement(i);
@@ -4152,7 +4132,6 @@ haveNoDrum:
 	}
 
 	// Now the Instrument (and all Drums) are matched up, we can do the resonance compensation crap.
-	compensateVolumeForResonance(modelStack);
 
 	// If saved before V2.1....
 	if (smDeserializer.firmware_version < FirmwareVersion::official({2, 1, 0, "beta"})) {

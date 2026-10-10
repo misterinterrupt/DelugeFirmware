@@ -277,22 +277,6 @@ lfo::Sync lfo2SyncMenu{STRING_FOR_SYNC, STRING_FOR_LFO2_SYNC, LFO2_ID};
 
 Submenu lfo2Menu{STRING_FOR_LFO2, {&lfo2TypeMenu, &lfo2RateMenu, &lfo2SyncMenu}};
 
-// EQ -------------------------------------------------------------------------------------
-UnpatchedParam bassMenu{STRING_FOR_BASS, params::UNPATCHED_BASS};
-UnpatchedParam trebleMenu{STRING_FOR_TREBLE, params::UNPATCHED_TREBLE};
-UnpatchedParam bassFreqMenu{STRING_FOR_BASS_FREQUENCY, params::UNPATCHED_BASS_FREQ};
-UnpatchedParam trebleFreqMenu{STRING_FOR_TREBLE_FREQUENCY, params::UNPATCHED_TREBLE_FREQ};
-
-Submenu eqMenu{
-    STRING_FOR_EQ,
-    {
-        &bassMenu,
-        &trebleMenu,
-        &bassFreqMenu,
-        &trebleFreqMenu,
-    },
-};
-
 // Bend Ranges -------------------------------------------------------------------------------
 
 bend_range::Main mainBendRangeMenu{STRING_FOR_NORMAL};
@@ -393,56 +377,6 @@ Submenu kitClipMasterMenu{
     },
 };
 
-// LPF Menu
-UnpatchedParam globalLPFFreqMenu{STRING_FOR_FREQUENCY, STRING_FOR_LPF_FREQUENCY, params::UNPATCHED_LPF_FREQ};
-UnpatchedParam globalLPFResMenu{STRING_FOR_RESONANCE, STRING_FOR_LPF_RESONANCE, params::UNPATCHED_LPF_RES};
-UnpatchedParam globalLPFMorphMenu{STRING_FOR_MORPH, STRING_FOR_LPF_MORPH, params::UNPATCHED_LPF_MORPH};
-Submenu globalLPFMenu{
-    STRING_FOR_LPF,
-    {
-        &globalLPFFreqMenu,
-        &globalLPFResMenu,
-        &globalLPFMorphMenu,
-        &lpfModeMenu,
-    },
-};
-
-// HPF Menu
-UnpatchedParam globalHPFFreqMenu{STRING_FOR_FREQUENCY, STRING_FOR_HPF_FREQUENCY, params::UNPATCHED_HPF_FREQ};
-UnpatchedParam globalHPFResMenu{STRING_FOR_RESONANCE, STRING_FOR_HPF_RESONANCE, params::UNPATCHED_HPF_RES};
-UnpatchedParam globalHPFMorphMenu{STRING_FOR_MORPH, STRING_FOR_HPF_MORPH, params::UNPATCHED_HPF_MORPH};
-
-Submenu globalHPFMenu{
-    STRING_FOR_HPF,
-    {
-        &globalHPFFreqMenu,
-        &globalHPFResMenu,
-        &globalHPFMorphMenu,
-        &hpfModeMenu,
-    },
-};
-
-Submenu globalFiltersMenu{
-    STRING_FOR_FILTERS,
-    {
-        &globalLPFMenu,
-        &globalHPFMenu,
-        &filterRoutingMenu,
-    },
-};
-
-// EQ Menu
-
-Submenu globalEQMenu{
-    STRING_FOR_EQ,
-    {
-        &bassMenu,
-        &trebleMenu,
-        &bassFreqMenu,
-        &trebleFreqMenu,
-    },
-};
-
 Submenu globalDistortionMenu{
     STRING_FOR_DISTORTION,
     {
@@ -454,7 +388,6 @@ Submenu globalDistortionMenu{
 Submenu globalFXMenu{
     STRING_FOR_FX,
     {
-        &globalEQMenu,
         &globalDistortionMenu,
     },
 };
@@ -517,7 +450,6 @@ Submenu audioClipDistortionMenu{
 Submenu audioClipFXMenu{
     STRING_FOR_FX,
     {
-        &eqMenu,
         &audioClipDistortionMenu,
     },
 };
@@ -989,7 +921,6 @@ Submenu soundFXMenu{
     STRING_FOR_FX,
     {
         &fxWithinEnvMenu,
-        &eqMenu,
         &soundDistortionMenu,
         &noiseMenu,
     },
@@ -1044,7 +975,6 @@ menu_item::Submenu soundEditorRootMenuAudioClip{
         &specificOutputSelectorMenu,
         &audioClipMasterMenu,
         &audioCompMenu,
-        &globalFiltersMenu,
         &audioClipFXMenu,
         &globalSidechainMenu,
         &audioClipSampleMenu,
@@ -1061,7 +991,6 @@ menu_item::Submenu soundEditorRootMenuPerformanceView{
     STRING_FOR_PERFORM_FX,
     {
         &performEditorMenu,
-        &globalFiltersMenu,
         &globalFXMenu,
     },
 };
@@ -1120,7 +1049,6 @@ menu_item::Submenu soundEditorRootMenuSongView{
     STRING_FOR_SONG,
     {
         &songMasterMenu,
-        &globalFiltersMenu,
         &globalFXMenu,
         &swingIntervalMenu,
         &activeScaleMenu,
@@ -1135,7 +1063,6 @@ menu_item::Submenu soundEditorRootMenuKitGlobalFX{
     {
         &kitClipMasterMenu,
         &audioCompMenu,
-        &globalFiltersMenu,
         &globalFXMenu,
         &globalSidechainMenu,
     },
@@ -1175,8 +1102,8 @@ MenuItem* paramShortcutsForSounds[][8] = {
     {&portaMenu,              &polyphonyMenu,          &priorityMenu,                  &unisonDetuneMenu,              &numUnisonToStereoSpreadMenu,       nullptr,  nullptr,                  &foldMenu                          },
     {&envReleaseMenu,         &envSustainMenu,         &envDecayMenu,                  &envAttackMenu,                 &lpfMorphMenu,        &lpfModeMenu,           &lpfResMenu,              &lpfFreqMenu                       },
     {&envReleaseMenu,         &envSustainMenu,         &envDecayMenu,                  &envAttackMenu,                 &hpfMorphMenu,        &hpfModeMenu,           &hpfResMenu,              &hpfFreqMenu                       },
-    {&sidechainReleaseMenu,   &sidechainSyncMenu,      &sidechainVolumeShortcutMenu,   &sidechainAttackMenu,           &sidechainShapeMenu,  &sidechainSendMenu,     &bassMenu,                &bassFreqMenu                      },
-    {&arpRateMenu,            &arpSyncMenu,            &arpGateMenu,                   &arpOctavesMenu,                &arpPresetModeMenu,   &drumNameMenu,          &trebleMenu,              &trebleFreqMenu                    },
+    {&sidechainReleaseMenu,   &sidechainSyncMenu,      &sidechainVolumeShortcutMenu,   &sidechainAttackMenu,           &sidechainShapeMenu,  &sidechainSendMenu,     nullptr,                nullptr                      },
+    {&arpRateMenu,            &arpSyncMenu,            &arpGateMenu,                   &arpOctavesMenu,                &arpPresetModeMenu,   &drumNameMenu,          nullptr,                 nullptr                    },
     {&lfo1RateMenu,           &lfo1SyncMenu,           &lfo1TypeMenu,                  nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {&lfo2RateMenu,           &lfo2SyncMenu,           &lfo2TypeMenu,                  nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
@@ -1191,10 +1118,10 @@ MenuItem* paramShortcutsForAudioClips[][8] = {
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {&globalLevelMenu,     	  &audioClipTransposeMenu, nullptr,                        &globalPanMenu,                 nullptr,              &srrMenu,               &bitcrushMenu,            &clippingMenu                      },
     {nullptr,                 nullptr,                 &priorityMenu,                  nullptr,                        nullptr,              nullptr,                nullptr,                  comingSoonMenu                     },
-    {nullptr,                 nullptr,                 nullptr,                        &audioClipAttackMenu,           &globalLPFMorphMenu,  &lpfModeMenu,           &globalLPFResMenu,        &globalLPFFreqMenu              	  },
-    {nullptr,                 nullptr,                 nullptr,                        &audioClipAttackMenu,           &globalHPFMorphMenu,  &hpfModeMenu,           &globalHPFResMenu,        &globalHPFFreqMenu                 },
-    {&sidechainReleaseMenu,   &sidechainSyncMenu,      &globalSidechainVolumeMenu,     &sidechainAttackMenu,           &sidechainShapeMenu,  nullptr,                &bassMenu,                &bassFreqMenu                      },
-    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                &trebleMenu,              &trebleFreqMenu                    },
+    {nullptr,                 nullptr,                 nullptr,                        &audioClipAttackMenu,           nullptr,  &lpfModeMenu,           nullptr,        nullptr              	  },
+    {nullptr,                 nullptr,                 nullptr,                        &audioClipAttackMenu,           nullptr,  &hpfModeMenu,           nullptr,        nullptr                 },
+    {&sidechainReleaseMenu,   &sidechainSyncMenu,      &globalSidechainVolumeMenu,     &sidechainAttackMenu,           &sidechainShapeMenu,  nullptr,                nullptr,                nullptr                      },
+    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                 nullptr                    },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
@@ -1209,10 +1136,10 @@ MenuItem* paramShortcutsForSongView[][8] = {
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  &globalStutterRateMenu             },
     {&globalLevelMenu,        nullptr,                 nullptr,                        &globalPanMenu,                 nullptr,              &srrMenu,               &bitcrushMenu,            nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
-    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalLPFMorphMenu,  &lpfModeMenu,           &globalLPFResMenu,        &globalLPFFreqMenu                 },
-    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalHPFMorphMenu,  &hpfModeMenu,           &globalHPFResMenu,        &globalHPFFreqMenu                 },
-    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                &bassMenu,                &bassFreqMenu                      },
-    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                &trebleMenu,              &trebleFreqMenu                    },
+    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,  &lpfModeMenu,           nullptr,        nullptr                 },
+    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,  &hpfModeMenu,           nullptr,        nullptr                 },
+    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                nullptr                      },
+    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                 nullptr                    },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
@@ -1227,10 +1154,10 @@ MenuItem* paramShortcutsForKitGlobalFX[][8] = {
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr             				  },
     {&globalLevelMenu,        &globalPitchMenu,        nullptr,                        &globalPanMenu,                 nullptr,              &srrMenu,               &bitcrushMenu,            nullptr                            },
     {nullptr,              	  nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
-    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalLPFMorphMenu,  &lpfModeMenu,           &globalLPFResMenu,        &globalLPFFreqMenu                 },
-    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        &globalHPFMorphMenu,  &hpfModeMenu,           &globalHPFResMenu,        &globalHPFFreqMenu                 },
-    {&sidechainReleaseMenu,   &sidechainSyncMenu,      &globalSidechainVolumeMenu,     &sidechainAttackMenu,           &sidechainShapeMenu,  nullptr,                &bassMenu,                &bassFreqMenu                      },
-    {nullptr,                 nullptr,            	   nullptr,                        nullptr,                		   nullptr,         	 nullptr,                &trebleMenu,              &trebleFreqMenu                    },
+    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,  &lpfModeMenu,           nullptr,        nullptr                 },
+    {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,  &hpfModeMenu,           nullptr,        nullptr                 },
+    {&sidechainReleaseMenu,   &sidechainSyncMenu,      &globalSidechainVolumeMenu,     &sidechainAttackMenu,           &sidechainShapeMenu,  nullptr,                nullptr,                nullptr                      },
+    {nullptr,                 nullptr,            	   nullptr,                        nullptr,                		   nullptr,         	 nullptr,                nullptr,                 nullptr                    },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },

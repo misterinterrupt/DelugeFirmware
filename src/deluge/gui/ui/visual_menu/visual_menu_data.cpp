@@ -123,10 +123,6 @@ extern deluge::gui::menu_item::unison::Detune unisonDetuneMenu;
 namespace deluge::gui::menu_item::unison {
 extern StereoSpread stereoSpreadMenu;
 }
-extern deluge::gui::menu_item::UnpatchedParam bassFreqMenu;
-extern deluge::gui::menu_item::UnpatchedParam bassMenu;
-extern deluge::gui::menu_item::UnpatchedParam trebleFreqMenu;
-extern deluge::gui::menu_item::UnpatchedParam trebleMenu;
 
 // Oscillators
 extern deluge::gui::menu_item::osc::Type oscTypeMenu;
@@ -227,8 +223,6 @@ static const VisualPage synthMasterPages[] = {
      {{{&synthModeMenu, "MODE"}, {&portaMenu, "GLIDE"}, {&polyphonyMenu, "POLY"}, {&priorityMenu, "PRIOR"}}}},
     {"Unison", STRING_FOR_UNISON,
      {{{&numUnisonMenu, "COUNT"}, {&unisonDetuneMenu, "DETUNE"}, {&deluge::gui::menu_item::unison::stereoSpreadMenu, "SPREAD"}, {nullptr, ""}}}},
-    {"Equalizer", EMPTY_STRING,
-     {{{&bassFreqMenu, "B-FRQ"}, {&bassMenu, "BASS"}, {&trebleFreqMenu, "T-FRQ"}, {&trebleMenu, "TREB"}}}},
 };
 
 static const VisualPage synthFilterPages[] = {
@@ -321,13 +315,6 @@ static const VisualPage audioClipMasterPages[] = {
      {{{&audioClipReverseMenu, "REVERSE"}, {&audioClipInterpolationMenu, "INTERP"}, {nullptr, ""}, {nullptr, ""}}}},
 };
 
-static const VisualPage audioClipFilterPages[] = {
-    {"Low-Pass Filter", STRING_FOR_LPF,
-     {{{&globalLPFFreqMenu, "CUTOFF"}, {&globalLPFResMenu, "RESO"}, {&globalLPFMorphMenu, "MORPH"}, {&lpfModeMenu, "MODE"}}}},
-    {"High-Pass Filter", STRING_FOR_HPF,
-     {{{&globalHPFFreqMenu, "CUTOFF"}, {&globalHPFResMenu, "RESO"}, {&globalHPFMorphMenu, "MORPH"}, {&hpfModeMenu, "MODE"}}}},
-};
-
 static const VisualPage audioClipFxPages[] = {
     {"Distortion", STRING_FOR_DISTORTION,
      {{{&clippingMenu, "CLIP"}, {&bitcrushMenu, "DECIM"}, {&srrMenu, "CRUSH"}, {nullptr, ""}}}},
@@ -337,7 +324,6 @@ static const VisualPage audioClipFxPages[] = {
 
 static const VisualCategory audioClipCategories[] = {
     {STRING_FOR_MASTER, nullptr, audioClipMasterPages},
-    {STRING_FOR_FILTERS, nullptr, audioClipFilterPages},
     {STRING_FOR_FX, nullptr, audioClipFxPages},
 };
 
@@ -402,14 +388,14 @@ static VisualPage fxBlocRuntimePages[1 + 3 * (1 + dsp::FxBloc::kMaxSlotParams / 
 static size_t fxBlocRuntimePageCount = 0;
 static char fxBlocRuntimeTitles[sizeof(fxBlocRuntimePages) / sizeof(VisualPage)][12];
 
-static VisualCategory songCategories[4];
-static constexpr size_t kFxBlocSongCategoryIndex = 3;
+static VisualCategory songCategories[3];
+static constexpr size_t kFxBlocSongCategoryIndex = 2;
 
 static VisualCategory synthCategoriesRuntime[10];
 static constexpr size_t kFxBlocSynthCategoryIndex = 9;
 
-static VisualCategory audioClipCategoriesRuntime[4];
-static constexpr size_t kFxBlocAudioCategoryIndex = 3;
+static VisualCategory audioClipCategoriesRuntime[3];
+static constexpr size_t kFxBlocAudioCategoryIndex = 2;
 
 static void ensureCategoriesInit();
 
@@ -483,15 +469,14 @@ static void ensureCategoriesInit() {
 	}
 	synthCategoriesRuntime[kFxBlocSynthCategoryIndex] = {EMPTY_STRING, "FX BLOCS", {}};
 
-	for (size_t i = 0; i < 3; i++) {
+	for (size_t i = 0; i < 2; i++) {
 		audioClipCategoriesRuntime[i] = audioClipCategories[i];
 	}
 	audioClipCategoriesRuntime[kFxBlocAudioCategoryIndex] = {EMPTY_STRING, "FX BLOCS", {}};
 
 	songCategories[0] = {STRING_FOR_MASTER, nullptr, songMasterPages};
-	songCategories[1] = {STRING_FOR_FILTERS, nullptr, audioClipFilterPages};
-	songCategories[2] = {STRING_FOR_FX, nullptr, audioClipFxPages};
-	songCategories[3] = {EMPTY_STRING, "FX BLOCS", {}};
+	songCategories[1] = {STRING_FOR_FX, nullptr, audioClipFxPages};
+	songCategories[2] = {EMPTY_STRING, "FX BLOCS", {}};
 }
 
 // -------------------------------------------------------------------------------------------------

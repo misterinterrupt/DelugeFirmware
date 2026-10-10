@@ -118,8 +118,8 @@ const uint32_t mutePadActionUIModes[] = {UI_MODE_NOTES_PRESSED, UI_MODE_AUDITION
 
 const uint32_t verticalScrollUIModes[] = {UI_MODE_NOTES_PRESSED, UI_MODE_AUDITIONING, UI_MODE_RECORD_COUNT_IN, 0};
 
-constexpr int32_t kNumNonGlobalParamsForAutomation = 53;
-constexpr int32_t kNumGlobalParamsForAutomation = 21;
+constexpr int32_t kNumNonGlobalParamsForAutomation = 49;
+constexpr int32_t kNumGlobalParamsForAutomation = 9;
 constexpr int32_t kParamNodeWidth = 3;
 
 // synth and kit rows FX - sorted in the order that Parameters are scrolled through on the display
@@ -137,11 +137,7 @@ const std::array<std::pair<params::Kind, ParamType>, kNumNonGlobalParamsForAutom
     {params::Kind::PATCHED, params::LOCAL_HPF_RESONANCE},
     {params::Kind::PATCHED, params::LOCAL_HPF_MORPH},
     // Bass, Bass Freq
-    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_BASS},
-    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_BASS_FREQ},
     // Treble, Treble Freq
-    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_TREBLE},
-    {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_TREBLE_FREQ},
     // Sidechain Shape
     {params::Kind::UNPATCHED_SOUND, params::UNPATCHED_SIDECHAIN_SHAPE},
     // Decimation, Bitcrush, Wavefolder
@@ -208,19 +204,9 @@ const std::array<std::pair<params::Kind, ParamType>, kNumGlobalParamsForAutomati
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_PITCH_ADJUST},
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_PAN},
     // LPF Cutoff, Resonance
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_LPF_FREQ},
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_LPF_RES},
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_LPF_MORPH},
     // HPF Cutoff, Resonance
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_HPF_FREQ},
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_HPF_RES},
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_HPF_MORPH},
     // Bass, Bass Freq
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_BASS},
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_BASS_FREQ},
     // Treble, Treble Freq
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_TREBLE},
-    {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_TREBLE_FREQ},
     // Sidechain Send, Shape
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SIDECHAIN_VOLUME},
     {params::Kind::UNPATCHED_GLOBAL, params::UNPATCHED_SIDECHAIN_SHAPE},

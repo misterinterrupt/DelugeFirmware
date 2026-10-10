@@ -184,10 +184,6 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 	if ((kind == Kind::UNPATCHED_SOUND || kind == Kind::UNPATCHED_GLOBAL) && p < (UNPATCHED_NUM_SHARED)) {
 		static l10n::String const NAMES[UNPATCHED_NUM_SHARED] = {
 		    [UNPATCHED_STUTTER_RATE] = STRING_FOR_STUTTER_RATE,
-		    [UNPATCHED_BASS] = STRING_FOR_BASS,
-		    [UNPATCHED_TREBLE] = STRING_FOR_TREBLE,
-		    [UNPATCHED_BASS_FREQ] = STRING_FOR_BASS_FREQUENCY,
-		    [UNPATCHED_TREBLE_FREQ] = STRING_FOR_TREBLE_FREQUENCY,
 		    [UNPATCHED_SAMPLE_RATE_REDUCTION] = STRING_FOR_DECIMATION,
 		    [UNPATCHED_BITCRUSHING] = STRING_FOR_BITCRUSH,
 		    [UNPATCHED_SIDECHAIN_SHAPE] = STRING_FOR_SIDECHAIN_SHAPE,
@@ -225,12 +221,6 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 
 		static l10n::String const NAMES[UNPATCHED_GLOBAL_MAX_NUM - unc]{
 		    [UNPATCHED_PAN - unc] = STRING_FOR_PAN,
-		    [UNPATCHED_LPF_FREQ - unc] = STRING_FOR_LPF_FREQUENCY,
-		    [UNPATCHED_LPF_RES - unc] = STRING_FOR_LPF_RESONANCE,
-		    [UNPATCHED_LPF_MORPH - unc] = STRING_FOR_LPF_MORPH,
-		    [UNPATCHED_HPF_FREQ - unc] = STRING_FOR_HPF_FREQUENCY,
-		    [UNPATCHED_HPF_RES - unc] = STRING_FOR_HPF_RESONANCE,
-		    [UNPATCHED_HPF_MORPH - unc] = STRING_FOR_HPF_MORPH,
 		    [UNPATCHED_VOLUME - unc] = STRING_FOR_MASTER_LEVEL,
 		    [UNPATCHED_SIDECHAIN_VOLUME - unc] = STRING_FOR_SIDECHAIN_LEVEL,
 		    [UNPATCHED_PITCH_ADJUST - unc] = STRING_FOR_MASTER_PITCH,
@@ -306,19 +296,7 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 		case UNPATCHED_PAN:
 			return "pan";
 
-		case UNPATCHED_LPF_FREQ:
-			return "lpfFrequency";
-		case UNPATCHED_LPF_RES:
-			return "lpfResonance";
-		case UNPATCHED_LPF_MORPH:
-			return "lpfMorph";
 
-		case UNPATCHED_HPF_FREQ:
-			return "hpfFrequency";
-		case UNPATCHED_HPF_MORPH:
-			return "hpfMorph";
-		case UNPATCHED_HPF_RES:
-			return "hpfResonance";
 
 		case UNPATCHED_VOLUME:
 			return "volume";
@@ -339,17 +317,9 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 		case UNPATCHED_STUTTER_RATE:
 			return "stutterRate";
 
-		case UNPATCHED_BASS:
-			return "bass";
 
-		case UNPATCHED_TREBLE:
-			return "treble";
 
-		case UNPATCHED_BASS_FREQ:
-			return "bassFreq";
 
-		case UNPATCHED_TREBLE_FREQ:
-			return "trebleFreq";
 
 		case UNPATCHED_SAMPLE_RATE_REDUCTION:
 			return "sampleRateReduction";

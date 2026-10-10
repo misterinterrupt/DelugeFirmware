@@ -104,7 +104,6 @@ public:
 	Error makeDrumNameUnique(String* name, int32_t startAtNumber);
 	bool setActiveClip(ModelStackWithTimelineCounter* modelStack, PgmChangeSend maySendMIDIPGMs);
 	void setupPatching(ModelStackWithTimelineCounter* modelStack);
-	void compensateInstrumentVolumeForResonance(ParamManagerForTimeline* paramManager, Song* song);
 	void deleteBackedUpParamManagers(Song* song);
 	void prepareForHibernationOrDeletion();
 	int32_t doTickForwardForArp(ModelStack* modelStack, int32_t currentPos);

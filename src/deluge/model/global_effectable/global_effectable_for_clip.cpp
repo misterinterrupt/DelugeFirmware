@@ -76,8 +76,6 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 	int32_t pitchAdjust =
 	    getFinalParameterValueExp(kMaxSampleValue, unpatchedParams->getValue(params::UNPATCHED_PITCH_ADJUST) >> 3);
 
-	setupFilterSetConfig(&volumePostFX, paramManagerForClip);
-
 	int32_t pan = unpatchedParams->getValue(params::UNPATCHED_PAN) >> 1;
 
 	// Render sidechain
@@ -126,9 +124,6 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 			saturate(&currentSample->r, &lastSaturationTanHWorkingValue[1]);
 		} while (++currentSample != bufferEnd);
 	}
-
-	// Render filters
-	processFilters(globalEffectableBuffer, numSamples);
 
 	// Render FX
 	processSRRAndBitcrushing(globalEffectableBuffer, numSamples, &volumePostFX, paramManagerForClip);

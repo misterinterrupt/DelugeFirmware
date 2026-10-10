@@ -2159,7 +2159,6 @@ skipInstance:
 	if (smDeserializer.firmware_version < FirmwareVersion::official({1, 2, 0})) {
 
 		deleteAllBackedUpParamManagers(true); // Before V1.2, lots of extras of these could be created during loading
-		globalEffectable.compensateVolumeForResonance(&paramManager);
 	}
 
 	if (syncScalingClip) {

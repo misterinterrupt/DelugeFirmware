@@ -93,8 +93,6 @@ public:
 	virtual void ensureInaccessibleParamPresetValuesWithoutKnobsAreZero(Song* song) {} // Song may be NULL
 	bool isBitcrushingEnabled(ParamManager* paramManager);
 	bool isSRREnabled(ParamManager* paramManager);
-	bool hasBassAdjusted(ParamManager* paramManager);
-	bool hasTrebleAdjusted(ParamManager* paramManager);
 	ModelStackWithAutoParam* getParamFromMIDIKnob(MIDIKnob* knob, ModelStackWithThreeMainThings* modelStack);
 	ActionResult buttonAction(deluge::hid::Button b, bool on, ModelStackWithThreeMainThings* modelStack);
 
@@ -103,13 +101,7 @@ public:
 	StereoSample allpassMemory[kNumAllpassFiltersPhaser];
 
 	// EQ
-	int32_t bassFreq; // These two should eventually not be variables like this
-	int32_t trebleFreq;
 
-	int32_t withoutTrebleL;
-	int32_t bassOnlyL;
-	int32_t withoutTrebleR;
-	int32_t bassOnlyR;
 
 
 	bool sampleRateReductionOnLastTime;
@@ -156,7 +148,6 @@ protected:
 	void displayOtherModKnobSettings(uint8_t whichModButton, bool on);
 
 private:
-	void doEQ(bool doBass, bool doTreble, int32_t* inputL, int32_t* inputR, int32_t bassAmount, int32_t trebleAmount);
 	ModelStackWithThreeMainThings* addNoteRowIndexAndStuff(ModelStackWithTimelineCounter* modelStack,
 	                                                       int32_t noteRowIndex);
 	void switchHPFModeWithOff();

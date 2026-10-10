@@ -384,8 +384,6 @@ bool UnpatchedParamSet::shouldParamIndicateMiddleValue(ModelStackWithParamId con
 		return runtimeFeatureSettings.get(RuntimeFeatureSettingType::QuantizedStutterRate)
 		           == RuntimeFeatureStateToggle::Off
 		       || isUIModeActive(UI_MODE_STUTTERING);
-	case params::UNPATCHED_BASS:
-	case params::UNPATCHED_TREBLE:
 		return true;
 	}
 	// Global

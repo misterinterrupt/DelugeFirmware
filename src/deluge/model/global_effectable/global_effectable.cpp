@@ -38,10 +38,6 @@ namespace params = deluge::modulation::params;
 GlobalEffectable::GlobalEffectable() {
 	unpatchedParamKind_ = params::Kind::UNPATCHED_GLOBAL;
 	lpfMode = FilterMode::TRANSISTOR_24DB_LEGACY;
-	filterSet.reset();
-
-	currentFilterType = FilterType::LPF;
-
 	editingComp = false;
 	currentCompParam = CompParam::RATIO;
 }
@@ -49,7 +45,6 @@ GlobalEffectable::GlobalEffectable() {
 void GlobalEffectable::cloneFrom(ModControllableAudio* other) {
 	ModControllableAudio::cloneFrom(other);
 
-	currentFilterType = ((GlobalEffectable*)other)->currentFilterType;
 }
 
 void GlobalEffectable::initParams(ParamManager* paramManager) {
@@ -64,14 +59,8 @@ void GlobalEffectable::initParams(ParamManager* paramManager) {
 	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_VOLUME].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
 	unpatchedParams->params[params::UNPATCHED_PITCH_ADJUST].setCurrentValueBasicForSetup(0);
 
-	unpatchedParams->params[params::UNPATCHED_LPF_RES].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
-	unpatchedParams->params[params::UNPATCHED_LPF_FREQ].setCurrentValueBasicForSetup(ONE_Q31);
 
-	unpatchedParams->params[params::UNPATCHED_HPF_RES].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
-	unpatchedParams->params[params::UNPATCHED_HPF_FREQ].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
 
-	unpatchedParams->params[params::UNPATCHED_LPF_MORPH].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
-	unpatchedParams->params[params::UNPATCHED_HPF_MORPH].setCurrentValueBasicForSetup(NEGATIVE_ONE_Q31);
 }
 
 void GlobalEffectable::initParamsForAudioClip(ParamManagerForTimeline* paramManager) {
@@ -87,10 +76,6 @@ void GlobalEffectable::modButtonAction(uint8_t whichModButton, bool on, ParamMan
 		endStutter(paramManager);
 	}
 
-	// LPF/HPF/EQ
-	if (whichModButton == 1) {
-		displayFilterSettings(on, currentFilterType);
-	}
 	// Compressor
 	else if (whichModButton == 4) {
 		displayCompressorSettings(on);
@@ -208,65 +193,6 @@ bool GlobalEffectable::modEncoderButtonAction(uint8_t whichModEncoder, bool on,
 			endStutter((ParamManagerForTimeline*)modelStack->paramManager);
 		}
 		return false;
-	}
-
-	// Filter section
-	else if (modKnobMode == 1) {
-		if (whichModEncoder == 1) {
-			if (on) {
-				currentFilterType =
-				    static_cast<FilterType>((util::to_underlying(currentFilterType) + 1) % kNumFilterTypes);
-
-				// if mod button is pressed, update mod button pop up
-				if (Buttons::isButtonPressed(
-				        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-					displayFilterSettings(on, currentFilterType);
-				}
-				else {
-					display->displayPopup(getFilterTypeDisplayName(currentFilterType));
-				}
-				return true;
-			}
-
-			return false;
-		}
-		else {
-			if (on) {
-				if (currentFilterType == FilterType::LPF) {
-					switchLPFMode();
-
-					// if mod button is pressed, update mod button pop up
-					if (Buttons::isButtonPressed(
-					        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-						displayFilterSettings(on, currentFilterType);
-					}
-					else {
-						display->displayPopup(getFilterModeDisplayName(currentFilterType));
-					}
-					return true;
-				}
-				else if (currentFilterType == FilterType::HPF) {
-					switchHPFMode();
-
-					// if mod button is pressed, update mod button pop up
-					if (Buttons::isButtonPressed(
-					        deluge::hid::button::fromXY(modButtonX[modKnobMode], modButtonY[modKnobMode]))) {
-						displayFilterSettings(on, currentFilterType);
-					}
-					else {
-						display->displayPopup(getFilterModeDisplayName(currentFilterType));
-					}
-					return true;
-				}
-				else {
-					return false;
-				}
-			}
-
-			else {
-				return false;
-			}
-		}
 	}
 
 	// Compressor section
@@ -494,31 +420,6 @@ int32_t GlobalEffectable::getParameterFromKnob(int32_t whichModEncoder) {
 			return params::UNPATCHED_PAN;
 		}
 	}
-	else if (modKnobMode == 1) {
-		switch (currentFilterType) {
-		case FilterType::LPF:
-			if (whichModEncoder != 0) {
-				return params::UNPATCHED_LPF_FREQ;
-			}
-			else {
-				return params::UNPATCHED_LPF_RES;
-			}
-		case FilterType::HPF:
-			if (whichModEncoder != 0) {
-				return params::UNPATCHED_HPF_FREQ;
-			}
-			else {
-				return params::UNPATCHED_HPF_RES;
-			}
-		default: // case FilterType::EQ:
-			if (whichModEncoder != 0) {
-				return params::UNPATCHED_TREBLE;
-			}
-			else {
-				return params::UNPATCHED_BASS;
-			}
-		}
-	}
 	else if (modKnobMode == 4) {
 		// Encoder 0 here selects comp params via clicks; no continuous param while
 		// not editing the compressor.
@@ -581,47 +482,9 @@ ModelStackWithAutoParam* GlobalEffectable::getParamFromModEncoder(int32_t whichM
 	}
 }
 
-void GlobalEffectable::setupFilterSetConfig(int32_t* postFXVolume, ParamManager* paramManager) {
 
-	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
-
-	int32_t lpfFrequency =
-	    getFinalParameterValueExp(paramNeutralValues[params::LOCAL_LPF_FREQ],
-	                              cableToExpParamShortcut(unpatchedParams->getValue(params::UNPATCHED_LPF_FREQ)));
-	int32_t lpfResonance =
-	    getFinalParameterValueLinear(paramNeutralValues[params::LOCAL_LPF_RESONANCE],
-	                                 cableToLinearParamShortcut(unpatchedParams->getValue(params::UNPATCHED_LPF_RES)));
-	int32_t lpfMorph =
-	    getFinalParameterValueLinear(paramNeutralValues[params::LOCAL_LPF_MORPH],
-	                                 cableToExpParamShortcut(unpatchedParams->getValue(params::UNPATCHED_LPF_MORPH)));
-	int32_t hpfFrequency =
-	    getFinalParameterValueExp(paramNeutralValues[params::LOCAL_HPF_FREQ],
-	                              cableToExpParamShortcut(unpatchedParams->getValue(params::UNPATCHED_HPF_FREQ)));
-	int32_t hpfResonance =
-	    getFinalParameterValueLinear(paramNeutralValues[params::LOCAL_HPF_RESONANCE],
-	                                 cableToLinearParamShortcut(unpatchedParams->getValue(params::UNPATCHED_HPF_RES)));
-	int32_t hpfMorph =
-	    getFinalParameterValueLinear(paramNeutralValues[params::LOCAL_HPF_MORPH],
-	                                 cableToExpParamShortcut(unpatchedParams->getValue(params::UNPATCHED_HPF_MORPH)));
-
-	bool doLPF = (lpfMode == FilterMode::TRANSISTOR_24DB_DRIVE
-	              || unpatchedParams->getValue(params::UNPATCHED_LPF_FREQ) < 2147483602
-	              || unpatchedParams->getValue(params::UNPATCHED_LPF_MORPH) > NEGATIVE_ONE_Q31);
-	bool doHPF = unpatchedParams->getValue(params::UNPATCHED_HPF_FREQ) > NEGATIVE_ONE_Q31
-	             || unpatchedParams->getValue(params::UNPATCHED_HPF_MORPH) > NEGATIVE_ONE_Q31;
-	FilterMode lpfModeForRender = doLPF ? lpfMode : FilterMode::OFF;
-	FilterMode hpfModeForRender = doHPF ? hpfMode : FilterMode::OFF;
-	*postFXVolume =
-	    filterSet.setConfig(lpfFrequency, lpfResonance, lpfModeForRender, lpfMorph, hpfFrequency, hpfResonance,
-	                        hpfModeForRender, hpfMorph, *postFXVolume, filterRoute, false, NULL);
-}
-
-[[gnu::hot]] void GlobalEffectable::processFilters(StereoSample* buffer, int32_t numSamples) {
-	filterSet.renderLongStereo(&buffer->l, &(buffer + numSamples)->l);
-}
 
 void GlobalEffectable::writeAttributesToFile(Serializer& writer, bool writeAutomation) {
-	writer.writeAttribute("currentFilterType", (char*)filterTypeToString(currentFilterType));
 	ModControllableAudio::writeAttributesToFile(writer);
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
 	// <--
@@ -665,10 +528,6 @@ void GlobalEffectable::writeParamAttributesToFile(Serializer& writer, ParamManag
 	ModControllableAudio::writeParamAttributesToFile(writer, paramManager, writeAutomation, valuesForOverride);
 
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
-	unpatchedParams->writeParamAsAttribute(writer, "lpfMorph", params::UNPATCHED_LPF_MORPH, writeAutomation, false,
-	                                       valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "hpfMorph", params::UNPATCHED_HPF_MORPH, writeAutomation, false,
-	                                       valuesForOverride);
 	unpatchedParams->writeParamAsAttribute(writer, "tempo", params::UNPATCHED_TEMPO, writeAutomation, false,
 	                                       valuesForOverride);
 }
@@ -677,20 +536,6 @@ void GlobalEffectable::writeParamTagsToFile(Serializer& writer, ParamManager* pa
                                             int32_t* valuesForOverride) {
 
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
-
-	writer.writeOpeningTagBeginning("lpf");
-	unpatchedParams->writeParamAsAttribute(writer, "frequency", params::UNPATCHED_LPF_FREQ, writeAutomation, false,
-	                                       valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "resonance", params::UNPATCHED_LPF_RES, writeAutomation, false,
-	                                       valuesForOverride);
-	writer.closeTag();
-
-	writer.writeOpeningTagBeginning("hpf");
-	unpatchedParams->writeParamAsAttribute(writer, "frequency", params::UNPATCHED_HPF_FREQ, writeAutomation, false,
-	                                       valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "resonance", params::UNPATCHED_HPF_RES, writeAutomation, false,
-	                                       valuesForOverride);
-	writer.closeTag();
 
 	ModControllableAudio::writeParamTagsToFile(writer, paramManager, writeAutomation, valuesForOverride);
 }
@@ -713,65 +558,7 @@ bool GlobalEffectable::readParamTagFromFile(Deserializer& reader, char const* ta
 	ParamCollectionSummary* unpatchedParamsSummary = paramManager->getUnpatchedParamSetSummary();
 	UnpatchedParamSet* unpatchedParams = (UnpatchedParamSet*)unpatchedParamsSummary->paramCollection;
 
-	if (!strcmp(tagName, "lpf")) {
-		while (*(tagName = reader.readNextTagOrAttributeName())) {
-			if (!strcmp(tagName, "frequency")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_LPF_FREQ,
-				                           readAutomationUpToPos);
-				reader.exitTag("frequency");
-			}
-			else if (!strcmp(tagName, "resonance")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_LPF_RES,
-				                           readAutomationUpToPos);
-				reader.exitTag("resonance");
-			}
-
-			else if (!strcmp(tagName, "morph")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_LPF_MORPH,
-				                           readAutomationUpToPos);
-				reader.exitTag("morph");
-			}
-		}
-		reader.exitTag("lpf");
-	}
-
-	else if (!strcmp(tagName, "hpf")) {
-		while (*(tagName = reader.readNextTagOrAttributeName())) {
-			if (!strcmp(tagName, "frequency")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_HPF_FREQ,
-				                           readAutomationUpToPos);
-				reader.exitTag("frequency");
-			}
-			else if (!strcmp(tagName, "resonance")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_HPF_RES,
-				                           readAutomationUpToPos);
-				reader.exitTag("resonance");
-			}
-
-			else if (!strcmp(tagName, "morph")) {
-				unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_HPF_MORPH,
-				                           readAutomationUpToPos);
-				reader.exitTag("morph");
-			}
-		}
-		reader.exitTag("hpf");
-	}
-
-	else if (!strcmp(tagName, "lpfMorph")) {
-		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_LPF_MORPH, readAutomationUpToPos);
-		reader.exitTag("lpfMorph");
-	}
-
-	else if (!strcmp(tagName, "hpfMorph")) {
-		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_HPF_MORPH, readAutomationUpToPos);
-		reader.exitTag("hpfMorph");
-	}
-	else if (!strcmp(tagName, "tempo")) {
-		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_TEMPO, readAutomationUpToPos);
-		reader.exitTag("tempo");
-	}
-
-	else if (!strcmp(tagName, "volume")) {
+	if (!strcmp(tagName, "volume")) {
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_VOLUME, readAutomationUpToPos);
 		reader.exitTag("volume");
 	}
@@ -832,11 +619,6 @@ Error GlobalEffectable::readTagFromFile(Deserializer& reader, char const* tagNam
 		reader.exitTag("defaultParams");
 	}
 
-	else if (!strcmp(tagName, "currentFilterType")) {
-		currentFilterType = stringToFilterType(reader.readTagOrAttributeValue());
-		reader.exitTag("currentFilterType");
-	}
-
 	else {
 		return ModControllableAudio::readTagFromFile(reader, tagName, NULL, readAutomationUpToPos, song);
 	}
@@ -846,22 +628,3 @@ Error GlobalEffectable::readTagFromFile(Deserializer& reader, char const* tagNam
 
 // Before calling this, check that (reader.firmwareVersionOfFileBeingRead < FIRMWARE_1P2P0 &&
 // !paramManager->resonanceBackwardsCompatibilityProcessed)
-void GlobalEffectable::compensateVolumeForResonance(ParamManagerForTimeline* paramManager) {
-
-	paramManager->resonanceBackwardsCompatibilityProcessed = true;
-
-	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
-
-	// If no LPF on, and resonance is at 50%, set it to 0%
-	if (!unpatchedParams->params[params::UNPATCHED_LPF_FREQ].isAutomated()
-	    && unpatchedParams->params[params::UNPATCHED_LPF_FREQ].getCurrentValue() >= 2147483602
-	    && !unpatchedParams->params[params::UNPATCHED_LPF_RES].containsSomething(0)) {
-		unpatchedParams->params[params::UNPATCHED_LPF_RES].currentValue = -2147483648;
-	}
-
-	// If no HPF on, and resonance is at 25%, set it to 0%
-	if (!unpatchedParams->params[params::UNPATCHED_HPF_FREQ].containsSomething(-2147483648)
-	    && !unpatchedParams->params[params::UNPATCHED_LPF_RES].containsSomething(-1073741824)) {
-		unpatchedParams->params[params::UNPATCHED_HPF_RES].currentValue = -2147483648;
-	}
-}

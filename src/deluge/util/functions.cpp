@@ -1305,16 +1305,6 @@ int32_t getParamFromUserValue(uint8_t p, int8_t userValue) {
 	case params::STATIC_SIDECHAIN_VOLUME:
 		return userValue * 21474836;
 
-	case params::UNPATCHED_START + params::UNPATCHED_BASS:
-	case params::UNPATCHED_START + params::UNPATCHED_TREBLE:
-		if (userValue == -50) {
-			return -2147483648;
-		}
-		if (userValue == 0) {
-			return 0;
-		}
-		return userValue * 42949672;
-
 	default:
 		return (uint32_t)userValue * 85899345 - 2147483648;
 	}
