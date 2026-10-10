@@ -1912,14 +1912,18 @@ void Sound::reassessRenderSkippingStatus(ModelStackWithSoundFlags* modelStack) {
 			// envelope) its wet tails — the delay's longest line plus generous
 			// reverb drain. Infinite-sustain settings get cut at that point;
 			// keeping them alive forever would burn a voice's worth of CPU.
-			bool chainHoldsTail = (!fxWithinAmpEnv && fxChain.isActive());
 			int32_t waitSamples = 0;
 			if (compressor.getThreshold() > 0) {
 				waitSamples = compressor.getReleaseMS() * 44;
 			}
-			if (chainHoldsTail) {
-				constexpr int32_t kFxTailSamples = 44100 * 3; // ~3s of tail drain
-				waitSamples = std::max(waitSamples, kFxTailSamples);
+			if (!fxWithinAmpEnv) {
+				// The engines report their own remaining tails (delay:
+				// repeats-until-silent; reverb: RT60) — the successor of the
+				// stock delay's repeatsUntilAbandon. Sustaining settings
+				// (INF / unity feedback) hold for a bounded 60s drain.
+				int32_t fxTail = static_cast<int32_t>(std::min<uint32_t>(
+					fxChain.tailSamples(), 60u * 44100u));
+				waitSamples = std::max(waitSamples, fxTail);
 			}
 			if (waitSamples > 0) {
 				if (!startSkippingRenderingAtTime) {

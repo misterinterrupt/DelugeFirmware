@@ -495,6 +495,11 @@ public:
 		}
 	}
 
+	/// Wet tail still pending in this bloc's engine, in samples (0 = none).
+	[[nodiscard]] uint32_t tailSamples() const {
+		return (engine_ != nullptr) ? engine_->tailSamples() : 0;
+	}
+
 	/// UI thread. Cache-and-defer for the bloc's params — mirrors the deferred
 	/// application the global reverb wrapper uses. Floats are 0..1 normalized;
 	/// int params are stored as their plain integer value.

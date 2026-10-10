@@ -169,6 +169,27 @@ public:
 	}
 	[[nodiscard]] bool getPhaseInvert() const override { return phaseInvert_; }
 
+	[[nodiscard]] uint32_t tailSamples() const override {
+		size_t longest = std::max(delaySamplesL_, delaySamplesR_);
+		float fb = feedback_val_;
+		if (fb < 0.0001f) {
+			return 0; // no feedback, no tail
+		}
+		constexpr uint32_t kTailCeiling = 60u * 44100u; // INF/unity sustains: bounded at 60s
+		if (fb >= 0.9999f) {
+			// Unity loop: the damping filter still drains it, but slowly and
+			// uncomputably here — give it a long bounded drain.
+			return kTailCeiling;
+		}
+		// Repeats until -60 dB: n = 6 / -ln(fb); tail = n x line length.
+		float n = 6.0f / -std::log(fb);
+		double tail = static_cast<double>(n) * static_cast<double>(longest);
+		if (tail >= static_cast<double>(kTailCeiling)) {
+			return kTailCeiling;
+		}
+		return static_cast<uint32_t>(tail);
+	}
+
 private:
 	static constexpr size_t kMaxDelay = 65536; // ~1486 ms buffer @ 44.1k
 

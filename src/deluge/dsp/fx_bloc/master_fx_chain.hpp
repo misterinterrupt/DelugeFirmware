@@ -109,6 +109,16 @@ public:
 		}
 	}
 
+	/// Longest wet tail any slot still owes, in samples (0 = none). The
+	/// render-skip logic holds the owning render open for exactly this long.
+	[[nodiscard]] uint32_t tailSamples() const {
+		uint32_t t = 0;
+		for (const auto& s : slots_) {
+			t = std::max(t, s.tailSamples());
+		}
+		return t;
+	}
+
 	/// In-place stereo processing through the configured topology.
 	void process(StereoSample* buffer, size_t numSamples) {
 		for (size_t done = 0; done < numSamples;) {

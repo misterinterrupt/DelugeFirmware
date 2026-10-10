@@ -167,6 +167,12 @@ struct Base {
 	[[nodiscard]] virtual float getOutLevel() const { return 0.5f; }
 
 	[[nodiscard]] constexpr int32_t getPanLeft() const { return amplitude_left_; }
+
+	/// Samples this engine still needs to render before its wet output falls
+	/// below audibility (0 = dry-through / nothing pending). The render-skip
+	/// logic holds the Sound open for exactly this long — the successor of the
+	/// stock delay's repeatsUntilAbandon.
+	[[nodiscard]] virtual uint32_t tailSamples() const { return 0; }
 	[[nodiscard]] constexpr int32_t getPanRight() const { return amplitude_right_; }
 
 private:

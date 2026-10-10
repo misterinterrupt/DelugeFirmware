@@ -153,6 +153,21 @@ public:
 	}
 	[[nodiscard]] float getDecay() const override { return decay_val_; }
 
+	[[nodiscard]] uint32_t tailSamples() const override {
+		constexpr uint32_t kTailCeiling = 60u * 44100u;
+		float g = std::clamp(decayFloat_, 0.05f, 0.999999f);
+		if (g >= 0.9995f) {
+			return kTailCeiling; // INF setting: sustaining, bounded
+		}
+		// RT60 seconds for this per-pass gain (matches the menu's readout curve)
+		float rt60 = 0.594f / -std::log(g);
+		double tail = static_cast<double>(rt60) * 44100.0;
+		if (tail >= static_cast<double>(kTailCeiling)) {
+			return kTailCeiling;
+		}
+		return static_cast<uint32_t>(tail);
+	}
+
 	void setDamping(float value) override {
 		damping_ = value;
 		const float coeff = 0.05f + value * 0.95f;
