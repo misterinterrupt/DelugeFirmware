@@ -50,8 +50,12 @@ public:
 				tapSum = kdfx::qsum64(tapSum, kdfx::q31_mul(t, tapGain(n)));
 			}
 
-			// 2. Feedback: the tap sum recirculates, loop gain = FDBK (≤ 1.0).
-			q31_t fb = kdfx::q31_mul(kdfx::q31_mul(tapSum, feedbackQ31_), kTapSumScale);
+			// 2. Feedback: the tap sum recirculates normalized by the tap count,
+			// so loop gain = FDBK (<= 1.0) for every contour shape. The old fixed
+			// 0.22 headroom constant assumed incoherent taps — with correlated
+			// (low-frequency) content the coherent sum reached ~2.5x FDBK and the
+			// line ran away from ~FDBK 40% up.
+			q31_t fb = kdfx::q31_mul(tapSum / std::max<int32_t>(tapCount, 1), feedbackQ31_);
 			buf_[writePos_] = add_saturation(inputSample, fb);
 
 			// 3. Output HPF and wet-add (send style).

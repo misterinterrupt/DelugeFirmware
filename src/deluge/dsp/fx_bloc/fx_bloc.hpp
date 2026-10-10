@@ -274,7 +274,7 @@ public:
 	// the largest at 17 (IN-GN + 16); 20 leaves headroom. The static_asserts by
 	// the tables enforce this at compile time — exceeding it corrupts the
 	// runtime page array (device: white column artifacts, frozen UI).
-	static constexpr size_t kMaxSlotParams = 20; // menu item pool per slot
+	static constexpr size_t kMaxSlotParams = 24; // menu item pool per slot (Spectral 4-Tap = 23)
 
 	// Display option strings for the int params, and the LEVEL / INGAIN column definitions.
 	static constexpr const char* kWaveformOptionStrings[] = {"SINE", "TRI", "S&H"};
@@ -1325,7 +1325,7 @@ constexpr FxBloc::ParamDef kDefsKdfxQuant[6] = {
     FxBloc::db(FxBloc::Param::Diffusion, "DC", -79.f, 0.f, true),
 };
 // Quantize+Flange (manual 714, "+" = fixed order: quantize then flange).
-constexpr FxBloc::ParamDef kDefsKdfxQntFlg[10] = {
+constexpr FxBloc::ParamDef kDefsKdfxQntFlg[9] = {
     FxBloc::INGAIN_DEF(),
     FxBloc::db(FxBloc::Param::RoomSize, "DYN", 0.f, 144.f),
     FxBloc::db(FxBloc::Param::Decay, "HEAD", 0.f, 144.f),
@@ -1334,7 +1334,6 @@ constexpr FxBloc::ParamDef kDefsKdfxQntFlg[10] = {
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
     FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
     FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
-    FxBloc::ms(FxBloc::Param::BaseDelay, "BASE", 0.1f, 7.f),
 };
 constexpr FxBloc::ParamDef kDefsKdfxRingMod[17] = {
     FxBloc::INGAIN_DEF(),
@@ -1381,7 +1380,7 @@ constexpr FxBloc::ParamDef kDefsCompressor[9] = {
 /// Spectral 4-Tap (135): LOOP time, FDBK, IMAGE, feedback HPF/TONE, then the
 /// per-tap controls: comb pitch (C-1..C8 as note numbers), PtAmt, Shapr, and
 /// the tap time fractions. IN-GN leads per house style.
-constexpr FxBloc::ParamDef kDefsKdfxSpectral4[18] = {
+constexpr FxBloc::ParamDef kDefsKdfxSpectral4[23] = {
     FxBloc::INGAIN_DEF(),
     {FxBloc::Param::RoomSize, "LOOP", false, 0, 1, nullptr, "MS", 1.f, 1480.f, 0, false},
     {FxBloc::Param::Decay, "FDBK", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
@@ -1398,8 +1397,13 @@ constexpr FxBloc::ParamDef kDefsKdfxSpectral4[18] = {
     {FxBloc::Param::AirShelf, "A3", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
     {FxBloc::Param::DelayTimeR, "A4", false, 0, 1, nullptr, "%", 0.f, 100.f, 0, false},
     {FxBloc::Param::DelayDrive, "S1", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
+    {FxBloc::Param::ChorusVoices, "S2", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
+    {FxBloc::Param::ShaperMode, "S3", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
+    {FxBloc::Param::ComboCfg, "S4", false, 0, 1, nullptr, "X", 0.1f, 6.f, 2, false},
+    {FxBloc::Param::Width, "T1", false, 0, 1, nullptr, "%", 2.f, 100.f, 0, false},
     {FxBloc::Param::PreDelay, "T2", false, 0, 1, nullptr, "%", 2.f, 100.f, 0, false},
     {FxBloc::Param::ERLevel, "T3", false, 0, 1, nullptr, "%", 2.f, 100.f, 0, false},
+    {FxBloc::Param::BassDecay, "T4", false, 0, 1, nullptr, "%", 2.f, 100.f, 0, false},
 };
 
 constexpr FxBloc::ParamDef kDefsGlobalSend[5] = {

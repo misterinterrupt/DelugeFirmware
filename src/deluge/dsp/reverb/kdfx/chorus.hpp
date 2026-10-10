@@ -99,18 +99,23 @@ public:
 				sumR += readInterp(bufR_, delayQ16R);
 			}
 
-			q31_t tapL = kdfx::qcollapse(sumL / (numVoices >> 1));
-			q31_t tapR = kdfx::qcollapse(sumR / (numVoices >> 1));
+			// Per-voice average: what the feedback loop sees. The old form
+			// divided by (numVoices >> 1), a 2x-boosted sum — with correlated
+			// content (DC, slow material) the loop gain reached 2x FDBK and
+			// the lines ran away at FDBK >= 50%.
+			q31_t tapL = kdfx::qcollapse(sumL / numVoices);
+			q31_t tapR = kdfx::qcollapse(sumR / numVoices);
 
-			// Bipolar feedback with saturation into delay lines
+			// Bipolar feedback with saturation into delay lines — now bounded
+			// by FDBK (<= 0.95) exactly.
 			q31_t fbL = kdfx::q31_mul(tapL, feedbackQ31_);
 			q31_t fbR = kdfx::q31_mul(tapR, feedbackQ31_);
 
 			bufL_[writePos_] = add_saturation(inputSample, fbL);
 			bufR_[writePos_] = add_saturation(inputSample, fbR);
 
-			q31_t wetL = tapL;
-			q31_t wetR = tapR;
+			q31_t wetL = tapL << 1; // the loudness the 2x sum used to give
+			q31_t wetR = tapR << 1;
 
 			// DC/HPF filter
 			kdfx::smoothDamp(hpfL_, wetL, hpfCoeff_);

@@ -172,12 +172,14 @@ public:
 	void setDelayTimeR(float v) override { setTapAmt(3, v); }
 	[[nodiscard]] float getDelayTimeR() const override { return amt_[3]; }
 
-	// Per-tap Shapr (0..1 -> 0.10-6.00x)
+	// Per-tap Shapr (0..1 -> 0.10-6.00x). S2-S4 ride the int-param ids
+	// (ChorusVoices/ShaperMode/ComboCfg) but arrive as continuous 0..1
+	// cache values — the FxBloc flush casts them, the value itself is 0..1.
 	void setDelayDrive(float v) override { setTapShapr(0, v); }
 	[[nodiscard]] float getDelayDrive() const override { return shapr_[0]; }
-	void setChorusVoices(int32_t v) override { setTapShapr(1, std::clamp<int32_t>(v, 0, 100) / 100.0f); }
-	void setShaperMode(int32_t v) override { setTapShapr(2, std::clamp<int32_t>(v, 0, 100) / 100.0f); }
-	void setComboCfg(int32_t v) override { setTapShapr(3, std::clamp<int32_t>(v, 0, 100) / 100.0f); }
+	void setChorusVoices(int32_t v) override { setTapShapr(1, std::clamp<int32_t>(v, 0, 1)); }
+	void setShaperMode(int32_t v) override { setTapShapr(2, std::clamp<int32_t>(v, 0, 1)); }
+	void setComboCfg(int32_t v) override { setTapShapr(3, std::clamp<int32_t>(v, 0, 1)); }
 
 	[[nodiscard]] uint32_t tailSamples() const override {
 		if (feedback_val_ < 0.0001f) {
