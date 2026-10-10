@@ -5,7 +5,7 @@ set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_LIST_DIR}/scripts/cmake/CMakeToolchainD
 
 project(Deluge
     LANGUAGES CXX C ASM
-    VERSION 666.0.1
+    VERSION 666.0.2
 )
 include(FetchContent)
 include(ProcessorCount)
