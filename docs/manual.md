@@ -1,4 +1,4 @@
-# Deluge FX-Blocs Firmware — User Manual
+# Deluge AntiFirmware — User Manual
 
 *Firmware branch `fx-blocs`. This manual covers everything this firmware adds and
 changes on top of the stock Deluge Community Firmware: the modular FX bloc system,
