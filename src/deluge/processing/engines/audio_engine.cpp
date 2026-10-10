@@ -59,7 +59,9 @@
 #include "storage/storage_manager.h"
 #include "task_scheduler.h"
 #include "timers_interrupts/timers_interrupts.h"
+#include "modulation/lfo.h"
 #include "util/functions.h"
+#include "util/waves.h"
 #include "util/misc.h"
 #include <cstring>
 #include <new>
@@ -600,7 +602,8 @@ void renderAudio(size_t numSamples) {
 	dsp::reverb::kSystemTempoBPM.store(
 	    currentSong ? playbackHandler.calculateBPM(currentSong->getTimePerTimerTickFloat()) : 120.0f,
 	    std::memory_order_relaxed);
-	masterFxChain.applyPending();
+	renderFxGlobalModSources(numSamples);
+	masterFxChain.applyPending(fxGlobalModSources);
 	masterFxChain.clearSendBusses(numSamples);
 
 	memset(&renderingBuffer, 0, numSamples * sizeof(StereoSample));
@@ -1282,6 +1285,25 @@ void stopAnyPreviewing() {
 		MultisampleRange* range = (MultisampleRange*)sampleForPreview->sources[0].ranges.getElement(0);
 		range->sampleHolder.setAudioFile(NULL);
 	}
+}
+
+int32_t fxGlobalModSources[kNumPatchSources];
+static LFO fxGlobalModLFO{};
+static uint32_t fxGlobalRandomState = 1;
+
+void renderFxGlobalModSources(size_t numSamples) {
+	// One shared LFO for chain modulation outside any Sound — 1 Hz triangle,
+	// cheap and predictable. Random walks slowly between values.
+	fxGlobalModLFO.phase += (uint32_t)((double)numSamples * 4294967296.0 / 44100.0);
+	fxGlobalModSources[util::to_underlying(PatchSource::LFO_GLOBAL)] = getTriangle(fxGlobalModLFO.phase);
+	// xorshift walk: drifts a small step each block, bounded bipolar.
+	fxGlobalRandomState ^= fxGlobalRandomState << 13;
+	fxGlobalRandomState ^= fxGlobalRandomState >> 17;
+	fxGlobalRandomState ^= fxGlobalRandomState << 5;
+	int32_t walk = (int32_t)(fxGlobalRandomState & 0xFFFFFF) - 0x800000;
+	int32_t current = fxGlobalModSources[util::to_underlying(PatchSource::RANDOM)];
+	current = std::clamp<int32_t>(current + (walk >> 12), -2147483647, 2147483647);
+	fxGlobalModSources[util::to_underlying(PatchSource::RANDOM)] = current;
 }
 
 void killAllFxTails() {

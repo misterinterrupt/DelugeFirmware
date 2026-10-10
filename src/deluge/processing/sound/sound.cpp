@@ -2039,6 +2039,12 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 	fxModSources[util::to_underlying(PatchSource::VELOCITY)] = lastVelocity_;
 	fxModSources[util::to_underlying(PatchSource::NOTE)] = lastNoteCode_;
 	fxModSources[util::to_underlying(PatchSource::AFTERTOUCH)] = lastAftertouch_;
+	fxModSources[util::to_underlying(PatchSource::ENVELOPE_0)] = lastEnv0_;
+	fxModSources[util::to_underlying(PatchSource::ENVELOPE_1)] = lastEnv1_;
+	fxModSources[util::to_underlying(PatchSource::LFO_LOCAL)] = lastLFO2Sample_;
+	fxModSources[util::to_underlying(PatchSource::X)] = monophonicExpressionValues[0];
+	fxModSources[util::to_underlying(PatchSource::Y)] = monophonicExpressionValues[2];
+	fxModSources[util::to_underlying(PatchSource::RANDOM)] = getNoise();
 	fxChain.applyPending(fxModSources);
 
 	if (skippingRendering) {

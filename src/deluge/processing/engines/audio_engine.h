@@ -155,6 +155,13 @@ void getMasterFxParamsFromSong(Song* song);
 /// or bloc re-selection revives the bloc at its settings.
 void killAllFxTails();
 
+/// Modulation source table for the master and kit/clip FX chains (per-note
+/// sources don't exist there; LFO1 is a dedicated global FX LFO).
+extern int32_t fxGlobalModSources[kNumPatchSources];
+
+/// Renders fxGlobalModSources for this block — call at the top of renderAudio.
+void renderFxGlobalModSources(size_t numSamples);
+
 VoiceSample* solicitVoiceSample();
 void voiceSampleUnassigned(VoiceSample* voiceSample);
 

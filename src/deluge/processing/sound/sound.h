@@ -90,6 +90,9 @@ public:
 	int32_t lastVelocity_ = 0;
 	int32_t lastNoteCode_ = 0;
 	int32_t lastAftertouch_ = 0;
+	int32_t lastEnv0_ = 0;
+	int32_t lastEnv1_ = 0;
+	int32_t lastLFO2Sample_ = 0;
 	LFOConfig lfoConfig[LFO_COUNT];
 
 	// December 3, 2024

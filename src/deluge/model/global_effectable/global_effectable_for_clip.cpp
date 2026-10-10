@@ -52,7 +52,7 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
                                                         int32_t numSamples, int32_t sideChainHitPending,
                                                         bool isClipActive, OutputType outputType,
                                                         SampleRecorder* recorder) {
-	fxChain.applyPending();
+	fxChain.applyPending(AudioEngine::fxGlobalModSources);
 	UnpatchedParamSet* unpatchedParams = paramManagerForClip->getUnpatchedParamSet();
 
 	// Process FX and stuff. For kits, stutter happens before reverb send

@@ -728,7 +728,8 @@ uint32_t Voice::getLocalLFOPhaseIncrement() {
 	for (int32_t e = 0; e < kNumEnvelopes; e++) {
 		if (e == 0
 		    || (paramManager->getPatchCableSet()->sourcesPatchedToAnything[GLOBALITY_LOCAL]
-		        & (1 << (util::to_underlying(PatchSource::ENVELOPE_0) + e)))) {
+		        & (1 << (util::to_underlying(PatchSource::ENVELOPE_0) + e)))
+		    || sound->fxChain.anyModFromSource(util::to_underlying(PatchSource::ENVELOPE_0) + e)) {
 			int32_t old = sourceValues[util::to_underlying(PatchSource::ENVELOPE_0) + e];
 			int32_t release = paramFinalValues[params::LOCAL_ENV_0_RELEASE + e];
 			if (e == 0 && overrideAmplitudeEnvelopeReleaseRate) {
@@ -738,6 +739,14 @@ uint32_t Voice::getLocalLFOPhaseIncrement() {
 			    envelopes[e].render(numSamples, paramFinalValues[params::LOCAL_ENV_0_ATTACK + e],
 			                        paramFinalValues[params::LOCAL_ENV_0_DECAY + e],
 			                        paramFinalValues[params::LOCAL_ENV_0_SUSTAIN + e], release, decayTableSmall8);
+			// FX-modulation table: the freshest voice's envelope rides out to
+			// the Sound (last writer wins — the envelope of the tail you hear).
+			if (e == 0) {
+				sound->lastEnv0_ = sourceValues[util::to_underlying(PatchSource::ENVELOPE_0)];
+			}
+			else {
+				sound->lastEnv1_ = sourceValues[util::to_underlying(PatchSource::ENVELOPE_1)];
+			}
 			uint32_t anyChange = (old != sourceValues[util::to_underlying(PatchSource::ENVELOPE_0) + e]);
 			sourcesChanged |= anyChange << (util::to_underlying(PatchSource::ENVELOPE_0) + e);
 		}
@@ -748,13 +757,15 @@ uint32_t Voice::getLocalLFOPhaseIncrement() {
 	     == EnvelopeStage::OFF); //(envelopes[0].state >= EnvelopeStage::DECAY &&
 	                             // localSourceValues[PatchSource::ENVELOPE_0 - Local::FIRST_SOURCE] == -2147483648);
 	// Local LFO
-	if (paramManager->getPatchCableSet()->sourcesPatchedToAnything[GLOBALITY_LOCAL]
-	    & (1 << util::to_underlying(PatchSource::LFO_LOCAL))) {
+	if ((paramManager->getPatchCableSet()->sourcesPatchedToAnything[GLOBALITY_LOCAL]
+	     & (1 << util::to_underlying(PatchSource::LFO_LOCAL)))
+	    || sound->fxChain.anyModFromSource(util::to_underlying(PatchSource::LFO_LOCAL))) {
 		int32_t old = sourceValues[util::to_underlying(PatchSource::LFO_LOCAL)];
 		// TODO: Same as with LFO1, there should be no reason to recompute the phase increment
 		// for every sample.
 		sourceValues[util::to_underlying(PatchSource::LFO_LOCAL)] =
 		    lfo.render(numSamples, sound->lfoConfig[LFO2_ID], getLocalLFOPhaseIncrement());
+		sound->lastLFO2Sample_ = sourceValues[util::to_underlying(PatchSource::LFO_LOCAL)];
 		uint32_t anyChange = (old != sourceValues[util::to_underlying(PatchSource::LFO_LOCAL)]);
 		sourcesChanged |= anyChange << util::to_underlying(PatchSource::LFO_LOCAL);
 	}

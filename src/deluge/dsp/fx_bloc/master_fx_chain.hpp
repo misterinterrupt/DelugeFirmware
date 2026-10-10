@@ -139,6 +139,19 @@ public:
 		return lastBlockPeak >= threshold;
 	}
 
+	/// True if any slot holds a modulation from this source (renders of
+	/// per-voice sources like LFO2/ENV2 are skipped unless something wants them).
+	[[nodiscard]] bool anyModFromSource(uint8_t source) const {
+		for (const auto& s : slots_) {
+			for (const auto& c : s.modConnections) {
+				if (c.inUse && c.source == source) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	/// Panic-kill every slot's wet tail (short fade, then silent-dry).
 	/// Safe from the UI thread: only bloc scalars are touched; the audio
 	/// thread performs the fade on its next blocks.
