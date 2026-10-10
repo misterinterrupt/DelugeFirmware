@@ -103,9 +103,9 @@ public:
 	FxBloc const& slot(size_t i) const { return slots_[i]; }
 
 	/// Audio thread only, at the top of each render block.
-	void applyPending() {
+	void applyPending(int32_t const* sourceValues = nullptr) {
 		for (auto& s : slots_) {
-			s.applyPending();
+			s.applyPending(sourceValues);
 		}
 	}
 

@@ -1416,6 +1416,10 @@ void Sound::noteOnPostArpeggiator(ModelStackWithSoundFlags* modelStack, int32_t 
                                   int32_t velocity, int16_t const* mpeValues, uint32_t sampleSyncLength,
                                   int32_t ticksLate, uint32_t samplesLate, int32_t fromMIDIChannel) {
 
+	// FX-modulation source samples: hold the latest event values.
+	lastVelocity_ = velocity;
+	lastNoteCode_ = noteCodePostArp;
+
 	Voice* voiceToReuse = NULL;
 
 	Voice* voiceForLegato = NULL;
@@ -2027,7 +2031,15 @@ void Sound::stopParamLPF(ModelStackWithSoundFlags* modelStack) {
 void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outputBuffer, int32_t numSamples,
                    int32_t sideChainHitPending, int32_t pitchAdjust, SampleRecorder* recorder) {
 
-	fxChain.applyPending();
+	// Source table for FX modulation, indexed by PatchSource. LFO1 renders
+	// per block below; its previous-block value is close enough at the
+	// boundary. VELOCITY / NOTE / AFTERTOUCH hold the last event's values.
+	int32_t fxModSources[kNumPatchSources] = {};
+	fxModSources[util::to_underlying(PatchSource::LFO_GLOBAL)] = lastGlobalLFOSample_;
+	fxModSources[util::to_underlying(PatchSource::VELOCITY)] = lastVelocity_;
+	fxModSources[util::to_underlying(PatchSource::NOTE)] = lastNoteCode_;
+	fxModSources[util::to_underlying(PatchSource::AFTERTOUCH)] = lastAftertouch_;
+	fxChain.applyPending(fxModSources);
 
 	if (skippingRendering) {
 		compressor.gainReduction = 0;
@@ -2041,12 +2053,14 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 		const auto patchSourceLFOGlobalUnderlying = util::to_underlying(PatchSource::LFO_GLOBAL);
 
 		int32_t old = globalSourceValues[patchSourceLFOGlobalUnderlying];
+		// (folded below — keep the LFO's fresh output for the FX-mod table)
 		// TODO: We don't really need to recompute phase increment unless rate, sync, or
 		// playbackHandler.getTimePerInternalTickInverse() has changed. Rate and sync changes
 		// already cause a resync. Maybe tempo changes do too? If so, this could be part of
 		// the resync logic. Note: same issue exists with LFO2 now that it supports sync.
 		globalSourceValues[patchSourceLFOGlobalUnderlying] =
 		    globalLFO.render(numSamples, lfoConfig[LFO1_ID], getGlobalLFOPhaseIncrement());
+		lastGlobalLFOSample_ = globalSourceValues[patchSourceLFOGlobalUnderlying];
 		uint32_t anyChange = (old != globalSourceValues[patchSourceLFOGlobalUnderlying]);
 		sourcesChanged |= anyChange << patchSourceLFOGlobalUnderlying;
 	}

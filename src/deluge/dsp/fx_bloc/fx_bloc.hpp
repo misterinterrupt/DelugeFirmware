@@ -460,8 +460,9 @@ public:
 		return true;
 	}
 
-	/// Audio thread only, at the top of each render block.
-	void applyPending() {
+	/// Audio thread only, at the top of each render block. `sourceValues` is
+	/// indexed by PatchSource underlying value; null disables modulation.
+	void applyPending(int32_t const* sourceValues = nullptr) {
 		renderGeneration_++;
 		if (pendingSwap_) {
 			pendingSwap_ = false;
@@ -474,6 +475,17 @@ public:
 			pendingEngine_ = nullptr;
 			model_ = pendingModel_;
 		}
+		// Modulated params need a push every block while connected — the source
+		// moves continuously. Mark them dirty so the flush below carries the
+		// folded value.
+		if (engine_ != nullptr && sourceValues != nullptr) {
+			for (const auto& c : modConnections) {
+				if (c.inUse && c.param != util::to_underlying(Param::None)) {
+					dirty_ |= (1ull << c.param);
+				}
+			}
+		}
+
 		// Deferred parameter application: menus write the cache from the UI thread at
 		// any time; the engine is only touched here, at the render boundary. Only the
 		// params actually written get pushed — the rest keep the engine's own state.
@@ -500,10 +512,66 @@ public:
 					}
 				}
 				else {
-					applyParamToEngine(engine_, static_cast<Param>(id), cache_[id]);
+					float v = cache_[id];
+					if (sourceValues != nullptr) {
+						for (const auto& c : modConnections) {
+							if (c.inUse && c.param == id) {
+								// depth is Q31 bipolar; the source table is Q31
+								// bipolar. Their product lands in param-space.
+								int32_t s = sourceValues[c.source];
+								int32_t contribution = multiply_32x32_rshift32_rounded(s, c.depth) << 1;
+								v = std::clamp(v + static_cast<float>(contribution) / 2147483648.0f, 0.0f, 1.0f);
+							}
+						}
+					}
+					applyParamToEngine(engine_, static_cast<Param>(id), v);
 				}
 			}
 		}
+	}
+
+	/// One modulation routing: `source` scaled by `depth` swings `param` around
+	/// the value the user set. Evaluated at the render boundary against the
+	/// owning context's source table; the base in the cache is never touched.
+	struct ModConnection {
+		uint8_t param;    // Param underlying
+		uint8_t source;   // PatchSource underlying
+		q31_t depth;      // bipolar, Q31; full-scale = the param's whole range
+		bool inUse;
+	};
+	static constexpr size_t kMaxModConnections = 8;
+	ModConnection modConnections[kMaxModConnections]{};
+
+	/// UI thread. Returns false if the pool is full.
+	bool setModConnection(Param param, uint8_t source, q31_t depth) {
+		for (auto& c : modConnections) {
+			if (c.inUse && c.param == util::to_underlying(param) && c.source == source) {
+				c.depth = depth; // re-touching an existing routing edits depth
+				return true;
+			}
+		}
+		for (auto& c : modConnections) {
+			if (!c.inUse) {
+				c = {util::to_underlying(param), source, depth, true};
+				return true;
+			}
+		}
+		return false;
+	}
+	void clearModConnection(Param param, uint8_t source) {
+		for (auto& c : modConnections) {
+			if (c.inUse && c.param == util::to_underlying(param) && c.source == source) {
+				c.inUse = false;
+			}
+		}
+	}
+	[[nodiscard]] bool hasModConnection(Param param, uint8_t source) const {
+		for (const auto& c : modConnections) {
+			if (c.inUse && c.param == util::to_underlying(param) && c.source == source) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/// Wet tail still pending in this bloc's engine, in samples (0 = none).

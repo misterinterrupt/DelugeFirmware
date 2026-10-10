@@ -84,6 +84,12 @@ public:
 	uint32_t sourcesChanged; // Applies from first source up to FIRST_UNCHANGEABLE_SOURCE
 
 	LFO globalLFO;
+	// FX-modulation source samples (see render): updated as the events/renders
+	// happen so the chain boundary always has fresh values.
+	int32_t lastGlobalLFOSample_ = 0;
+	int32_t lastVelocity_ = 0;
+	int32_t lastNoteCode_ = 0;
+	int32_t lastAftertouch_ = 0;
 	LFOConfig lfoConfig[LFO_COUNT];
 
 	// December 3, 2024
