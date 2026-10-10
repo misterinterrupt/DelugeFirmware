@@ -39,7 +39,7 @@ defines it but our engine does not implement it yet (never list those — rule 3
 | KDFX CHO | Chorus family 150–153 + vibrato sides of 159/160 | 2/4/6 voices, waveforms, quadrature spread |
 | KDFX TONE | 909 Super Shaper, 910 3 Band Shaper, enhancers 959/960, EQ tools | Drive, 4 shaper modes, 3-band EQ, level |
 | KDFX FLANGER | 154 Flanger 1, 155 Flanger 2 | Single stereo tap, bipolar feedback |
-| KDFX PHASER | 156–160 (LFO Phaser family) | 4× one-pole allpass cascade, swept coeff, feedback |
+| KDFX PHASER | 156–160 (LFO Phaser family) | 4× one-pole allpass cascade, swept coeff, bipolar FDBK ±100% (reference: negative = degenerative) |
 | KDFX TREMOLO | 961 Tremolo, 962 Tremolo BPM | Insert-style; BPM sync later |
 | KDFX PAN | 963 AutoPanner, 964 Dual AutoPanner | Insert-style; linear crossfade v1 |
 | KDFX DIST | Distortion 724–728 (Mono/Stereo Distort, +Cab, +EQ) | Insert-style: LOCUT/DRIVE/4 shaper modes/CAB/HCUT; "+EQ" = chain KDFX TONE after it |
@@ -47,14 +47,14 @@ defines it but our engine does not implement it yet (never list those — rule 3
 | KDFX LASER | LaserVerb 911–913 (Mono/Lite/full) | Widening-spaces impulse train: TIME 0–2 S, SPAC 0–40 SMP, CONT (0=delay, 34%=reverse), FDBK to 100% |
 | CHO+DLY / CHO+REV | 700 / 703–704 class combinations | Generic pair engine; Mod* trio for the chorus half; CFG where the manual's <> allows |
 | KDFX RESFILT / ENVFILT / LFOSWP | 903 / 900 / 902 | TPT SVF bank: TYPE LP/HP/BP/NOTCH, RES 0-50 DB (self-ring only at top); ENVFILT adds MINF + bipolar SWEEP + ATK/REL 0-300 DB/S; LFOSWP adds BPM+beats LFO (FIX/SYS clock via per-block tempo push), MIN/MAX limits (inverting allowed), 5 shapes + width + smoothing |
-| KDFX RINGMOD | 907 | MODE L*R (only LEFT passes dry) / OSC: Osc1 shape+width+smooth + 4 sines, each Lvl + Freq 16-25088 HZ; one generic setRmOsc(osc, which, v) virtual |
+| KDFX RINGMOD | 907 | MODE L*R (only LEFT passes dry) / OSC: Osc1 shape+width+smooth (incl. Expon per the reference) + 4 sines, each Lvl + Freq 16-25088 HZ; one generic setRmOsc(osc, which, v) virtual |
 | KDFX QUANT / QNT+FLG | (714 partner / 714) | DYN 0-144 DB (31-bit cap = transparent top), HEAD 0-144 DB, DC Off/-79-0 DB; QNT+FLG fixed-order pair |
 | SPEC 4-TAP | 135 Spectral Multitap (4-tap) | Loop + FDBK + Fdbk Image + feedback HPF/TONE; per-tap comb (P1-P4, Chamberlin resonator, unity peak), PtAmt (A1-A4), Shapr (S1-S4), tap fractions (T1-T4) |
 | FLG+DLY / FLG+REV / FLG+LASER | 706 / 710 / 711 | Pair engine, fixed order (manual "+") |
 | SHPR+REV | 718 Shaper<>Reverb | Pair engine; tone drive/EQ + full reverb suite; CFG. The EQ/shaper routes to the primary half exist now (the SHPR/BASS/MID/TRBL columns used to be dead) |
 | REV<>COMP | 719 Reverb<>Compress | Pair engine (reverb + stock compressor half via the Mod* trio: THRSH/RATIO/ATK); CFG RVB>CMP / CMP>RVB |
 | TUBAMP<>FLG | 730 TubeAmp<>MD>Flan (our pair: TubeAmp<>Flan) | Pair engine; tubeamp drive/mode/LOCUT/CAB/HCUT + flanger Mod* trio; CFG TUB>FLG / FLG>TUB |
-| PTCHR | 908 Pitcher | Tuned harmonic resonator bank per docs/pitcher_bloc_spec.md: PITCH C-1..G9 (MIDI note), PTCH-OFF ±12 ST (FXMod target), ODD/PAIR/QTR/HALF drawbar weights; 16 Chamberlin resonators, unity peak, Q≈25, per-block tuning |
+| PTCHR | 908 Pitcher | Tuned harmonic resonator bank per docs/pitcher_bloc_spec.md: PITCH C-1..G9 (MIDI note), PTCH-OFF ±12 ST (FXMod target), ODD/PAIR/QTR/HALF drawbar weights (bipolar ±100% — negative phase-inverts the group, per the Algorithm Reference); 16 Chamberlin resonators, unity peak, Q≈25, per-block tuning, peaks carried to ~0.42·sr |
 | FLG<>PTCHR | 712 Flange<>Pitcher | Pair engine; pitcher leads, flanger rides the Mod* trio; CFG PT>FLG / FLG>PT |
 | MNPTCHR+CHO / MNPTCHR+FLN | 720 / 721 MonoPitcher+Chor / +Flan | Pair engine, fixed order (our pitcher runs stereo in the pair — the manual's "Mono" is a PAU saver we don't need) |
 | PTCHR+CHO+DLY / PTCHR+FLN+DLY | 722 / 723 Pitcher+Chor+Dly / Pitcher+Flan+Dly | KdfxPitcherTriple: pitcher → modulated half → delay, fixed order; TIME/FDBK/TONE/XFEED/HPF/PHASE on the delay half |

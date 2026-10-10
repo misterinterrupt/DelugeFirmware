@@ -68,11 +68,15 @@ public:
 	[[nodiscard]] float getDecay() const override { return depth_val_; }
 
 	void setDamping(float value) override {
-		// Cascade feedback 0..0.7
-		feedback_val_ = std::clamp(value, 0.0f, 1.0f) * 0.7f;
+		// Bipolar cascade feedback ±0.95 (reference FXAlgs #156-160: Fdbk Level
+		// -100..100%). An allpass is unity-gain at every frequency, so loop gain
+		// is exactly |feedback| even for fully-correlated content — negative
+		// settings flip regenerative/degenerative, the same ±95 house scale as
+		// the chorus and flanger.
+		feedback_val_ = std::clamp((value - 0.5f) * 1.90f, -0.95f, 0.95f);
 		feedbackQ31_ = static_cast<q31_t>(feedback_val_ * ONE_Q31f);
 	}
-	[[nodiscard]] float getDamping() const override { return feedback_val_ / 0.7f; }
+	[[nodiscard]] float getDamping() const override { return (feedback_val_ / 1.90f) + 0.5f; }
 
 	void setDiffusion(float value) override {
 		spread_val_ = value;

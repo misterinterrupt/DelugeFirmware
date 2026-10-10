@@ -192,6 +192,14 @@ inline float oscWave(int32_t shape, uint32_t phase, float plsw, float smooth) {
 	case 4: // Tri
 		w = 1.0f - 4.0f * std::fabs(p - 0.5f);
 		break;
+	case 5: { // Expon (ringmod Osc1 only): convex exponential rise from 0 to a
+		// narrow sharp peak at the cycle end, wrapping straight back to 0 —
+		// "a waveform with narrow, sharp peaks which seems to rise exponentially
+		// from 0" (reference FXAlg #907).
+		constexpr float k = 6.9078f; // e^k - 1 = 999: three decades of rise
+		w = 2.0f * ((std::exp(k * p) - 1.0f) / (std::exp(k) - 1.0f)) - 1.0f;
+		break;
+	}
 	case 0:
 	default: // Sine
 		w = sine;

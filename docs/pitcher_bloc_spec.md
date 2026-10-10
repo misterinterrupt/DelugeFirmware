@@ -75,7 +75,8 @@ Harmonic H's weight combines its group memberships, drawbar-style:
 - `half(H)`  = H % 2 == 0 (the "half-series" 2f0, 4f0, ... subgroup bending)
 - `quarter(H)` = H % 4 == 0
 
-Starting point (tune against presets 914/915 by ear):
+Weights are bipolar (-100..100%; negative = phase-inverted group — see the
+correction above). Starting point (tune against presets 914/915 by ear):
 
 ```
 weight(H) = odd(H)  ? ODD_WT

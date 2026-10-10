@@ -59,7 +59,7 @@ public:
 	void setRmMode(int32_t v) override { mode_ = (v != 0) ? 1 : 0; }
 	[[nodiscard]] int32_t getRmMode() const override { return mode_; }
 
-	/// which: 0 lvl (0-1), 1 freq (0-1 log 16-25088), 2 shape (0-4), 3 pls width
+	/// which: 0 lvl (0-1), 1 freq (0-1 log 16-25088), 2 shape (0-5 incl Expon), 3 pls width
 	/// (0-1), 4 smooth (0-1). osc: 1..5.
 	void setRmOsc(int32_t osc, int32_t which, float v) override {
 		v = std::clamp(v, 0.0f, 1.0f);
@@ -70,7 +70,7 @@ public:
 			oscInc_[osc - 1] = static_cast<uint32_t>(
 			    (logHzFromT(v) / float(kSampleRate)) * 4294967296.0f);
 			break;
-		case 2: oscShape_[osc - 1] = std::clamp<int32_t>(static_cast<int32_t>(std::lround(v)), 0, 4); break;
+		case 2: oscShape_[osc - 1] = std::clamp<int32_t>(static_cast<int32_t>(std::lround(v)), 0, 5); break;
 		case 3: oscPls_[osc - 1] = v; break;
 		case 4: oscSmooth_[osc - 1] = v; break;
 		default: break;

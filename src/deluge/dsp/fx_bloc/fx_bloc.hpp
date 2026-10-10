@@ -301,6 +301,9 @@ public:
 	static constexpr const char* kFiltTypeStrings[] = {"12L-L", "24L-L", "12L", "24L", "24L-DR", "SVF-B", "SVF-N"};
 	static constexpr const char* kRmModeStrings[] = {"L*R", "OSC"};
 	static constexpr const char* kRmShapeStrings[] = {"SINE", "SAW+", "SAW-", "PULSE", "TRI"};
+	// Ringmod Osc1 adds Expon (reference FXAlg #907); the filter LFO keeps the
+	// manual's five shapes.
+	static constexpr const char* kRmShape1Strings[] = {"SINE", "SAW+", "SAW-", "PULSE", "TRI", "EXPN"};
 	static constexpr const char* kFiltClkStrings[] = {"FIX", "SYS"};
 	static constexpr const char* kBusOptionStrings[] = {"BUS 1", "BUS 2", "BUS 3"};
 
@@ -315,7 +318,7 @@ public:
 	static constexpr const char* const* kTubFlgCfgOptions() { return kTubFlgCfgStrings; }
 	static constexpr const char* const* kFiltTypeOptions() { return kFiltTypeStrings; }
 	static constexpr const char* const* kRmModeOptions() { return kRmModeStrings; }
-	static constexpr const char* const* kRmShapeOptions() { return kRmShapeStrings; }
+	static constexpr const char* const* kRmShapeOptions() { return kRmShape1Strings; }
 	static constexpr const char* const* kFiltClkOptions() { return kFiltClkStrings; }
 	static constexpr const char* const* kFiltShapeOptions() { return kRmShapeStrings; }
 	static constexpr const char* const* kBusOptions() { return kBusOptionStrings; }
@@ -1233,7 +1236,7 @@ constexpr FxBloc::ParamDef kDefsKdfxPhaser[8] = {
     FxBloc::INGAIN_DEF(),
     FxBloc::hz(FxBloc::Param::RoomSize, "RATE", 0.05f, 8.f),
     FxBloc::pct(FxBloc::Param::Decay, "DEPTH"),
-    {FxBloc::Param::Damping, "FDBK", false, 0, 1, nullptr, "%", 0.f, 70.f, 0, false},
+    FxBloc::bipolarPct(FxBloc::Param::Damping, "FDBK", 95.f),
     FxBloc::LEVEL_DEF(),
     {FxBloc::Param::Diffusion, "SPRD", false, 0, 1, nullptr, "DEG", 0.f, 180.f, 0, false},
     FxBloc::hz(FxBloc::Param::HPF, "HPF", 20.f, 1000.f, 0),
@@ -1429,7 +1432,7 @@ constexpr FxBloc::ParamDef kDefsKdfxRingMod[17] = {
     FxBloc::LEVEL_DEF(),
     FxBloc::pct(FxBloc::Param::RmO1Lvl, "O1LVL"),
     FxBloc::logHz(FxBloc::Param::RmO1Freq, "O1FRQ", 16.f, 25088.f, 0),
-    {FxBloc::Param::RmO1Shape, "O1SHP", true, 0, 4, FxBloc::kRmShapeOptions()},
+    {FxBloc::Param::RmO1Shape, "O1SHP", true, 0, 5, FxBloc::kRmShapeOptions()},
     FxBloc::pct(FxBloc::Param::RmO1Plsw, "O1PLS"),
     FxBloc::pct(FxBloc::Param::RmO1Smooth, "O1SMH"),
     FxBloc::pct(FxBloc::Param::RmO2Lvl, "S2LVL"),
@@ -1500,11 +1503,11 @@ constexpr FxBloc::ParamDef kDefsKdfxPitcher[8] = {
     FxBloc::INGAIN_DEF(),
     {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
     {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
-    FxBloc::pct(FxBloc::Param::TrebleGain, "ODD"),
-    FxBloc::pct(FxBloc::Param::TrebleFreq, "PAIR"),
+    FxBloc::bipolarPct(FxBloc::Param::TrebleGain, "ODD", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::TrebleFreq, "PAIR", 100.f),
     FxBloc::LEVEL_DEF(),
-    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
-    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+    FxBloc::bipolarPct(FxBloc::Param::AirShelf, "QTR", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::DelayTimeR, "HALF", 100.f),
 };
 /// 712 Flange<>Pitcher — pitcher leads (its natural ids), flanger rides the
 /// Mod* trio, CFG swaps the order.
@@ -1512,10 +1515,10 @@ constexpr FxBloc::ParamDef kDefsKdfxFlgPtchr[12] = {
     FxBloc::INGAIN_DEF(),
     {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
     {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
-    FxBloc::pct(FxBloc::Param::TrebleGain, "ODD"),
-    FxBloc::pct(FxBloc::Param::TrebleFreq, "PAIR"),
-    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
-    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+    FxBloc::bipolarPct(FxBloc::Param::TrebleGain, "ODD", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::TrebleFreq, "PAIR", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::AirShelf, "QTR", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::DelayTimeR, "HALF", 100.f),
     FxBloc::LEVEL_DEF(),
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
     FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
@@ -1528,11 +1531,11 @@ constexpr FxBloc::ParamDef kDefsKdfxPtchrCho[11] = {
     FxBloc::INGAIN_DEF(),
     {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
     {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
-    FxBloc::pct(FxBloc::Param::TrebleGain, "ODD"),
-    FxBloc::pct(FxBloc::Param::TrebleFreq, "PAIR"),
+    FxBloc::bipolarPct(FxBloc::Param::TrebleGain, "ODD", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::TrebleFreq, "PAIR", 100.f),
     FxBloc::LEVEL_DEF(),
-    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
-    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+    FxBloc::bipolarPct(FxBloc::Param::AirShelf, "QTR", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::DelayTimeR, "HALF", 100.f),
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 15.f),
     FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 10.f),
     FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
@@ -1541,11 +1544,11 @@ constexpr FxBloc::ParamDef kDefsKdfxPtchrFlan[11] = {
     FxBloc::INGAIN_DEF(),
     {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
     {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
-    FxBloc::pct(FxBloc::Param::TrebleGain, "ODD"),
-    FxBloc::pct(FxBloc::Param::TrebleFreq, "PAIR"),
+    FxBloc::bipolarPct(FxBloc::Param::TrebleGain, "ODD", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::TrebleFreq, "PAIR", 100.f),
     FxBloc::LEVEL_DEF(),
-    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
-    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+    FxBloc::bipolarPct(FxBloc::Param::AirShelf, "QTR", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::DelayTimeR, "HALF", 100.f),
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
     FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),
     FxBloc::bipolarPct(FxBloc::Param::ModFdbk, "MFDBK", 95.f),
@@ -1556,10 +1559,10 @@ constexpr FxBloc::ParamDef kDefsKdfxPtchrChoDly[17] = {
     FxBloc::INGAIN_DEF(),
     {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
     {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
-    FxBloc::pct(FxBloc::Param::BassGain, "ODD"),
-    FxBloc::pct(FxBloc::Param::BassFreq, "PAIR"),
-    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
-    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+    FxBloc::bipolarPct(FxBloc::Param::BassGain, "ODD", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::BassFreq, "PAIR", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::AirShelf, "QTR", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::DelayTimeR, "HALF", 100.f),
     FxBloc::LEVEL_DEF(),
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 15.f),
     FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 10.f),
@@ -1576,10 +1579,10 @@ constexpr FxBloc::ParamDef kDefsKdfxPtchrFlanDly[17] = {
     FxBloc::INGAIN_DEF(),
     {FxBloc::Param::RoomSize, "PITCH", false, 0, 1, nullptr, "NOTE", 0.f, 127.f, 0, false},
     {FxBloc::Param::Decay, "PTOFF", false, 0, 1, nullptr, "ST", 0.f, 12.f, 1, true},
-    FxBloc::pct(FxBloc::Param::BassGain, "ODD"),
-    FxBloc::pct(FxBloc::Param::BassFreq, "PAIR"),
-    FxBloc::pct(FxBloc::Param::AirShelf, "QTR"),
-    FxBloc::pct(FxBloc::Param::DelayTimeR, "HALF"),
+    FxBloc::bipolarPct(FxBloc::Param::BassGain, "ODD", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::BassFreq, "PAIR", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::AirShelf, "QTR", 100.f),
+    FxBloc::bipolarPct(FxBloc::Param::DelayTimeR, "HALF", 100.f),
     FxBloc::LEVEL_DEF(),
     FxBloc::hz(FxBloc::Param::ModRate, "MRATE", 0.05f, 8.f),
     FxBloc::ms(FxBloc::Param::ModDepth, "MDEP", 0.f, 3.f, 2),

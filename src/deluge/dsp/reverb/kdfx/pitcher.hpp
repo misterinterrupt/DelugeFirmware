@@ -7,6 +7,7 @@
  * drawbars Odd/Pair/Quartr/Half Wts, whose interaction shapes the response:
  *
  *   weight(H) = (H odd ? ODD : PAIR) x (H%4==0 ? QTR : 1) x (H%2==0 ? HALF : 1)
+ * (each -100..100%; negative = phase-inverted group)
  *
  * Engine: one bank of Chamberlin two-pole resonators per stereo channel (the
  * same resonator voice as the Spectral 4-Tap combs after the audibility fix),
@@ -75,14 +76,16 @@ public:
 	void setDecay(float v) override { offVal_ = std::clamp(v, 0.0f, 1.0f); }
 	[[nodiscard]] float getDecay() const override { return offVal_; }
 
-	// Drawbars, 0..100% (group weights combine per the header formula)
-	void setTrebleGain(float v) override { oddW_ = std::clamp(v, 0.0f, 1.0f); } // Odd Wts
+	// Drawbars, bipolar -100..100% (reference FXAlg #908: negative values
+	// phase-invert the group — the [100,-100,100,100]-class curves; FXMod on
+	// ODD morphs between them). Group weights combine per the header formula.
+	void setTrebleGain(float v) override { oddW_ = std::clamp(v, -1.0f, 1.0f); } // Odd Wts
 	[[nodiscard]] float getTrebleGain() const override { return oddW_; }
-	void setTrebleFreq(float v) override { pairW_ = std::clamp(v, 0.0f, 1.0f); } // Pair Wts
+	void setTrebleFreq(float v) override { pairW_ = std::clamp(v, -1.0f, 1.0f); } // Pair Wts
 	[[nodiscard]] float getTrebleFreq() const override { return pairW_; }
-	void setAirShelf(float v) override { qtrW_ = std::clamp(v, 0.0f, 1.0f); } // Quartr Wts
+	void setAirShelf(float v) override { qtrW_ = std::clamp(v, -1.0f, 1.0f); } // Quartr Wts
 	[[nodiscard]] float getAirShelf() const override { return qtrW_; }
-	void setDelayTimeR(float v) override { halfW_ = std::clamp(v, 0.0f, 1.0f); } // Half Wts
+	void setDelayTimeR(float v) override { halfW_ = std::clamp(v, -1.0f, 1.0f); } // Half Wts
 	[[nodiscard]] float getDelayTimeR() const override { return halfW_; }
 
 	/// The resonators ring well under a second after input stops (Q~25, but
@@ -98,7 +101,8 @@ private:
 	};
 
 	// Per-block tuning: f0 from PITCH + PTCH-OFF, then per-harmonic coefficients
-	// and drawbar weights. Harmonics at or above ~15.4 kHz (0.35 x sr) drop out.
+	// and drawbar weights. Harmonics at or above ~0.42 x sr (~18.5 kHz at 44.1k)
+	// drop out — the reference carries peaks "all the way up to 24 kHz".
 	void tune() {
 		float note = pitchVal_ * 127.0f + (offVal_ - 0.5f) * 24.0f; // ±12 st offset
 		float f0 = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
@@ -112,12 +116,12 @@ private:
 				weight *= halfW_;
 			}
 			float fc = f0 * static_cast<float>(n);
-			if (fc > float(kSampleRate) * 0.35f) {
+			if (fc > float(kSampleRate) * 0.42f) {
 				weight = 0.0f; // harmonic above the tuned band — drop it
 			}
 			gainQ31_[h] = static_cast<q31_t>(weight * ONE_Q31f);
 			// Chamberlin: f = 2 sin(pi fc/sr), damp = 1/Q held at >= f/2 for stability
-			float f = std::clamp(2.0f * std::sin(3.14159265f * fc / float(kSampleRate)), 0.0f, 1.5f);
+			float f = std::clamp(2.0f * std::sin(3.14159265f * fc / float(kSampleRate)), 0.0f, 1.9f);
 			float damp = std::max(1.0f / kQ, f * 0.5f);
 			f_[h] = static_cast<q31_t>(f * ONE_Q31f);
 			damp_[h] = static_cast<q31_t>(damp * ONE_Q31f);
