@@ -397,9 +397,15 @@ private:
 		}
 		return s;
 	}
-	static float dispMin(const dsp::FxBloc::ParamDef& d) { return d.bipolar ? -d.realMax : d.realMin; }
+	// The fine-value space always runs ascending from the range's true minimum, even for
+	// params defined with a descending range (e.g. THRSH 0..-48 dB): Integer's
+	// min/max and std::clamp require maxValue >= minValue, or the knob collapses to the
+	// two range endpoints (device bug: "threshold only changes to two values").
+	static float dispMin(const dsp::FxBloc::ParamDef& d) {
+		return d.bipolar ? -d.realMax : std::min(d.realMin, d.realMax);
+	}
 	static float spanSteps(const dsp::FxBloc::ParamDef& d) {
-		float span = d.bipolar ? 2.0f * d.realMax : d.realMax - d.realMin;
+		float span = d.bipolar ? 2.0f * d.realMax : std::abs(d.realMax - d.realMin);
 		return span / stepOf(d);
 	}
 
