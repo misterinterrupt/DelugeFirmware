@@ -70,19 +70,15 @@ using namespace gui;
 using namespace deluge::modulation::params;
 
 // Performance View constants
-constexpr int32_t kNumParamsForPerformance = 3;
+constexpr int32_t kNumParamsForPerformance = 1;
 
 // list of parameters available for assignment to FX columns in performance view
 constexpr std::array<ParamsForPerformance, kNumParamsForPerformance> songParamsForPerformance = {{
 
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_SAMPLE_RATE_REDUCTION, 6, 5, colours::magenta, colours::magenta.forTail()},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_BITCRUSHING, 6, 6, colours::magenta, colours::magenta.forTail()},
     {Kind::UNPATCHED_GLOBAL, UNPATCHED_STUTTER_RATE, 5, 7, colours::blue, colours::blue.forTail()},
 }};
 
 constexpr std::array<ParamsForPerformance, kDisplayWidth> defaultLayoutForPerformance = {{
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_SAMPLE_RATE_REDUCTION, 6, 5, colours::magenta, colours::magenta.forTail()},
-    {Kind::UNPATCHED_GLOBAL, UNPATCHED_BITCRUSHING, 6, 6, colours::magenta, colours::magenta.forTail()},
     {Kind::UNPATCHED_GLOBAL, UNPATCHED_STUTTER_RATE, 5, 7, colours::blue, colours::blue.forTail()},
 }};
 
@@ -121,7 +117,7 @@ constexpr uint32_t paramIDShortcutsForPerformanceView[kDisplayWidth][kDisplayHei
     {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID},
     {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID},
     {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, UNPATCHED_STUTTER_RATE},
-    {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, UNPATCHED_SAMPLE_RATE_REDUCTION, UNPATCHED_BITCRUSHING,
+    {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID,
      kNoParamID},
     {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID},
     {kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID, kNoParamID},

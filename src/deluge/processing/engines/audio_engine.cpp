@@ -845,8 +845,6 @@ void renderSongFX(size_t numSamples) { // LPF and stutter for song (must happen 
 	// 167763968 is 134217728 made a bit bigger so that default filter resonance doesn't reduce volume overall
 
 	if (currentSong) {
-		currentSong->globalEffectable.processSRRAndBitcrushing(renderingBuffer.data(), numSamples,
-		                                                       &masterVolumeAdjustmentL, &currentSong->paramManager);
 
 		masterVolumeAdjustmentR = masterVolumeAdjustmentL; // This might have changed in the above function calls
 

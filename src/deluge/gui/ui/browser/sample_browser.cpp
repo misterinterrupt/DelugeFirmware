@@ -993,12 +993,12 @@ doLoadAsSample:
 			int32_t p = params::LOCAL_OSC_A_WAVE_INDEX + soundEditor.currentSourceIndex;
 			if (soundEditor.currentSound->modKnobs[7][0].paramDescriptor.getJustTheParam() == p) {
 				soundEditor.currentSound->modKnobs[7][0].paramDescriptor.setToHaveParamOnly(
-				    params::UNPATCHED_BITCRUSHING + params::UNPATCHED_START);
+				    params::UNPATCHED_COMPRESSOR_BLEND + params::UNPATCHED_START);
 				anyChange = true;
 			}
 			if (soundEditor.currentSound->modKnobs[7][1].paramDescriptor.getJustTheParam() == p) {
 				soundEditor.currentSound->modKnobs[7][1].paramDescriptor.setToHaveParamOnly(
-				    params::UNPATCHED_SAMPLE_RATE_REDUCTION + params::UNPATCHED_START);
+				    params::UNPATCHED_STUTTER_RATE + params::UNPATCHED_START);
 				anyChange = true;
 			}
 

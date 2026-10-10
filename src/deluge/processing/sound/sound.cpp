@@ -2247,7 +2247,6 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, StereoSample* outp
 		postReverbVolumeLastTime = postReverbVolume;
 	}
 
-	processSRRAndBitcrushing((StereoSample*)soundBuffer, numSamples, &postFXVolume, paramManager);
 	processStutter((StereoSample*)soundBuffer, numSamples, paramManager);
 
 	processOutputVolume((StereoSample*)soundBuffer, numSamples, postFXVolume, postReverbVolume, 0, true);

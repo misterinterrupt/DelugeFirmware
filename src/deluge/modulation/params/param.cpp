@@ -184,8 +184,6 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 	if ((kind == Kind::UNPATCHED_SOUND || kind == Kind::UNPATCHED_GLOBAL) && p < (UNPATCHED_NUM_SHARED)) {
 		static l10n::String const NAMES[UNPATCHED_NUM_SHARED] = {
 		    [UNPATCHED_STUTTER_RATE] = STRING_FOR_STUTTER_RATE,
-		    [UNPATCHED_SAMPLE_RATE_REDUCTION] = STRING_FOR_DECIMATION,
-		    [UNPATCHED_BITCRUSHING] = STRING_FOR_BITCRUSH,
 		    [UNPATCHED_SIDECHAIN_SHAPE] = STRING_FOR_SIDECHAIN_SHAPE,
 		    [UNPATCHED_COMPRESSOR_THRESHOLD] = STRING_FOR_THRESHOLD,
 		    [UNPATCHED_COMPRESSOR_RATIO] = STRING_FOR_RATIO,
@@ -296,8 +294,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 		case UNPATCHED_PAN:
 			return "pan";
 
-
-
 		case UNPATCHED_VOLUME:
 			return "volume";
 
@@ -316,18 +312,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 		switch (static_cast<UnpatchedShared>(param - UNPATCHED_START)) {
 		case UNPATCHED_STUTTER_RATE:
 			return "stutterRate";
-
-
-
-
-
-		case UNPATCHED_SAMPLE_RATE_REDUCTION:
-			return "sampleRateReduction";
-
-		case UNPATCHED_BITCRUSHING:
-			return "bitcrushAmount";
-
-
 
 		case UNPATCHED_SIDECHAIN_SHAPE:
 			return "compressorShape";
@@ -370,8 +354,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 
 		case GLOBAL_VOLUME_POST_REVERB_SEND:
 			return "volumePostReverbSend";
-
-
 
 		case GLOBAL_ARP_RATE:
 			return "arpRate";

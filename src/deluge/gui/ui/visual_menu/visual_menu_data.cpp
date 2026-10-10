@@ -152,8 +152,6 @@ extern deluge::gui::menu_item::lfo::Type lfo2TypeMenu;
 
 
 extern deluge::gui::menu_item::fx::Clipping clippingMenu;
-extern deluge::gui::menu_item::UnpatchedParam bitcrushMenu;
-extern deluge::gui::menu_item::UnpatchedParam srrMenu;
 extern deluge::gui::menu_item::patched_param::Integer foldMenu;
 
 extern deluge::gui::menu_item::audio_compressor::Threshold compThreshold;
@@ -273,7 +271,7 @@ static const VisualPage synthLfoPages[] = {
 
 static const VisualPage synthFxPages[] = {
     {"Distortion", STRING_FOR_DISTORTION,
-     {{{&clippingMenu, "CLIP"}, {&bitcrushMenu, "DECIM"}, {&srrMenu, "CRUSH"}, {&foldMenu, "FOLD"}}}},
+     {{{&clippingMenu, "CLIP"}, {nullptr, ""}, {nullptr, ""}, {&foldMenu, "FOLD"}}}},
     {"Compressor 1", STRING_FOR_COMMUNITY_FEATURE_MASTER_COMPRESSOR,
      {{{&compThreshold, "THRESH"}, {&compRatio, "RATIO"}, {&compAttack, "ATK"}, {&compRelease, "REL"}}}},
     {"Compressor 2", STRING_FOR_COMMUNITY_FEATURE_MASTER_COMPRESSOR,
@@ -317,7 +315,7 @@ static const VisualPage audioClipMasterPages[] = {
 
 static const VisualPage audioClipFxPages[] = {
     {"Distortion", STRING_FOR_DISTORTION,
-     {{{&clippingMenu, "CLIP"}, {&bitcrushMenu, "DECIM"}, {&srrMenu, "CRUSH"}, {nullptr, ""}}}},
+     {{{&clippingMenu, "CLIP"}, {nullptr, ""}, {nullptr, ""}, {nullptr, ""}}}},
     {"Sidechain", STRING_FOR_SIDECHAIN,
      {{{&globalSidechainVolumeMenu, "VOL"}, {&sidechainAttackMenu, "ATK"}, {&sidechainReleaseMenu, "REL"}, {&sidechainSyncMenu, "SYNC"}}}},
 };

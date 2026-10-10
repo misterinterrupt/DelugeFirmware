@@ -51,7 +51,6 @@ ModControllableAudio::ModControllableAudio() {
 	filterRoute = FilterRoute::HIGH_TO_LOW;
 
 	// Sample rate reduction
-	sampleRateReductionOnLastTime = false;
 
 	// Saturation
 	clippingAmount = 0;
@@ -89,10 +88,6 @@ void ModControllableAudio::initParams(ParamManager* paramManager) {
 	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
 
 	Stutterer::initParams(paramManager);
-
-	unpatchedParams->params[params::UNPATCHED_SAMPLE_RATE_REDUCTION].setCurrentValueBasicForSetup(-2147483648);
-
-	unpatchedParams->params[params::UNPATCHED_BITCRUSHING].setCurrentValueBasicForSetup(-2147483648);
 
 	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_SHAPE].setCurrentValueBasicForSetup(-601295438);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_THRESHOLD].setCurrentValueBasicForSetup(0);
@@ -151,116 +146,6 @@ void ModControllableAudio::processOutputVolume(StereoSample* buffer, int32_t num
 	} while (++inputSample != bufferEnd);
 
 	postReverbVolumeLastTime = postReverbVolume;
-}
-
-bool ModControllableAudio::isBitcrushingEnabled(ParamManager* paramManager) {
-	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
-	return (unpatchedParams->getValue(params::UNPATCHED_BITCRUSHING) >= -2113929216);
-}
-
-bool ModControllableAudio::isSRREnabled(ParamManager* paramManager) {
-	UnpatchedParamSet* unpatchedParams = paramManager->getUnpatchedParamSet();
-	return (unpatchedParams->getValue(params::UNPATCHED_SAMPLE_RATE_REDUCTION) != -2147483648);
-}
-
-void ModControllableAudio::processSRRAndBitcrushing(StereoSample* buffer, int32_t numSamples, int32_t* postFXVolume,
-                                                    ParamManager* paramManager) {
-	StereoSample const* const bufferEnd = buffer + numSamples;
-
-	uint32_t bitCrushMaskForSRR = 0xFFFFFFFF;
-
-	bool srrEnabled = isSRREnabled(paramManager);
-
-	// Bitcrushing ------------------------------------------------------------------------------
-	if (isBitcrushingEnabled(paramManager)) {
-		uint32_t positivePreset =
-		    (paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_BITCRUSHING) + 2147483648) >> 29;
-		if (positivePreset > 4) {
-			*postFXVolume >>= (positivePreset - 4);
-		}
-
-		// If not also doing SRR
-		if (!srrEnabled) {
-			uint32_t mask = 0xFFFFFFFF << (19 + (positivePreset));
-			StereoSample* __restrict__ currentSample = buffer;
-			do {
-				currentSample->l &= mask;
-				currentSample->r &= mask;
-			} while (++currentSample != bufferEnd);
-		}
-
-		else {
-			bitCrushMaskForSRR = 0xFFFFFFFF << (18 + (positivePreset));
-		}
-	}
-
-	// Sample rate reduction -------------------------------------------------------------------------------------
-	if (srrEnabled) {
-
-		// Set up for first time
-		if (!sampleRateReductionOnLastTime) {
-			sampleRateReductionOnLastTime = true;
-			lastSample.l = lastSample.r = 0;
-			grabbedSample.l = grabbedSample.r = 0;
-			lowSampleRatePos = 0;
-		}
-
-		// This function, slightly unusually, uses 22 bits to represent "1". That's 4194304. I tried using 24, but stuff
-		// started clipping off where I needed it if sample rate too low
-
-		uint32_t positivePreset =
-		    paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_SAMPLE_RATE_REDUCTION) + 2147483648;
-		int32_t lowSampleRateIncrement = getExp(4194304, (positivePreset >> 3));
-		int32_t highSampleRateIncrement = ((uint32_t)0xFFFFFFFF / (lowSampleRateIncrement >> 6)) << 6;
-		// int32_t highSampleRateIncrement = getExp(4194304, -(int32_t)(positivePreset >> 3)); // This would work too
-
-		StereoSample* currentSample = buffer;
-		do {
-
-			// Convert down.
-			// If time to "grab" another sample for down-conversion...
-			if (lowSampleRatePos < 4194304) {
-				int32_t strength2 = lowSampleRatePos;
-				int32_t strength1 = 4194303 - strength2;
-
-				lastGrabbedSample = grabbedSample; // What was current is now last
-				grabbedSample.l = multiply_32x32_rshift32_rounded(lastSample.l, strength1 << 9)
-				                  + multiply_32x32_rshift32_rounded(currentSample->l, strength2 << 9);
-				grabbedSample.r = multiply_32x32_rshift32_rounded(lastSample.r, strength1 << 9)
-				                  + multiply_32x32_rshift32_rounded(currentSample->r, strength2 << 9);
-				grabbedSample.l &= bitCrushMaskForSRR;
-				grabbedSample.r &= bitCrushMaskForSRR;
-
-				// Set the "time" at which we want to "grab" our next sample for down-conversion.
-				lowSampleRatePos += lowSampleRateIncrement;
-
-				// "Re-sync" the up-conversion spinner.
-				// I previously had it using strength2 instead of "lowSampleRatePos & 16777215", but that just works
-				// better. Ah, writing the massive explanation would take ages.
-				highSampleRatePos =
-				    multiply_32x32_rshift32_rounded(lowSampleRatePos & 4194303, highSampleRateIncrement << 8) << 2;
-			}
-			lowSampleRatePos -= 4194304; // We're one step closer to grabbing our next sample for down-conversion
-			lastSample = *currentSample;
-
-			// Convert up
-			int32_t strength2 =
-			    std::min(highSampleRatePos,
-			             (uint32_t)4194303); // Would only overshoot if we raised the sample rate during playback
-			int32_t strength1 = 4194303 - strength2;
-			currentSample->l = (multiply_32x32_rshift32_rounded(lastGrabbedSample.l, strength1 << 9)
-			                    + multiply_32x32_rshift32_rounded(grabbedSample.l, strength2 << 9))
-			                   << 2;
-			currentSample->r = (multiply_32x32_rshift32_rounded(lastGrabbedSample.r, strength1 << 9)
-			                    + multiply_32x32_rshift32_rounded(grabbedSample.r, strength2 << 9))
-			                   << 2;
-
-			highSampleRatePos += highSampleRateIncrement;
-		} while (++currentSample != bufferEnd);
-	}
-	else {
-		sampleRateReductionOnLastTime = false;
-	}
 }
 
 void ModControllableAudio::writeAttributesToFile(Serializer& writer) {
@@ -381,10 +266,6 @@ void ModControllableAudio::writeParamAttributesToFile(Serializer& writer, ParamM
 
 	unpatchedParams->writeParamAsAttribute(writer, "stutterRate", params::UNPATCHED_STUTTER_RATE, writeAutomation,
 	                                       false, valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "sampleRateReduction", params::UNPATCHED_SAMPLE_RATE_REDUCTION,
-	                                       writeAutomation, false, valuesForOverride);
-	unpatchedParams->writeParamAsAttribute(writer, "bitCrush", params::UNPATCHED_BITCRUSHING, writeAutomation, false,
-	                                       valuesForOverride);
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
 	unpatchedParams->writeParamAsAttribute(writer, "compressorThreshold", params::UNPATCHED_COMPRESSOR_THRESHOLD,
 	                                       writeAutomation, false, valuesForOverride);
@@ -418,18 +299,6 @@ bool ModControllableAudio::readParamTagFromFile(Deserializer& reader, char const
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_STUTTER_RATE,
 		                           readAutomationUpToPos);
 		reader.exitTag("stutterRate");
-	}
-
-	else if (!strcmp(tagName, "sampleRateReduction")) {
-		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_SAMPLE_RATE_REDUCTION,
-		                           readAutomationUpToPos);
-		reader.exitTag("sampleRateReduction");
-	}
-
-	else if (!strcmp(tagName, "bitCrush")) {
-		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_BITCRUSHING,
-		                           readAutomationUpToPos);
-		reader.exitTag("bitCrush");
 	}
 
 	else {

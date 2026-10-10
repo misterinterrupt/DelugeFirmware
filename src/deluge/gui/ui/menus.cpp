@@ -321,16 +321,12 @@ submenu::Sidechain sidechainMenu{
 
 fx::Clipping clippingMenu{STRING_FOR_SATURATION};
 fx::WithinEnv fxWithinEnvMenu{l10n::String::STRING_FOR_FX_ENVELOPE};
-UnpatchedParam srrMenu{STRING_FOR_DECIMATION, params::UNPATCHED_SAMPLE_RATE_REDUCTION};
-UnpatchedParam bitcrushMenu{STRING_FOR_BITCRUSH, params::UNPATCHED_BITCRUSHING};
 patched_param::Integer foldMenu{STRING_FOR_WAVEFOLD, STRING_FOR_WAVEFOLD, params::LOCAL_FOLD};
 
 Submenu soundDistortionMenu{
     STRING_FOR_DISTORTION,
     {
         &clippingMenu,
-        &srrMenu,
-        &bitcrushMenu,
         &foldMenu,
     },
 };
@@ -380,8 +376,6 @@ Submenu kitClipMasterMenu{
 Submenu globalDistortionMenu{
     STRING_FOR_DISTORTION,
     {
-        &srrMenu,
-        &bitcrushMenu,
     },
 };
 
@@ -442,8 +436,6 @@ Submenu audioClipDistortionMenu{
     STRING_FOR_DISTORTION,
     {
         &clippingMenu,
-        &srrMenu,
-        &bitcrushMenu,
     },
 };
 
@@ -1098,7 +1090,7 @@ MenuItem* paramShortcutsForSounds[][8] = {
     {&sourceVolumeMenu,       &sourceTransposeMenu,    &oscTypeMenu,                   &pulseWidthMenu,                &oscPhaseMenu,        &sourceFeedbackMenu,    &sourceWaveIndexMenu,     &oscSyncMenu                       },
     {&modulatorVolume,        &modulatorTransposeMenu, comingSoonMenu,                 comingSoonMenu,                 &modulatorPhaseMenu,  &modulatorFeedbackMenu, comingSoonMenu,           &sequenceDirectionMenu             },
     {&modulatorVolume,        &modulatorTransposeMenu, comingSoonMenu,                 comingSoonMenu,                 &modulatorPhaseMenu,  &modulatorFeedbackMenu, &modulatorDestMenu,       nullptr                            },
-    {&volumeMenu,             &masterTransposeMenu,    &vibratoMenu,                   &panMenu,                       &synthModeMenu,       &srrMenu,               &bitcrushMenu,            &clippingMenu                      },
+    {&volumeMenu,             &masterTransposeMenu,    &vibratoMenu,                   &panMenu,                       &synthModeMenu,       nullptr,                nullptr,            &clippingMenu                      },
     {&portaMenu,              &polyphonyMenu,          &priorityMenu,                  &unisonDetuneMenu,              &numUnisonToStereoSpreadMenu,       nullptr,  nullptr,                  &foldMenu                          },
     {&envReleaseMenu,         &envSustainMenu,         &envDecayMenu,                  &envAttackMenu,                 &lpfMorphMenu,        &lpfModeMenu,           &lpfResMenu,              &lpfFreqMenu                       },
     {&envReleaseMenu,         &envSustainMenu,         &envDecayMenu,                  &envAttackMenu,                 &hpfMorphMenu,        &hpfModeMenu,           &hpfResMenu,              &hpfFreqMenu                       },
@@ -1116,7 +1108,7 @@ MenuItem* paramShortcutsForAudioClips[][8] = {
     {nullptr,     	  		  nullptr, 				   nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
-    {&globalLevelMenu,     	  &audioClipTransposeMenu, nullptr,                        &globalPanMenu,                 nullptr,              &srrMenu,               &bitcrushMenu,            &clippingMenu                      },
+    {&globalLevelMenu,     	  &audioClipTransposeMenu, nullptr,                        &globalPanMenu,                 nullptr,              nullptr,                nullptr,            &clippingMenu                      },
     {nullptr,                 nullptr,                 &priorityMenu,                  nullptr,                        nullptr,              nullptr,                nullptr,                  comingSoonMenu                     },
     {nullptr,                 nullptr,                 nullptr,                        &audioClipAttackMenu,           nullptr,  &lpfModeMenu,           nullptr,        nullptr              	  },
     {nullptr,                 nullptr,                 nullptr,                        &audioClipAttackMenu,           nullptr,  &hpfModeMenu,           nullptr,        nullptr                 },
@@ -1134,7 +1126,7 @@ MenuItem* paramShortcutsForSongView[][8] = {
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  &globalStutterRateMenu             },
-    {&globalLevelMenu,        nullptr,                 nullptr,                        &globalPanMenu,                 nullptr,              &srrMenu,               &bitcrushMenu,            nullptr                            },
+    {&globalLevelMenu,        nullptr,                 nullptr,                        &globalPanMenu,                 nullptr,              nullptr,                nullptr,            nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,  &lpfModeMenu,           nullptr,        nullptr                 },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,  &hpfModeMenu,           nullptr,        nullptr                 },
@@ -1152,7 +1144,7 @@ MenuItem* paramShortcutsForKitGlobalFX[][8] = {
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr             				  },
-    {&globalLevelMenu,        &globalPitchMenu,        nullptr,                        &globalPanMenu,                 nullptr,              &srrMenu,               &bitcrushMenu,            nullptr                            },
+    {&globalLevelMenu,        &globalPitchMenu,        nullptr,                        &globalPanMenu,                 nullptr,              nullptr,                nullptr,            nullptr                            },
     {nullptr,              	  nullptr,                 nullptr,                        nullptr,                        nullptr,              nullptr,                nullptr,                  nullptr                            },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,  &lpfModeMenu,           nullptr,        nullptr                 },
     {nullptr,                 nullptr,                 nullptr,                        nullptr,                        nullptr,  &hpfModeMenu,           nullptr,        nullptr                 },

@@ -69,8 +69,6 @@ public:
 	void writeTagsToFile(Serializer& writer);
 	Error readTagFromFile(Deserializer& reader, char const* tagName, ParamManagerForTimeline* paramManager,
 	                      int32_t readAutomationUpToPos, Song* song);
-	void processSRRAndBitcrushing(StereoSample* buffer, int32_t numSamples, int32_t* postFXVolume,
-	                              ParamManager* paramManager);
 	static void writeParamAttributesToFile(Serializer& writer, ParamManager* paramManager, bool writeAutomation,
 	                                       int32_t* valuesForOverride = NULL);
 	static void writeParamTagsToFile(Serializer& writer, ParamManager* paramManager, bool writeAutomation,
@@ -104,7 +102,6 @@ public:
 
 
 
-	bool sampleRateReductionOnLastTime;
 	uint8_t clippingAmount; // Song probably doesn't currently use this?
 	FilterMode lpfMode;
 	FilterMode hpfMode;
