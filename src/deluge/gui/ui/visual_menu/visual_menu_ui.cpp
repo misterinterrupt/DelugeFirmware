@@ -402,11 +402,7 @@ bool VisualMenuUI::openForClip(Clip* clip, const MenuItem* targetItem) {
 		}
 	}
 
-	if (!openUI(this)) {
-		display->displayPopup("MENU OPEN FAIL");
-		return false;
-	}
-	return true;
+	return openUI(this);
 }
 
 void VisualMenuUI::applySourceIndexForCurrentPage() {
@@ -473,10 +469,6 @@ ActionResult VisualMenuUI::buttonAction(deluge::hid::Button b, bool on, bool inC
 			// Slot press re-syncs the item's cached value (below), which reads through the
 			// soundEditor context — validate it first.
 			if (!refreshEditContext()) {
-				// A dropped slot press strands selection at -1 and later select-encoder
-				// turns silently fall through to page navigation (reported as "turning
-				// the knob just navigates"). Name it instead.
-				display->displayPopup("SLOT CTX FAIL");
 				return ActionResult::DEALT_WITH;
 			}
 			bool switchingSlot = (selectedSlot_ != slotPressed);
@@ -656,9 +648,6 @@ void VisualMenuUI::selectEncoderAction(int8_t offset) {
 	}
 
 	if (currentUIMode != UI_MODE_NONE && currentUIMode != UI_MODE_AUDITIONING) {
-		char why[28];
-		snprintf_(why, sizeof(why), "MODE BLOCK %d", (int)currentUIMode);
-		display->displayPopup(why);
 		return;
 	}
 
@@ -710,14 +699,6 @@ void VisualMenuUI::selectEncoderAction(int8_t offset) {
 				renderUIsForOled();
 				return;
 			}
-		}
-		// A slot IS selected/held but the edit branch didn't run (empty slot cell,
-		// item null, or a stock item with shift held). Falling through to navigation
-		// here reads as "the knob just navigates instead of editing" — say which.
-		if (activeSlot >= 0) {
-			char why[24];
-			snprintf_(why, sizeof(why), "SLOT SKIP %d", (int)activeSlot);
-			display->displayPopup(why);
 		}
 	}
 
