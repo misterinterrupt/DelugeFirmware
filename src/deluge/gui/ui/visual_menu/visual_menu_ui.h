@@ -97,6 +97,11 @@ private:
 	// before an item reads or writes a param.
 	Drum* contextDrum_ = nullptr;
 	bool contextAffectEntire_ = false;
+	// True when the menu is bound to the kit as a whole (affect-entire, or the no-drum
+	// fallback). Such a context is drum-independent by definition — refreshEditContext()
+	// must not treat a row selected mid-session as drift, or the re-derive rebinds the
+	// live menu to that drum and drops the slot selection on every interaction.
+	bool contextKitGlobalFX_ = false;
 
 	void applySourceIndexForCurrentPage();
 

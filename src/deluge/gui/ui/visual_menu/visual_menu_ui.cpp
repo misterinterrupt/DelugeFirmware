@@ -302,6 +302,7 @@ bool VisualMenuUI::setupEditContext(Clip* clip, const MenuItem* item) {
 	// Capture the context signature so drift is detectable by refreshEditContext().
 	contextDrum_ = nullptr;
 	contextAffectEntire_ = false;
+	contextKitGlobalFX_ = kitGlobalFX;
 	if (contextIsClipMinder_ && clip && clip->type == ClipType::INSTRUMENT) {
 		auto* instClip = static_cast<InstrumentClip*>(clip);
 		contextAffectEntire_ = instClip->affectEntire;
@@ -340,12 +341,20 @@ bool VisualMenuUI::refreshEditContext() {
 			if (instClip->affectEntire != contextAffectEntire_) {
 				drifted = true;
 			}
-			Drum* drum = nullptr;
-			if (instClip->output && instClip->output->type == OutputType::KIT) {
-				drum = static_cast<Kit*>(instClip->output)->selectedDrum;
-			}
-			if (drum != contextDrum_) {
-				drifted = true;
+			// Only a per-drum context follows row selection. A kit-global context
+			// (affect-entire, or the no-drum fallback) edits the kit regardless of which
+			// row is selected, so a drum press mid-session is not drift — treating it as
+			// such re-derived on every interaction, rebound the menu to the pressed
+			// drum, and dropped the slot selection ("kit FX edit one sound instead of
+			// the kit"; "slot edits fall through to page nav").
+			if (!contextKitGlobalFX_) {
+				Drum* drum = nullptr;
+				if (instClip->output && instClip->output->type == OutputType::KIT) {
+					drum = static_cast<Kit*>(instClip->output)->selectedDrum;
+				}
+				if (drum != contextDrum_) {
+					drifted = true;
+				}
 			}
 		}
 		if (!drifted) {
