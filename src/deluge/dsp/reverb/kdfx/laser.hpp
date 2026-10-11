@@ -126,7 +126,7 @@ private:
 	/// Q31 tap gain for tap n from the contour shape.
 	q31_t tapGain(int32_t n) const {
 		if (n <= 0) {
-			return ONE_Q31f;
+			return ONE_Q31;
 		}
 		float base;
 		if (contour_val_ >= kReversePoint) {

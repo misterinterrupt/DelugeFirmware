@@ -210,7 +210,7 @@ private:
 	q31_t trebleGainQ31_ = 0;
 
 	q31_t outLevel_ = static_cast<q31_t>(0.8f * ONE_Q31f);
-	q31_t normGain_ = ONE_Q31f; // 1/drive, applied at the output
+	q31_t normGain_ = ONE_Q31; // 1/drive, applied at the output
 
 	q31_t bassL_ = 0;
 	q31_t midLpL_ = 0, midHpL_ = 0;
